@@ -1,0 +1,40 @@
+name: 校验贡献数据边界
+
+on:
+  pull_request:
+    paths:
+      - 'public/bank/community-contributions-v1.json'
+      - 'shared/**'
+      - 'worker/**'
+      - 'scripts/normalize-community-bank.mjs'
+      - 'scripts/prepare-review-batch.mjs'
+      - 'scripts/test-contribution-pipeline.mjs'
+  push:
+    branches:
+      - main
+    paths:
+      - 'public/bank/community-contributions-v1.json'
+      - 'shared/**'
+      - 'worker/**'
+      - 'scripts/normalize-community-bank.mjs'
+      - 'scripts/prepare-review-batch.mjs'
+      - 'scripts/test-contribution-pipeline.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出贡献契约
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: 校验白名单、哈希和审核流水线
+        run: node scripts/test-contribution-pipeline.mjs

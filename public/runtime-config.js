@@ -1,0 +1,1 @@
+window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ = '';

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { loadCurrentFormalModel } from './lib/load-formal-model.mjs';
 import {
   PHASES,
   calculatePriority,
@@ -6,7 +7,14 @@ import {
   reducer,
   sessionSummary,
 } from '../src/lib/engine.js';
-import { argumentsById, getRelevantDilemmas } from '../src/data/model.js';
+import {
+  argumentsById,
+  configureFormalModel,
+  getRelevantDilemmas,
+} from '../src/data/model.js';
+
+const { model } = await loadCurrentFormalModel();
+configureFormalModel(model);
 
 const act = (state, action) => reducer(state, action);
 

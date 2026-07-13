@@ -1,0 +1,17 @@
+{
+  "schema": "argument-chain-bank-manifest",
+  "version": 1,
+  "current": "0.5.0",
+  "models": [
+    {
+      "version": "0.5.0",
+      "path": "model-0.5.0.json"
+    }
+  ],
+  "extensions": [
+    {
+      "path": "community-contributions-v1.json",
+      "required": false
+    }
+  ]
+}

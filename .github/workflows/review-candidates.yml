@@ -1,0 +1,161 @@
+name: 生成候选论证审核 PR
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: candidate-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: 'true'
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - name: 检出正式题库
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: 选择持续更新的审核分支
+        id: review-branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="automation/candidate-review"
+          url="$(gh pr list --base main --head "$branch" --state open --json url --jq '.[0].url // ""')"
+          if [ -n "$url" ]; then
+            echo "has_open_pr=true" >> "$GITHUB_OUTPUT"
+          else
+            git fetch origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null || true
+            git switch -C "$branch"
+            echo "has_open_pr=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 检查 R2 配置
+        if: steps.review-branch.outputs.has_open_pr != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT_ID R2_BUCKET; do
+            if [ -z "${!name:-}" ]; then
+              echo "缺少必需的 GitHub Secret：${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: 从私有候选区读取待审核对象
+        if: steps.review-branch.outputs.has_open_pr != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/r2-candidates
+          aws s3api list-objects-v2 \
+            --bucket "$R2_BUCKET" \
+            --prefix "candidates/v1/" \
+            --max-items 25 \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --query 'Contents[].Key' \
+            --output json \
+            > .tmp/r2-object-keys.json
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const parsed = JSON.parse(readFileSync(".tmp/r2-object-keys.json", "utf8"));
+            const pattern = /^candidates\/v1\/[a-f0-9]{2}\/[a-f0-9]{64}\.json$/;
+            const keys = Array.isArray(parsed) ? parsed.filter((key) => pattern.test(key)) : [];
+            writeFileSync(".tmp/r2-object-keys.txt", keys.length ? `${keys.join("\n")}\n` : "");
+          '
+          while IFS= read -r key; do
+            [ -n "$key" ] || continue
+            destination=".tmp/r2-candidates/${key#candidates/v1/}"
+            mkdir -p "$(dirname "$destination")"
+            aws s3api get-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              "$destination" \
+              >/dev/null
+          done < .tmp/r2-object-keys.txt
+
+      - name: 校验、去重并生成正式扩展变更
+        id: prepare
+        if: steps.review-branch.outputs.has_open_pr != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/prepare-review-batch.mjs \
+            --input .tmp/r2-candidates \
+            --bank public/bank/community-contributions-v1.json \
+            --processed-keys .tmp/processed-keys.txt \
+            --rejected-keys .tmp/rejected-keys.txt \
+            --report .tmp/review-report.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: 删除未通过隐私或结构校验的对象
+        if: steps.prepare.outcome == 'success' && steps.prepare.outputs.rejected_count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r key; do
+            [ -n "$key" ] || continue
+            aws s3api delete-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              >/dev/null
+          done < .tmp/rejected-keys.txt
+
+      - name: 建立公开审核 PR
+        id: pull-request
+        if: steps.prepare.outcome == 'success' && steps.prepare.outputs.candidate_count != '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="automation/candidate-review"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/bank/community-contributions-v1.json
+          git commit -m "data: 添加待审核的匿名完整论证"
+          git push --force-with-lease --set-upstream origin "$branch"
+          url="$(gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "审核匿名贡献的完整论证" \
+            --body "本 PR 由定时任务生成，只包含用户明确同意公开、且通过结构校验、内容哈希、去重和敏感信息扫描的完整论证。请人工检查命题类型、推导相关性、措辞、政治平衡与题库复用；合并前不得把自动检查视为事实认证。")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: 删除已进入审核流程或已去重的对象
+        if: steps.prepare.outcome == 'success' && steps.prepare.outputs.processed_count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r key; do
+            [ -n "$key" ] || continue
+            aws s3api delete-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              >/dev/null
+          done < .tmp/processed-keys.txt

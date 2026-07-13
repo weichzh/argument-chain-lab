@@ -32,7 +32,16 @@ export const PHASES = Object.freeze({
 
 export const createInitialState = () => ({
   modelVersion: MODEL_META.version,
+  storageVersion: 4,
   phase: PHASES.LANDING,
+  entryPath: null,
+  sessionOverlay: {
+    facts: {},
+    claims: {},
+    arguments: {},
+    policies: [],
+    dilemmas: [],
+  },
   policyIndex: 0,
   records: {},
   currentChain: null,
@@ -330,7 +339,66 @@ const startDirection = (state, direction) => {
 export const reducer = (state, action) => {
   switch (action.type) {
     case 'START':
-      return startPolicy({ ...createInitialState(), startedAt: now() }, 0);
+      return startPolicy({ ...createInitialState(), entryPath: 'bank', startedAt: now() }, 0);
+
+    case 'START_AT_POLICY': {
+      const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
+      if (policyIndex < 0) return state;
+      return startPolicy(
+        {
+          ...createInitialState(),
+          entryPath: 'bank',
+          sessionOverlay: state.sessionOverlay,
+          startedAt: now(),
+        },
+        policyIndex,
+      );
+    }
+
+    case 'SET_SESSION_OVERLAY':
+      return {
+        ...state,
+        sessionOverlay: action.overlay,
+        updatedAt: now(),
+      };
+
+    case 'START_FROM_CANDIDATE': {
+      const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
+      if (policyIndex < 0) return state;
+      const initial = startPolicy(
+        {
+          ...createInitialState(),
+          entryPath: 'custom',
+          sessionOverlay: state.sessionOverlay,
+          startedAt: now(),
+        },
+        policyIndex,
+      );
+      const directed = startDirection(initial, action.direction);
+      const argument = argumentsById[action.argumentId];
+      if (!argument || argument.targetClaimId !== directed.currentTargetClaimId) return directed;
+      return {
+        ...directed,
+        currentArgumentId: argument.id,
+        phase: argument.factIds.length ? PHASES.FACT : PHASES.BRIDGE,
+        updatedAt: now(),
+      };
+    }
+
+    case 'USE_CANDIDATE_ARGUMENT': {
+      const argument = argumentsById[action.argumentId];
+      if (!argument || argument.targetClaimId !== state.currentTargetClaimId) return state;
+      return {
+        ...state,
+        currentArgumentId: argument.id,
+        currentFactIndex: 0,
+        pendingFactResponses: {},
+        pendingConflict: null,
+        breakReason: null,
+        phase: argument.factIds.length ? PHASES.FACT : PHASES.BRIDGE,
+        updatedAt: now(),
+      };
+    }
 
     case 'SET_STANCE': {
       const policy = policies[state.policyIndex];

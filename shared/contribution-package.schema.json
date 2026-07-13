@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/weichzh/argument-chain-lab/main/shared/contribution-package.schema.json",
+  "title": "Argument Chain Contribution Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "bankVersion", "consentVersion", "status", "checks", "argument"],
+  "properties": {
+    "schema": { "const": "argument-chain-contribution" },
+    "version": { "const": 1 },
+    "bankVersion": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "consentVersion": { "const": 1 },
+    "status": { "const": "complete" },
+    "checks": { "$ref": "#/$defs/checks" },
+    "argument": { "$ref": "#/$defs/argument" }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": { "enum": ["policy", "bridge"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1200 }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "statement", "plainExplanation", "plainTruthConditions", "plainFalsifier", "truthConditions", "falsifier", "response"],
+      "properties": {
+        "kind": { "enum": ["stipulated", "empirical", "descriptive"] },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "plainExplanation": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "plainTruthConditions": { "type": "string", "minLength": 1, "maxLength": 2400 },
+        "plainFalsifier": { "type": "string", "minLength": 1, "maxLength": 2400 },
+        "truthConditions": { "type": "string", "minLength": 1, "maxLength": 2400 },
+        "falsifier": { "type": "string", "minLength": 1, "maxLength": 2400 },
+        "response": { "const": "true" }
+      }
+    },
+    "bridge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "shortLabel", "text", "explanation", "example", "response"],
+      "properties": {
+        "kind": { "enum": ["bridge", "terminal"] },
+        "shortLabel": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1600 },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 2400 },
+        "example": { "type": "string", "minLength": 1, "maxLength": 2400 },
+        "response": { "const": "accept" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "facts", "bridge", "inference"],
+      "properties": {
+        "target": { "$ref": "#/$defs/target" },
+        "facts": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "$ref": "#/$defs/fact" } },
+        "bridge": { "$ref": "#/$defs/bridge" },
+        "inference": { "const": "defeasible_support" }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["noUnresolvedConflicts", "noModelGaps"],
+      "properties": {
+        "noUnresolvedConflicts": { "const": true },
+        "noModelGaps": { "const": true }
+      }
+    },
+    "argument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction", "target", "steps", "fixedPoint", "stressTest"],
+      "properties": {
+        "direction": { "enum": ["support", "oppose", "undirected"] },
+        "target": { "$ref": "#/$defs/target" },
+        "steps": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "$ref": "#/$defs/step" } },
+        "fixedPoint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["claimText", "confirmation"],
+          "properties": {
+            "claimText": { "type": "string", "minLength": 1, "maxLength": 1600 },
+            "confirmation": { "const": "independently_accepted" }
+          }
+        },
+        "stressTest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scenario", "question", "response", "distinction"],
+          "properties": {
+            "scenario": { "type": "string", "minLength": 1, "maxLength": 3200 },
+            "question": { "type": "string", "minLength": 1, "maxLength": 1600 },
+            "response": { "enum": ["applies", "relevant_distinction"] },
+            "distinction": { "type": ["string", "null"], "maxLength": 2400 }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "response": { "const": "applies" } } },
+              "then": { "properties": { "distinction": { "type": "null" } } }
+            },
+            {
+              "if": { "properties": { "response": { "const": "relevant_distinction" } } },
+              "then": { "properties": { "distinction": { "type": "string", "minLength": 1 } } }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

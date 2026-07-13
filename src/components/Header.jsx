@@ -1,49 +1,39 @@
 import React from 'react';
-import { Book, Rotate } from './Icons.jsx';
-import { policies } from '../data/model.js';
-import { PHASES } from '../lib/engine.js';
+import { BookOpen, Database, Settings } from 'lucide-react';
+import { getCurrentPolicy, PHASES } from '../lib/engine.js';
 
-export default function Header({ state, onMethod, onReset }) {
-  const assessmentPhases = new Set([
-    PHASES.STANCE,
-    PHASES.DIRECTION,
-    PHASES.ARGUMENT,
-    PHASES.FACT,
-    PHASES.BRIDGE,
-    PHASES.DEPTH,
-    PHASES.TERMINAL_CONFIRM,
-    PHASES.STRESS,
-    PHASES.BROKEN,
-    PHASES.POLICY_COMPLETE,
-  ]);
-  const showProgress = assessmentPhases.has(state.phase);
-  const progress = Math.min(100, Math.max(0, ((state.policyIndex + (state.phase === PHASES.POLICY_COMPLETE ? 1 : 0)) / policies.length) * 100));
+const utilityButton = (label, Icon, onClick, active = false) => (
+  <button
+    className={`header-tool${active ? ' active' : ''}`}
+    type="button"
+    onClick={onClick}
+    title={label}
+  >
+    <Icon size={18} aria-hidden="true" />
+    <span>{label}</span>
+  </button>
+);
 
+export default function Header({
+  state,
+  aiConfigured,
+  onMethod,
+  onConfig,
+  onLocalData,
+}) {
+  const policy = getCurrentPolicy(state);
+  const inProgress = state.phase !== PHASES.LANDING && state.phase !== PHASES.RESULTS;
   return (
     <header className="app-header">
-      <div className="header-inner">
-        <button className="brand-button" type="button" onClick={onMethod} aria-label="打开关键概念与方法说明">
-          <span className="brand-mark" aria-hidden="true">∴</span>
-          <span className="brand-copy">
-            <strong>论证链实验室</strong>
-            <small>Minimal Bridge Dialogue</small>
-          </span>
-        </button>
-
-        {showProgress ? (
-          <div className="header-progress" aria-label={`政策进度 ${state.policyIndex + 1} / ${policies.length}`}>
-            <span>政策 {Math.min(state.policyIndex + 1, policies.length)} / {policies.length}</span>
-            <div className="progress-track"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
-          </div>
-        ) : <div className="header-progress-spacer" />}
-
-        <nav className="header-actions" aria-label="工具">
-          <button className="icon-text-button" type="button" onClick={onMethod}><Book size={18} />概念说明</button>
-          {state.phase !== PHASES.LANDING ? (
-            <button className="icon-text-button subtle" type="button" onClick={onReset}><Rotate size={18} />重置</button>
-          ) : null}
-        </nav>
+      <div className="header-brand">
+        <span className="brand-wordmark">论证链实验室</span>
+        {inProgress && policy ? <small title={policy.title}>{policy.shortTitle || policy.title}</small> : null}
       </div>
+      <nav className="header-tools" aria-label="辅助工具">
+        {utilityButton('方法', BookOpen, onMethod)}
+        {utilityButton(aiConfigured ? 'AI 已配置' : 'AI 配置', Settings, onConfig, aiConfigured)}
+        {utilityButton('本地数据', Database, onLocalData)}
+      </nav>
     </header>
   );
 }

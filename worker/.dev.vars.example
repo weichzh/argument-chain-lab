@@ -1,0 +1,2 @@
+# 本地开发不需要密钥；用逗号分隔允许提交的静态站点 Origin。
+ALLOWED_ORIGINS=http://localhost:5173

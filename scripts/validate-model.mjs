@@ -6,7 +6,12 @@ import {
   facts,
   getArgumentsForClaim,
   policies,
+  configureFormalModel,
 } from '../src/data/model.js';
+import { loadCurrentFormalModel } from './lib/load-formal-model.mjs';
+
+const { model } = await loadCurrentFormalModel();
+configureFormalModel(model);
 
 const failures = [];
 const warnings = [];

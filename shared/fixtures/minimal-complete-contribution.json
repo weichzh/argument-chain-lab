@@ -1,0 +1,57 @@
+{
+  "schema": "argument-chain-contribution",
+  "version": 1,
+  "bankVersion": "0.5.0",
+  "consentVersion": 1,
+  "status": "complete",
+  "checks": {
+    "noUnresolvedConflicts": true,
+    "noModelGaps": true
+  },
+  "argument": {
+    "direction": "support",
+    "target": {
+      "kind": "policy",
+      "text": "在题设条件下，应当采用这项政策。"
+    },
+    "steps": [
+      {
+        "target": {
+          "kind": "policy",
+          "text": "在题设条件下，应当采用这项政策。"
+        },
+        "facts": [
+          {
+            "kind": "stipulated",
+            "statement": "题设已经固定不存在效果相同而限制更小的替代方案。",
+            "plainExplanation": "这里只确认题目固定的替代方案条件，不判断政策是否正当。",
+            "plainTruthConditions": "题目已经明确说明没有同样有效且限制更小的办法。",
+            "plainFalsifier": "找到一项符合题设、同样有效且限制更小的办法。",
+            "truthConditions": "题设明确排除效果相同而限制更小的替代方案。",
+            "falsifier": "能够给出一项效果相同而限制更小、并且符合题设的替代方案。",
+            "response": "true"
+          }
+        ],
+        "bridge": {
+          "kind": "terminal",
+          "shortLabel": "避免不必要限制",
+          "text": "制度不应施加实现目标所不需要的限制。",
+          "explanation": "这条原则要求限制手段与公开目标之间存在必要关系。",
+          "example": "两种方案效果相同，应选择对个人选择限制较小的一种。",
+          "response": "accept"
+        },
+        "inference": "defeasible_support"
+      }
+    ],
+    "fixedPoint": {
+      "claimText": "制度不应施加实现目标所不需要的限制。",
+      "confirmation": "independently_accepted"
+    },
+    "stressTest": {
+      "scenario": "在政治对象不同但限制结构相同的案例中，较小限制同样能够实现目标。",
+      "question": "这条原则在该案例中是否仍然适用？",
+      "response": "applies",
+      "distinction": null
+    }
+  }
+}
