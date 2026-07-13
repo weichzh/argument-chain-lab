@@ -1,0 +1,1391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/minimal-bridge-expansion-pack-1.json",
+  "title": "Minimal Bridge Expansion Pack",
+  "description": "论证链访谈产生的候选题库扩展包。candidateModel 字段与论证链实验室 0.5.0 的题库结构对齐。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "baseModel",
+    "meta",
+    "session",
+    "candidateModel",
+    "editorialSuggestions",
+    "annotations",
+    "validation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "minimal-bridge-expansion-pack"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "baseModel": {
+      "$ref": "#/$defs/baseModel"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "session": {
+      "$ref": "#/$defs/session"
+    },
+    "candidateModel": {
+      "$ref": "#/$defs/candidateModel"
+    },
+    "editorialSuggestions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/editorialSuggestion"
+      }
+    },
+    "annotations": {
+      "$ref": "#/$defs/annotations"
+    },
+    "validation": {
+      "$ref": "#/$defs/validation"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_]*$"
+    },
+    "baseModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "deduplicationStatus"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deduplicationStatus": {
+          "enum": [
+            "checked",
+            "unchecked",
+            "partial"
+          ]
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packId",
+        "createdAt",
+        "language",
+        "status",
+        "reviewStatus",
+        "containsSensitivePoliticalData",
+        "consentToExport"
+      ],
+      "properties": {
+        "packId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "language": {
+          "const": "zh-CN"
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "checkpoint"
+          ]
+        },
+        "reviewStatus": {
+          "enum": [
+            "draft",
+            "reviewed",
+            "approved",
+            "rejected"
+          ]
+        },
+        "containsSensitivePoliticalData": {
+          "const": true
+        },
+        "consentToExport": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rewriteApproval": {
+      "enum": [
+        "accepted",
+        "edited",
+        "rejected",
+        "pending"
+      ]
+    },
+    "belief": {
+      "enum": [
+        "true",
+        "false",
+        "unknown"
+      ]
+    },
+    "bridgeResponse": {
+      "enum": [
+        "accept",
+        "reject",
+        "uncertain"
+      ]
+    },
+    "bridgeStrength": {
+      "enum": [
+        "pro_tanto",
+        "presumptive",
+        "decisive",
+        "absolute",
+        "unspecified"
+      ]
+    },
+    "chainStatus": {
+      "enum": [
+        "complete",
+        "conditional",
+        "tension",
+        "unresolved"
+      ]
+    },
+    "factResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factId",
+        "belief",
+        "confidence",
+        "userEvidence",
+        "notes",
+        "evidenceStatus"
+      ],
+      "properties": {
+        "factId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "belief": {
+          "$ref": "#/$defs/belief"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "userEvidence": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "evidenceStatus": {
+          "enum": [
+            "stipulated",
+            "user_claim_only",
+            "source_supplied",
+            "ai_verified",
+            "needs_evidence",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "chainStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "argumentCandidateId",
+        "targetClaimId",
+        "userOriginalReason",
+        "normalizedReason",
+        "rewriteApproval",
+        "factResponses",
+        "bridgeClaimId",
+        "bridgeResponse",
+        "bridgeStrength"
+      ],
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "argumentCandidateId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "targetClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "userOriginalReason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalizedReason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rewriteApproval": {
+          "$ref": "#/$defs/rewriteApproval"
+        },
+        "factResponses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/factResponse"
+          }
+        },
+        "bridgeClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "bridgeResponse": {
+          "$ref": "#/$defs/bridgeResponse"
+        },
+        "bridgeStrength": {
+          "$ref": "#/$defs/bridgeStrength"
+        }
+      }
+    },
+    "fixedPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claimId",
+        "independentAcceptance",
+        "stoppingPointAcceptance",
+        "status"
+      ],
+      "properties": {
+        "claimId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "independentAcceptance": {
+          "enum": [
+            "yes",
+            "no",
+            "uncertain",
+            "not_asked"
+          ]
+        },
+        "stoppingPointAcceptance": {
+          "enum": [
+            "yes",
+            "no",
+            "uncertain",
+            "not_asked"
+          ]
+        },
+        "status": {
+          "enum": [
+            "provisional_fixed_point",
+            "terminal_candidate",
+            "unconfirmed",
+            "rejected_as_fixed_point",
+            "retracted_after_stress",
+            "none"
+          ]
+        }
+      }
+    },
+    "stressTestResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "scenario",
+        "fixedFacts",
+        "response",
+        "relevantDistinction",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "not_reached",
+            "declined"
+          ]
+        },
+        "scenario": {
+          "type": "string"
+        },
+        "fixedFacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "response": {
+          "enum": [
+            "applies",
+            "relevant_distinction",
+            "unexplained_exception",
+            "retract",
+            "uncertain",
+            "not_answered"
+          ]
+        },
+        "relevantDistinction": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "argumentChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chainId",
+        "rootTargetClaimId",
+        "steps",
+        "fixedPoint",
+        "stressTestResponse",
+        "status",
+        "breakReason",
+        "modelGaps"
+      ],
+      "properties": {
+        "chainId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "rootTargetClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chainStep"
+          }
+        },
+        "fixedPoint": {
+          "$ref": "#/$defs/fixedPoint"
+        },
+        "stressTestResponse": {
+          "$ref": "#/$defs/stressTestResponse"
+        },
+        "status": {
+          "$ref": "#/$defs/chainStatus"
+        },
+        "breakReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "modelGaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "policySession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionPolicyId",
+        "policyCandidateId",
+        "userOriginalPolicyText",
+        "normalizedPolicyText",
+        "rewriteApproval",
+        "userDirection",
+        "scope",
+        "chains",
+        "strongestDefeaters"
+      ],
+      "properties": {
+        "sessionPolicyId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "policyCandidateId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "userOriginalPolicyText": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalizedPolicyText": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rewriteApproval": {
+          "$ref": "#/$defs/rewriteApproval"
+        },
+        "userDirection": {
+          "enum": [
+            "support",
+            "oppose",
+            "conditional_support",
+            "conditional_oppose",
+            "undecided",
+            "thought_experiment"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/argumentChain"
+          }
+        },
+        "strongestDefeaters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conflictId",
+        "propositionId",
+        "priorResponse",
+        "currentResponse",
+        "contexts",
+        "resolution",
+        "notes"
+      ],
+      "properties": {
+        "conflictId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "propositionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "priorResponse": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currentResponse": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contexts": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "resolution": {
+          "enum": [
+            "revise_prior",
+            "keep_prior",
+            "scope_gap",
+            "suspend",
+            "unresolved"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "valueComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dilemmaId",
+        "leftClaimId",
+        "rightClaimId",
+        "response",
+        "relevantDistinction",
+        "notes"
+      ],
+      "properties": {
+        "dilemmaId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "leftClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "rightClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "response": {
+          "enum": [
+            "left",
+            "right",
+            "equal",
+            "incomparable",
+            "scope_gap",
+            "unknown"
+          ]
+        },
+        "relevantDistinction": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisionId",
+        "itemId",
+        "before",
+        "after",
+        "reason"
+      ],
+      "properties": {
+        "revisionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "itemId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "before": {
+          "type": "string"
+        },
+        "after": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userAlias",
+        "collectionMode",
+        "policySessions",
+        "crossChainConflicts",
+        "valueComparisons",
+        "revisionHistory"
+      ],
+      "properties": {
+        "userAlias": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "collectionMode": {
+          "enum": [
+            "interview_only",
+            "interview_and_verify"
+          ]
+        },
+        "policySessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/policySession"
+          }
+        },
+        "crossChainConflicts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conflict"
+          }
+        },
+        "valueComparisons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/valueComparison"
+          }
+        },
+        "revisionHistory": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/revision"
+          }
+        }
+      }
+    },
+    "factRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "statement",
+        "truthConditions",
+        "falsifier",
+        "note",
+        "responseGuide",
+        "plainExplanation",
+        "plainTruthConditions",
+        "plainFalsifier"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "kind": {
+          "enum": [
+            "stipulated",
+            "empirical",
+            "descriptive"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "truthConditions": {
+          "type": "string",
+          "minLength": 1
+        },
+        "falsifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string"
+        },
+        "responseGuide": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plainExplanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plainTruthConditions": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plainFalsifier": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stressTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario",
+        "question",
+        "distinctions"
+      ],
+      "properties": {
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "distinctions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "policyClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "policyId",
+        "direction",
+        "shortLabel",
+        "text",
+        "explanation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "kind": {
+          "const": "policy"
+        },
+        "policyId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "direction": {
+          "enum": [
+            "support",
+            "oppose"
+          ]
+        },
+        "shortLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "bridgeClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "shortLabel",
+        "text",
+        "explanation",
+        "responseGuide",
+        "example"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "kind": {
+          "const": "bridge"
+        },
+        "shortLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responseGuide": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "terminalClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "shortLabel",
+        "text",
+        "explanation",
+        "responseGuide",
+        "example",
+        "stressTest"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "kind": {
+          "const": "terminal"
+        },
+        "shortLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responseGuide": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stressTest": {
+          "$ref": "#/$defs/stressTest"
+        }
+      }
+    },
+    "claimRecord": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/policyClaim"
+        },
+        {
+          "$ref": "#/$defs/bridgeClaim"
+        },
+        {
+          "$ref": "#/$defs/terminalClaim"
+        }
+      ]
+    },
+    "plainSteps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facts",
+        "bridgeLabel",
+        "bridgeText",
+        "targetText"
+      ],
+      "properties": {
+        "facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "bridgeLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bridgeText": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetText": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "argumentRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "targetClaimId",
+        "title",
+        "summary",
+        "factIds",
+        "bridgeClaimId",
+        "plainSteps"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "targetClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "factIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          }
+        },
+        "bridgeClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "plainSteps": {
+          "$ref": "#/$defs/plainSteps"
+        }
+      }
+    },
+    "policyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "number",
+        "title",
+        "shortTitle",
+        "proposition",
+        "scope",
+        "supportClaimId",
+        "opposeClaimId",
+        "question"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "number": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shortTitle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supportClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "opposeClaimId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "dilemmaRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "left",
+        "right",
+        "title",
+        "scenario",
+        "leftAction",
+        "rightAction",
+        "fixedFacts"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "left": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "right": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "leftAction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rightAction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixedFacts": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "author",
+        "year",
+        "title",
+        "role"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1
+        },
+        "year": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "doi": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accessedAt": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "candidateModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facts",
+        "claims",
+        "arguments",
+        "policies",
+        "dilemmas",
+        "sources"
+      ],
+      "properties": {
+        "facts": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/factRecord"
+          }
+        },
+        "claims": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/claimRecord"
+          }
+        },
+        "arguments": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/argumentRecord"
+          }
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/policyRecord"
+          }
+        },
+        "dilemmas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dilemmaRecord"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRecord"
+          }
+        }
+      }
+    },
+    "editorialSuggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "text",
+        "reason",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "type": {
+          "enum": [
+            "alternative_argument",
+            "missing_fact",
+            "missing_bridge",
+            "counterargument",
+            "dilemma",
+            "wording_revision",
+            "deduplication",
+            "source_request",
+            "other"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "ai_suggested",
+            "user_accepted",
+            "user_rejected",
+            "needs_review"
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceType",
+        "userOriginalText",
+        "rewriteApproval",
+        "notes"
+      ],
+      "properties": {
+        "sourceType": {
+          "enum": [
+            "user_confirmed",
+            "user_rejected",
+            "user_uncertain",
+            "ai_normalized",
+            "ai_suggested",
+            "existing_model",
+            "external_source"
+          ]
+        },
+        "userOriginalText": {
+          "type": "string"
+        },
+        "rewriteApproval": {
+          "$ref": "#/$defs/rewriteApproval"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "possibleDuplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "existingId",
+        "relation",
+        "reason"
+      ],
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "existingId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$"
+        },
+        "relation": {
+          "enum": [
+            "exact_reuse",
+            "scope_specialization",
+            "possible_duplicate",
+            "overlap"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenanceById",
+        "reuseExistingIds",
+        "possibleDuplicates",
+        "needsEvidence",
+        "needsHumanReview",
+        "promotionReady"
+      ],
+      "properties": {
+        "provenanceById": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "reuseExistingIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          }
+        },
+        "possibleDuplicates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/possibleDuplicate"
+          }
+        },
+        "needsEvidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "needsHumanReview": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "promotionReady": {
+          "type": "boolean"
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonValid",
+        "allReferencesResolved",
+        "noNormativeLeakageInFacts",
+        "acyclicArgumentGraph",
+        "terminalNodesHaveStressTests"
+      ],
+      "properties": {
+        "jsonValid": {
+          "type": "boolean"
+        },
+        "allReferencesResolved": {
+          "type": "boolean"
+        },
+        "noNormativeLeakageInFacts": {
+          "type": "boolean"
+        },
+        "acyclicArgumentGraph": {
+          "type": "boolean"
+        },
+        "terminalNodesHaveStressTests": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

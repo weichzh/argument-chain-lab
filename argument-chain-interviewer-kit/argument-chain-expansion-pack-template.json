@@ -1,0 +1,52 @@
+{
+  "schema": "minimal-bridge-expansion-pack",
+  "schemaVersion": 1,
+  "baseModel": {
+    "id": "minimal-bridge-dialogue",
+    "version": "0.5.0",
+    "deduplicationStatus": "unchecked"
+  },
+  "meta": {
+    "packId": "exp_yyyymmdd_topic_random",
+    "createdAt": "2026-07-13T00:00:00Z",
+    "language": "zh-CN",
+    "status": "checkpoint",
+    "reviewStatus": "draft",
+    "containsSensitivePoliticalData": true,
+    "consentToExport": false
+  },
+  "session": {
+    "userAlias": null,
+    "collectionMode": "interview_only",
+    "policySessions": [],
+    "crossChainConflicts": [],
+    "valueComparisons": [],
+    "revisionHistory": []
+  },
+  "candidateModel": {
+    "facts": {},
+    "claims": {},
+    "arguments": {},
+    "policies": [],
+    "dilemmas": [],
+    "sources": []
+  },
+  "editorialSuggestions": [],
+  "annotations": {
+    "provenanceById": {},
+    "reuseExistingIds": [],
+    "possibleDuplicates": [],
+    "needsEvidence": [],
+    "needsHumanReview": [
+      "这是空白模板，尚未包含访谈数据。"
+    ],
+    "promotionReady": false
+  },
+  "validation": {
+    "jsonValid": true,
+    "allReferencesResolved": true,
+    "noNormativeLeakageInFacts": true,
+    "acyclicArgumentGraph": true,
+    "terminalNodesHaveStressTests": true
+  }
+}
