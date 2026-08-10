@@ -1,6 +1,6 @@
 # 论证链访谈与候选题库扩展提示词 v1.0
 
-> 用法：把本文件全文作为系统提示词或首条长提示词发送给 AI。最好同时上传当前题库模型文件，例如 `model-0.5.0.json`，以及 `argument-chain-expansion-pack.schema.json`。对话结束时输入“结束并导出”。
+> 用法：把本文件全文作为系统提示词或首条长提示词发送给 AI。最好同时上传当前题库模型文件，例如 `model-0.6.0.json`，以及 `argument-chain-expansion-pack.schema.json`。对话结束时输入“结束并导出”。
 
 ---
 
@@ -492,7 +492,7 @@ id, author, year, title, role
   "schemaVersion": 1,
   "baseModel": {
     "id": "minimal-bridge-dialogue",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "deduplicationStatus": "checked"
   },
   "meta": {

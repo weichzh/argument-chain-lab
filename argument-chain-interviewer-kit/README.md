@@ -9,7 +9,7 @@
 
 ## 推荐使用方式
 
-1. 在新对话中上传主提示词、Schema 和当前题库 `model-0.5.0.json`。
+1. 在新对话中上传主提示词、Schema 和当前题库 `model-0.6.0.json`。
 2. 要求 AI 严格按照主提示词开始访谈。
 3. 用户可以随时输入 `显示当前链条`、`保存检查点` 或 `结束并导出`。
 4. 结束时保存：
@@ -26,7 +26,7 @@ python argument-chain-pack-tools.py validate argument-chain-expansion-pack.json 
 
 ```bash
 python argument-chain-pack-tools.py merge \
-  model-0.5.0.json \
+  model-0.6.0.json \
   argument-chain-expansion-pack.json \
   model-merged.json \
   --schema argument-chain-expansion-pack.schema.json \
@@ -37,7 +37,7 @@ python argument-chain-pack-tools.py merge \
 
 ## 当前系统边界
 
-论证链实验室 0.5.0 通过 `public/bank/manifest.json` 读取版本化 JSON 题库，`src/data/model.js` 只负责运行时校验和只读适配。辅助脚本合并的是离线模型快照，不会自动更新题库清单；要让结果进入网页，仍需审核合并生成的模型并更新清单指向。
+论证链实验室 0.6.0 通过 `public/bank/manifest.json` 读取版本化 JSON 题库，`src/data/model.js` 只负责运行时校验和只读适配。辅助脚本合并的是离线模型快照，不会自动更新题库清单；要让结果进入网页，仍需审核合并生成的模型并更新清单指向。
 
 ## 隐私
 

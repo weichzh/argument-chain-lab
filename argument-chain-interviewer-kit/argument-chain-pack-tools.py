@@ -2,7 +2,7 @@
 """Validate and merge minimal-bridge expansion packs.
 
 This helper works on exported model JSON snapshots. It does not rewrite the
-React source file used by Argument Chain Lab 0.5.0.
+Argument Chain Lab application source.
 """
 from __future__ import annotations
 

@@ -18,7 +18,7 @@ export default function ProofView({ state }) {
     <aside className={`argument-ledger${open ? ' open' : ''}`} aria-label="论证记录">
       <button className="ledger-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <ListTree size={20} />
-        <strong>论证记录 · 已确认 {steps.length} 项</strong>
+        <strong>当前论证 · 已确认 {steps.length} 步</strong>
         <span>{state.currentChain?.status === 'complete' ? '严格完整' : '仅保存在本地'}</span>
         <ChevronUp className={open ? '' : 'collapsed'} />
       </button>

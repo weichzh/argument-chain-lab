@@ -10,6 +10,7 @@ import {
 import {
   argumentsById,
   configureFormalModel,
+  getArgumentsForClaim,
   getRelevantDilemmas,
 } from '../src/data/model.js';
 
@@ -173,6 +174,31 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   assert.equal(state.phase, PHASES.POLICY_COMPLETE);
   assert.equal(state.currentChain.status, 'unresolved');
   assert.equal(state.modelGaps.length, 1);
+}
+
+{
+  let state = createInitialState();
+  state = act(state, { type: 'START_AT_POLICY', policyId: 'workplace_cogovernance' });
+  state = act(state, { type: 'SET_STANCE', stance: 'support' });
+  assert(getArgumentsForClaim('speech_oppose').some((item) => item.id === 'speech_inquiry_oppose'));
+  assert(getArgumentsForClaim('surveillance_oppose').some((item) => item.id === 'surveillance_civic_association_oppose'));
+  assert.equal(getArgumentsForClaim('workplace_cogovernance_support').length, 3);
+  assert.equal(getArgumentsForClaim('workplace_cogovernance_oppose').length, 3);
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'workplace_shared_control_support' });
+  state = answerAllFacts(state, 'workplace_shared_control_support');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'production_to_productive_self_governance' });
+  state = answerAllFacts(state, 'production_to_productive_self_governance');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
+  state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
+  assert.equal(state.currentChain.status, 'complete');
+  assert.equal(state.currentChain.terminal.claimId, 'productive_self_governance');
+  assert.deepEqual(
+    getRelevantDilemmas(['productive_self_governance', 'intergenerational_stewardship']).map((item) => item.id),
+    ['production_vs_stewardship'],
+  );
 }
 
 

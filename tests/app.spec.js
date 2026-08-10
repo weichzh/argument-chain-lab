@@ -39,7 +39,7 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
 
   await expect(page.getByRole('heading', { name: '本轮机械报告' })).toBeVisible();
   await expect(page.locator('.report-step')).toHaveCount(2);
-  await expect(page.getByText('正式题库 0.5.0').first()).toBeVisible();
+  await expect(page.getByText('正式题库 0.6.0').first()).toBeVisible();
   await expect(page.locator('.report-list').filter({ hasText: '已确认' })).toContainText('避免人的死亡、重伤和严重身体损害');
   expect(requests).toHaveLength(0);
 
@@ -58,6 +58,8 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
 test('移动端配置清除后不保留明文密钥且页面无横向溢出', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
+  await page.getByRole('button', { name: '从题库开始', exact: true }).click();
+  expect(await page.locator('.stage-rail').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.getByTitle('AI 配置').click();
   await page.getByLabel('粘贴配置文本').fill(JSON.stringify({
     schema: 'argument-chain-ai-config',
@@ -77,4 +79,23 @@ test('移动端配置清除后不保留明文密钥且页面无横向溢出', as
   await expect(page.getByLabel('生成的 AI 配置文本')).toHaveCount(0);
   await expect(page.getByLabel('API Key')).toHaveValue('');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('短桌面视口可点击底部立场，并可在无 AI 时记录题库缺口', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '从题库开始', exact: true }).click();
+  await page.getByRole('button', { name: /^暂时没有立场/ }).click();
+  await page.getByRole('button', { name: '什么理由会反对它', exact: true }).click();
+  await page.getByLabel('这些都不符合我的想法').fill('现有理由没有覆盖我的实际理由。');
+  await page.getByRole('button', { name: '记录题库缺口并结束这项判断', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: '这条论证仍未解决' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (
+    `${JSON.stringify(localStorage)}${JSON.stringify(sessionStorage)}`
+      .includes('现有理由没有覆盖我的实际理由。')
+  ))).toBe(false);
+  await page.getByRole('button', { name: '查看完整预览', exact: true }).click();
+  await expect(page.getByText('预设理由没有覆盖用户的实际理由')).toBeVisible();
+  await expect(page.getByText('现有理由没有覆盖我的实际理由。')).toHaveCount(0);
 });

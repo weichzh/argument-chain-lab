@@ -74,7 +74,7 @@ function ChoiceList({ options }) {
   );
 }
 
-function FreeInput({ state, onAskAi, aiLoading, scope = 'current_target' }) {
+function FreeInput({ state, dispatch, onAskAi, aiLoading, scope = 'current_target' }) {
   const policy = getCurrentPolicy(state);
   const key = sessionDraftKey(`${state.phase}:${state.currentTargetClaimId || policy?.id || 'root'}`);
   const [draft, setDraft] = useState(() => {
@@ -114,7 +114,17 @@ function FreeInput({ state, onAskAi, aiLoading, scope = 'current_target' }) {
         placeholder="写下你的判断、理由或需要补充的条件…"
       />
       <div className="free-input-actions">
-        <p>内容直接发送到你配置的模型服务商；AI 只能提出候选。</p>
+        <p>只有选择 AI 梳理时才会发送内容；记录题库缺口不会保存这段原文。</p>
+        <button
+          className="button quiet"
+          type="button"
+          onClick={() => {
+            update('');
+            dispatch({ type: 'NO_ARGUMENT' });
+          }}
+        >
+          记录题库缺口并结束这项判断
+        </button>
         <button
           className="button secondary"
           type="button"
@@ -181,7 +191,7 @@ function StanceQuestion({ state, dispatch, onAskAi, aiLoading }) {
             onSelect: () => dispatch({ type: 'SKIP_POLICY', reason: '用户跳过了这份公开论证。' }),
           },
         ]} />
-        <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
+        <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
       </>
     );
   }
@@ -194,7 +204,7 @@ function StanceQuestion({ state, dispatch, onAskAi, aiLoading }) {
         { id: 'oppose', label: '反对', detail: '继续检查反对这项政策的实际理由。', onSelect: () => dispatch({ type: 'SET_STANCE', stance: 'oppose' }) },
         { id: 'undecided', label: '暂时没有立场', detail: '可以先选择一个方向，检查什么理由会使它成立。', onSelect: () => dispatch({ type: 'SET_STANCE', stance: 'undecided' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
+      <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
     </>
   );
 }
@@ -208,7 +218,7 @@ function DirectionQuestion({ state, dispatch, onAskAi, aiLoading }) {
         { id: 'oppose', label: '什么理由会反对它', onSelect: () => dispatch({ type: 'SET_DIRECTION', direction: 'oppose' }) },
         { id: 'skip', label: '暂不形成判断', onSelect: () => dispatch({ type: 'SKIP_POLICY' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
+      <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
     </>
   );
 }
@@ -240,7 +250,7 @@ function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
         ))}
         {!argumentsForDisplay.length ? <p className="empty-state">当前题库没有匹配理由。你可以直接写下自己的想法，让 AI 提出结构化候选。</p> : null}
       </div>
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
+      <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }
@@ -261,7 +271,7 @@ function FactQuestion({ state, dispatch, onAskAi, aiLoading }) {
         { id: 'false', label: '不成立', onSelect: () => dispatch({ type: 'ANSWER_FACT', response: 'false' }) },
         { id: 'unknown', label: '我还不能判断', detail: '缺少足够信息，不等于第三种真值。', onSelect: () => dispatch({ type: 'ANSWER_FACT', response: 'unknown' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
+      <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }
@@ -279,7 +289,7 @@ function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
         { id: 'reject', label: '不接受这条原则', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'reject' }) },
         { id: 'uncertain', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'uncertain' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
+      <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }

@@ -963,8 +963,6 @@ details > summary {
 
 /* Argument ledger */
 .argument-ledger {
-  position: sticky;
-  bottom: 0;
   z-index: 20;
   grid-column: 1 / -1;
   align-self: end;
@@ -1939,14 +1937,14 @@ details > summary {
 
   .stage-rail {
     grid-row: 1;
-    padding: 12px 18px;
+    padding: 12px 10px;
     overflow-x: auto;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
 
   .stage-rail ol {
-    min-width: 500px;
+    min-width: 0;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
   }
@@ -1954,7 +1952,7 @@ details > summary {
   .stage-rail li {
     min-height: 36px;
     grid-template-columns: 28px 1fr;
-    gap: 7px;
+    gap: 4px;
   }
 
   .stage-rail li:not(:last-child)::after {
@@ -1973,7 +1971,7 @@ details > summary {
 
   .stage-rail li strong {
     padding-top: 5px;
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .question-surface {
