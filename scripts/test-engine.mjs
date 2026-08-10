@@ -182,7 +182,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
   assert(getArgumentsForClaim('speech_oppose').some((item) => item.id === 'speech_inquiry_oppose'));
   assert(getArgumentsForClaim('surveillance_oppose').some((item) => item.id === 'surveillance_civic_association_oppose'));
-  assert.equal(getArgumentsForClaim('workplace_cogovernance_support').length, 3);
+  assert.equal(getArgumentsForClaim('workplace_cogovernance_support').length, 4);
   assert.equal(getArgumentsForClaim('workplace_cogovernance_oppose').length, 3);
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'workplace_shared_control_support' });
   state = answerAllFacts(state, 'workplace_shared_control_support');
@@ -198,6 +198,34 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   assert.deepEqual(
     getRelevantDilemmas(['productive_self_governance', 'intergenerational_stewardship']).map((item) => item.id),
     ['production_vs_stewardship'],
+  );
+}
+
+{
+  assert(getArgumentsForClaim('speech_oppose').some((item) => item.id === 'speech_basic_liberty_oppose'));
+  assert(getArgumentsForClaim('surveillance_oppose').some((item) => item.id === 'surveillance_basic_liberty_oppose'));
+  assert(getArgumentsForClaim('income_support').some((item) => item.id === 'income_least_advantaged_support'));
+  assert(getArgumentsForClaim('carbon_support').some((item) => item.id === 'carbon_general_rule_support'));
+  assert.equal(getArgumentsForClaim('education_opportunity_support').length, 3);
+  assert.equal(getArgumentsForClaim('education_opportunity_oppose').length, 3);
+
+  let state = createInitialState();
+  state = act(state, { type: 'START_AT_POLICY', policyId: 'education_opportunity_fund' });
+  state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'education_local_knowledge_oppose' });
+  state = answerAllFacts(state, 'education_local_knowledge_oppose');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'local_feedback_to_decentralized_adaptation' });
+  state = answerAllFacts(state, 'local_feedback_to_decentralized_adaptation');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
+  state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
+  assert.equal(state.currentChain.status, 'complete');
+  assert.equal(state.currentChain.terminal.claimId, 'decentralized_adaptation');
+  assert.deepEqual(
+    getRelevantDilemmas(['decentralized_adaptation', 'fair_equality_of_opportunity']).map((item) => item.id),
+    ['adaptation_vs_opportunity'],
   );
 }
 

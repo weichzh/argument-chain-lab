@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/schemas/minimal-bridge-expansion-pack-1.json",
   "title": "Minimal Bridge Expansion Pack",
-  "description": "论证链访谈产生的候选题库扩展包。candidateModel 字段与论证链实验室 0.6.0 的题库结构对齐。",
+  "description": "论证链访谈产生的候选题库扩展包。candidateModel 字段与论证链实验室 0.7.0 的题库结构对齐。",
   "type": "object",
   "additionalProperties": false,
   "required": [

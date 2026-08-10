@@ -1,0 +1,3791 @@
+{
+  "schema": "minimal-bridge-dialogue-model",
+  "schemaVersion": 3,
+  "meta": {
+    "id": "minimal-bridge-dialogue",
+    "version": "0.7.0",
+    "title": "论证链实验室",
+    "subtitle": "逐层检查事实、规范原则与当前基本价值",
+    "updatedAt": "2026-08-10"
+  },
+  "typeRules": {
+    "minimalBridge": "If V contains an evaluative predicate not definable in the descriptive vocabulary, F alone does not entail V: F1 ∧ … ∧ Fn ⊭ V.",
+    "operationalSupport": "Ordinary policy paths are represented as defeasible support: F1 ∧ … ∧ Fn ∧ B ⇝ V.",
+    "strictEntailment": "Use ⊨ only when B is explicitly sufficient and every premise relevant to the formal consequence has been included.",
+    "descriptive": "Each F is represented as a bivalent proposition with truth and falsification conditions; unknown is an epistemic response, not a third truth value.",
+    "normative": "Each B contains normative content and may become the V of a deeper recursive question.",
+    "terminal": "A G node requires separate user nomination and explicit independent confirmation; running out of reasons does not create a fixed point.",
+    "dilemma": "A dilemma is eligible only when both endpoint values were confirmed as provisional fixed points in this session."
+  },
+  "facts": {
+    "speech_scope_noncoercive": {
+      "id": "speech_scope_noncoercive",
+      "kind": "stipulated",
+      "statement": "这项法律只处理公开的严重贬低或侮辱性表达。直接威胁、针对个人的骚扰、能够核实为假的事实陈述，以及指挥组织暴力的内容，都不在本题范围内。",
+      "truthConditions": "法案文字明确排除这四类行为，而且题目没有另外加入其他强制行为。",
+      "falsifier": "只要法案实际覆盖其中任何一类行为，或者题目还包含没有说明的强制行为，这句话就不成立。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这里只是在划定题目边界：本题讨论的是冒犯或贬损性的公开表达，不讨论威胁、骚扰、造谣或组织暴力。这样可以避免把几种性质不同的表达混在一起。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "speech_reduces_serious_assaults": {
+      "id": "speech_reduces_serious_assaults",
+      "kind": "empirical",
+      "statement": "在其他条件相近的地区，这项法律实施后，针对特定群体的重伤案件连续三年平均减少了至少20%。研究把同一时期警力和治安预算的变化分开计算后，仍然得到这个结果。",
+      "truthConditions": "研究使用统一的案件统计口径、可比的对照地区，并把同期治安投入纳入分析后，估计降幅仍不低于 20%。",
+      "falsifier": "高质量研究发现案件没有明显下降、案件反而增加，或者降幅可以完全由同期治安投入增加解释。",
+      "note": "这句话只谈法律是否造成了至少 20% 的降幅，不包含“20% 是否足够重要”的价值判断。",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问一个效果问题：法律实施以后，针对相关群体的重伤案件是否真的明显减少，而且减少不能只是因为同期增加了治安投入。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_no_equal_alternative": {
+      "id": "speech_no_equal_alternative",
+      "kind": "empirical",
+      "statement": "在相同研究条件下，增加反暴力执法、加强受害者保护和支持反向表达的组合方案，减少重伤案件的幅度仍低于这项禁令。",
+      "truthConditions": "采用同样的统计口径比较后，替代方案组合的估计效果明显低于这项法律，而且误差范围也不支持两者效果相同。",
+      "falsifier": "存在限制更小的方案，在同样条件下达到或超过这项法律的估计效果。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较禁令和较温和方案的实际效果。它不是说替代方案毫无作用，而是说在相同研究条件下，替代方案减少重伤的幅度更小。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_participation_gap_reduced": {
+      "id": "speech_participation_gap_reduced",
+      "kind": "empirical",
+      "statement": "这项法律实施后，原先经常受到贬低或侮辱的群体，在参加公开听证、使用公共服务和报名公职方面，与其他群体的差距连续三年缩小。",
+      "truthConditions": "行政数据和调查数据使用相同口径，三项差距在实施后连续三年下降，而且主要的同期变化已经被纳入分析。",
+      "falsifier": "差距没有缩小，只是短期波动后恢复，或者变化可以由人口结构和公共服务供给变化解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问法律实施后，原先受贬损群体参与公共生活的实际差距是否持续缩小。它没有直接判断这种结果是否足以支持禁令。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_preexisting_participation_barrier": {
+      "id": "speech_preexisting_participation_barrier",
+      "kind": "empirical",
+      "statement": "在法律实施前，经常受到贬低或侮辱的群体，参加公开听证、使用公共服务和报名公职的比例长期较低。研究把收入、教育、年龄和地区差异分开计算后，这个差距仍然存在；接触这类表达越多的人，参与差距也越大。",
+      "truthConditions": "连续多年的数据都显示：控制收入、教育、年龄和地区后，差距仍稳定存在，而且贬损暴露程度可以预测差距大小。",
+      "falsifier": "控制这些因素后差距消失，或者贬损暴露程度不能再预测参与差距。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话在问：法律实施前是否已经存在稳定的参与障碍，而且这种障碍与接触贬损表达的程度有关，不能只用收入、教育、年龄或地区差异解释。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_enforcement_variance": {
+      "id": "speech_enforcement_variance",
+      "kind": "empirical",
+      "statement": "面对内容相同的表达，不同执法单位会因为说话者身份不同，而给出明显不同的立案概率。",
+      "truthConditions": "盲测或审计样本显示，在控制表达内容和具体情境后，说话者身份仍能明显预测是否立案。",
+      "falsifier": "控制内容和情境后，身份不再影响立案概率，或者差异可以由其他可观察的行为差别解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问执法是否存在身份差别：表达内容和情境相同，仅仅更换说话者身份，立案概率是否也会改变。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_open_standard_no_review": {
+      "id": "speech_open_standard_no_review",
+      "kind": "stipulated",
+      "statement": "法律只写了“严重贬低或侮辱”，没有列出足够明确的判断标准。立案机关不必公开具体理由，立案前也没有独立机构复核。",
+      "truthConditions": "开放性表述、个案理由不公开、立案前没有独立复核，这三个条件同时存在。",
+      "falsifier": "法条列出清楚而可执行的标准，或者个案理由必须公开，或者立案前必须经过独立复核。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目直接规定的制度条件：法律标准较模糊，机关不用公开个案理由，立案前也没有独立复核。三项条件需要分别看清。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "speech_blocks_verified_reporting": {
+      "id": "speech_blocks_verified_reporting",
+      "kind": "empirical",
+      "statement": "这项法律实施后，包含可核实腐败或机构失误证据的报道变少；其他举报渠道增加的已核实披露，不足以补上这个缺口。",
+      "truthConditions": "报道记录和举报记录采用事先确定的核实标准，合计后的已核实披露数量确实下降。",
+      "falsifier": "已核实披露的总量没有下降，或者减少的只是没有可靠证据的内容。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问禁令是否同时压低了有证据的腐败或失误报道，而且其他举报渠道没有补回这些经过核实的信息。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_organized_violence_link": {
+      "id": "speech_organized_violence_link",
+      "kind": "empirical",
+      "statement": "题目所说的这类表达出现后，随后七天内发生组织性暴力动员的概率会上升。研究把已知动员网络的影响分开计算后，这种关系仍然存在。",
+      "truthConditions": "事先登记的统计模型在另一批样本中仍能得到同方向结果，而且研究设计排除了已知动员网络和明显的反向因果。",
+      "falsifier": "换一批样本后无法重复这个结果，或者这种关系可以完全由原有动员网络解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话问的是可检验的预测关系：这类表达出现后，七天内的组织性暴力动员是否更可能发生，而且不能只由已有动员网络解释。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "speech_restriction_no_greater_cooperation_risk": {
+      "id": "speech_restriction_no_greater_cooperation_risk",
+      "kind": "empirical",
+      "statement": "按同一套事件标准、同一段时间比较，这项法律新引发的组织性暴力和关键公共服务中断，没有多于它所减少的同类事件。",
+      "truthConditions": "使用统一口径计算后，法律新增的同类事件总数低于它减少的总数。",
+      "falsifier": "法律引发的有组织暴力或公共服务中断数量，等于或超过它减少的数量。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较两类后果：法律新造成的组织性暴力或公共服务中断，是否少于它所减少的同类事件。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "surveillance_scope": {
+      "id": "surveillance_scope",
+      "kind": "stipulated",
+      "statement": "制度保存所有成年人的通信时间、联系对象和位置记录，保存期为五年。查询前不需要先证明某个人有具体嫌疑，也不需要事前得到独立法院批准。",
+      "truthConditions": "制度文本同时包含这些数据种类、五年保存期，以及没有个别嫌疑和事前独立批准的查询条件。",
+      "falsifier": "其中任何一项与题目不同，例如只保存特定嫌疑人的数据，或者查询前必须取得独立批准。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这里只是在说明制度覆盖谁、保存什么、保存多久，以及查询需要什么条件。它本身不判断全民保存是否正当。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "surveillance_prevents_attacks": {
+      "id": "surveillance_prevents_attacks",
+      "kind": "empirical",
+      "statement": "这项制度使已经开始准备、接近实施的致命袭击，每年减少至少15%。研究把同一时期情报预算增加的影响分开计算后，仍然得到这个结果。",
+      "truthConditions": "独立评估事先确定“进入实施阶段”的定义，设置可比对照，并控制情报预算后，估计降幅仍不低于 15%。",
+      "falsifier": "评估发现效果接近零、方向相反，或者全部效果都可以由其他情报资源增加解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问全民保存制度是否确实减少了已经进入实施阶段的致命袭击，而且这个效果不能只归因于情报预算增加。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "surveillance_no_equal_targeted_method": {
+      "id": "surveillance_no_equal_targeted_method",
+      "kind": "empirical",
+      "statement": "在预算相同的条件下，只保存有具体嫌疑对象的数据，并加快司法授权，减少袭击的效果仍低于全民保存制度。",
+      "truthConditions": "可比试验或准实验显示，定向保存方案的估计效果明显低于全民保存方案。",
+      "falsifier": "定向保存和加快司法批准达到或超过全民保存的效果。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较两种办法：定向保存加快速司法批准，是否能在相同预算下达到全民保存制度的防袭击效果。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "surveillance_no_greater_cooperation_risk": {
+      "id": "surveillance_no_greater_cooperation_risk",
+      "kind": "empirical",
+      "statement": "按同一套事件标准、同一段时间比较，全民保存制度新引发的组织性暴力和公共服务中断，没有多于它所避免的袭击原本会造成的同类事件。",
+      "truthConditions": "使用统一口径计算后，制度新增的同类事件总数低于它避免的总数。",
+      "falsifier": "制度引发的同类事件数量，等于或超过它所避免的数量。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较制度造成和避免的同类严重后果，不是在笼统地问制度“利大于弊”。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "surveillance_audit_public": {
+      "id": "surveillance_audit_public",
+      "kind": "stipulated",
+      "statement": "这项制度通过公开立法建立。成年人有大体平等的投票和代表机会；每次查询都会自动留下记录，年度统计公开，议会也可以废除制度。但具体查询仍不需要事前独立批准。",
+      "truthConditions": "公开立法、参与机会、查询留痕、年度统计公开和议会可撤销这几个条件全部存在。",
+      "falsifier": "其中任何一个条件不存在，或者受影响群体在制度上没有大体相同的参与机会。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目固定的一组程序条件：制度公开立法、查询留痕、年度统计公开并可由议会废除，但个案查询没有事前独立批准。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "surveillance_false_positive_cost": {
+      "id": "surveillance_false_positive_cost",
+      "kind": "empirical",
+      "statement": "由系统标记引发的限制出境、冻结账户或拘留中，至少5%最后被确认找错了人，而且大多数损失无法完全恢复。",
+      "truthConditions": "案件审计以最终裁判或独立复核为准，错误率不低于 5%，并记录了无法完全恢复的损失。",
+      "falsifier": "错误率明显低于 5%，或者相关损失都能在短期内完全恢复。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问两件事：系统标记是否会以不低的比例找错人，以及限制出境、冻结账户或拘留造成的损失是否通常难以完全恢复。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "surveillance_chills_association": {
+      "id": "surveillance_chills_association",
+      "kind": "empirical",
+      "statement": "制度实施后，没有被指控违法的记者、律师和政治团体，与消息来源的通信变少；减少的主要是那些能从通信时间、联系对象和位置记录中识别出来的联系。",
+      "truthConditions": "纵向数据或自然实验显示，制度实施后这些特定联系明显减少，而且行业规模变化和通信平台迁移不能解释该变化。",
+      "falsifier": "联系频率没有变化，或者下降可以由平台迁移、职业结构变化等其他因素解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话问的是合法联系是否因为通信时间、联系对象和位置记录被长期保存而减少，尤其是记者、律师和政治团体与消息来源之间的通信。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "surveillance_discretionary_queries": {
+      "id": "surveillance_discretionary_queries",
+      "kind": "stipulated",
+      "statement": "执行机关可以查询任何成年人的记录，不必公开针对这个人的理由，也不必事先取得独立批准。",
+      "truthConditions": "制度明确赋予执行机关这种查询能力。",
+      "falsifier": "查询必须符合针对个人的明确标准，而且必须在查询前取得独立批准。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目直接规定的权限范围：机关可以查询任何成年人的记录，不必先说明针对这个人的理由，也不必事前取得独立批准。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "income_program_scope": {
+      "id": "income_program_scope",
+      "kind": "stipulated",
+      "statement": "每名成年人每月领取一笔不附带工作条件的现金。金额等于税后可支配收入中间数的15%；这里的“中间数”是把所有人的收入从低到高排列后，位于正中间的数。资金来自收入越高、适用税率越高的所得税，而且不会取代残障救助和紧急救助。",
+      "truthConditions": "方案文本同时包含金额、无工作条件、累进所得税筹资和保留两类专项救助这四项内容。",
+      "falsifier": "其中任何一项发生变化。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这里只是在固定方案内容：谁领取、领取多少、是否附带工作条件、如何筹资，以及哪些原有救助继续保留。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "income_reduces_deprivation": {
+      "id": "income_reduces_deprivation",
+      "kind": "empirical",
+      "statement": "方案实施三年后，无法稳定获得食物、住所或必要药物的人口比例至少下降了25%。",
+      "truthConditions": "采用事先确定的物质匮乏指标和可比对照后，估计降幅仍不低于 25%。",
+      "falsifier": "比例没有下降、降幅明显低于 25%，或者变化可以由其他同期政策解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问方案实施后，缺少食物、住所或必要药物的人口比例是否确实大幅下降。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "income_no_larger_same_loss": {
+      "id": "income_no_larger_same_loss",
+      "kind": "empirical",
+      "statement": "把税收负担和人们可能改变行为的影响都算进去后，确实有一部分人会因方案而新陷入食物、住所或必要药物匮乏；但这部分人数少于因方案而摆脱同类匮乏的人数。",
+      "truthConditions": "税后收入和行为数据表明，新增的同类匮乏人数低于减少的人数。",
+      "falsifier": "新增的同类匮乏人数等于或超过减少的人数。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话把方案减少的基本生活匮乏，与税收或行为变化新造成的同类匮乏放在同一口径下比较。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "income_reduces_caseworker_discretion": {
+      "id": "income_reduces_caseworker_discretion",
+      "kind": "stipulated",
+      "statement": "基本现金只根据年龄和居住记录自动发放。个案工作人员不能依据含义模糊的评价标准拒绝发放。",
+      "truthConditions": "发放规则只依赖年龄和居住记录，个案人员没有其他拒绝基础支付的裁量权。",
+      "falsifier": "个案人员仍能根据没有列明边界的评价标准拒绝发放。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目固定的发放规则：基础现金只看年龄和居住记录，个案工作人员不能用含义模糊的态度评价拒绝发放。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "income_status_quo_gatekeeping": {
+      "id": "income_status_quo_gatekeeping",
+      "kind": "stipulated",
+      "statement": "现有基础救助允许个案工作人员用没有完整定义的“求职诚意”或“家庭支持”等标准拒绝发放，而且拒绝前没有独立复核。",
+      "truthConditions": "开放性的拒绝标准和拒绝前没有独立复核这两个条件同时存在。",
+      "falsifier": "拒绝只能依据完整列明、可以核实的标准，或者拒绝前必须经过独立复核。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目对现行救助的设定：工作人员可以使用边界不清的标准拒绝申请，而且拒绝前没有独立复核。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "income_exit_abuse": {
+      "id": "income_exit_abuse",
+      "kind": "empirical",
+      "statement": "方案实施后，曾遭遇工资扣留、工作场所暴力或伴侣暴力的人，离开相关雇佣或伴侣关系的比例上升。",
+      "truthConditions": "纵向数据使用事先确定的事件定义，显示现金到账后退出比例上升，而且当地就业和住房供给变化不能解释这个结果。",
+      "falsifier": "退出比例没有上升、反而下降，或者变化可以由其他服务扩张解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问稳定现金到账后，遭遇扣薪或暴力的人是否更有可能离开相关雇佣或伴侣关系。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "income_dependency_control": {
+      "id": "income_dependency_control",
+      "kind": "empirical",
+      "statement": "在部分受助者中，雇主或伴侣控制着当事人获得食物、住所或必要医疗的唯一来源，并能通过切断这些资源，提高当事人拒绝要求的代价。",
+      "truthConditions": "个案资料和调查数据同时确认：资源来源是唯一的，控制者确实能切断它，而且切断会增加拒绝要求的损失。",
+      "falsifier": "当事人有可以立即使用的替代来源，或者控制者不能改变其获得基本资源的条件。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话问的是一种具体控制关系：雇主或伴侣是否掌握当事人唯一的基本生活来源，并能用切断资源提高拒绝要求的代价。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "income_financed_from_voluntary_holdings": {
+      "id": "income_financed_from_voluntary_holdings",
+      "kind": "stipulated",
+      "statement": "新增税款来自劳动报酬、投资收益和自愿交易所得。本题假定这些收入不是靠欺诈或强迫取得的。",
+      "truthConditions": "题目明确把收入来源限制在这些条件内。",
+      "falsifier": "收入来自欺诈、强制，或者来自已经确认但没有补偿的第三方损失。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目对税源取得方式的限定：相关收入来自劳动、投资或自愿交易，题目没有设定其中存在欺诈或强迫。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "income_noncontributors": {
+      "id": "income_noncontributors",
+      "kind": "empirical",
+      "statement": "部分领取者与持续贡献者有相近的劳动能力、工作机会和照护负担，但连续五年没有从事有偿劳动、照护、学习或社区服务。",
+      "truthConditions": "个体数据按事先确定的标准，同时满足能力相近、机会相近、照护负担相近和连续五年没有这些活动。",
+      "falsifier": "不存在这样的群体，或者他们的能力、机会、未统计贡献或照护负担与持续贡献者并不相近。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述一个特定群体：他们与贡献者的能力、机会和照护负担相近，却连续多年没有从事题目列出的任何贡献活动。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "income_program_requires_contributions": {
+      "id": "income_program_requires_contributions",
+      "kind": "stipulated",
+      "statement": "这项现金支付只有在税收持续流入时才能维持。如果税收下降，而其他条件不变，支付总额就会下降，或者转化为债务。",
+      "truthConditions": "方案的筹资规则和预算关系都显示支付依赖持续的税收、借款或其他投入。",
+      "falsifier": "在没有持续税收、借款或其他投入的情况下，支付总额仍能长期保持不变。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明预算关系：现金支付不能凭空持续，必须依靠税收、借款或其他持续投入。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "income_future_burden": {
+      "id": "income_future_burden",
+      "kind": "empirical",
+      "statement": "如果方案保持不变，未来二十年增加的净债务会通过更高税率或削减基础服务，使后续人口中至少与当前受益人数相当的一部分人，无法稳定获得食物、住所、必要能源或必要医疗。",
+      "truthConditions": "经独立复核的长期预算和分配模型，在主要参数范围内都得到这种规模的后续物质匮乏。",
+      "falsifier": "方案长期收支平衡，或者未来调整不会造成这种规模的基本生活条件丧失。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话问的是长期财政后果：现有方案不调整时，新增债务是否会通过税收或服务削减，使以后的人失去基本生活条件。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_program_scope": {
+      "id": "carbon_program_scope",
+      "kind": "stipulated",
+      "statement": "方案根据煤、石油和天然气燃烧后会产生多少碳排放来收费，费率在十年内逐步提高。扣除管理成本后的收入平均返还给每个人；进口商品按同一标准处理，政府每三年公开检查一次实际效果。",
+      "truthConditions": "方案文本同时包含收费口径、十年递增、等额返还、进口调整和三年复核。",
+      "falsifier": "其中任何一项发生变化。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这里只是在固定碳费方案的收费方式、提高速度、返还方式、进口处理和复核周期。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "carbon_reduces_damage": {
+      "id": "carbon_reduces_damage",
+      "kind": "empirical",
+      "statement": "与不实施政策相比，这项方案在十年内使累计温室气体排放至少减少15%。研究模型同时显示，由这些排放造成的死亡、重伤和财产损失也会减少。",
+      "truthConditions": "多种模型在主要参数范围内都显示排放和损失下降，而且累计排放差不低于 15%。",
+      "falsifier": "排放差接近零、排放反而增加，或者死亡、重伤和财产损失没有下降。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问方案是否真的减少累计排放，并进一步减少由气候变化造成的死亡、重伤或财产损失。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_no_equal_alternative": {
+      "id": "carbon_no_equal_alternative",
+      "kind": "empirical",
+      "statement": "在财政成本相同、执行时间同为十年的条件下，已经评估过的其他政策组合——也就是不靠碳排放收费的方案——累计减排量都低于这项方案。",
+      "truthConditions": "在统一的核算范围内，可比模型都显示替代组合的减排量较低。",
+      "falsifier": "存在财政成本不更高、限制也更小，而且减排量达到或超过这项方案的替代办法。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较的是已经评估过的替代政策。在财政成本和时间相同的条件下，它们是否能达到同样的累计减排量。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_future_loss": {
+      "id": "carbon_future_loss",
+      "kind": "empirical",
+      "statement": "不采取政策会提高未来二十年至八十年间，人们遭受高温相关死亡、洪水损失和粮食减产的概率。",
+      "truthConditions": "多个独立来源的模型，在规定时间范围内都显示这些指标的概率上升。",
+      "falsifier": "模型不支持概率上升，或者变化可以完全由与排放无关的因素解释。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问不采取政策是否会提高未来人遭受高温死亡、洪水损失和粮食减产的概率。损失应不应该被重视，要另问规范原则。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_external_costs": {
+      "id": "carbon_external_costs",
+      "kind": "empirical",
+      "statement": "化石燃料造成的碳排放增加时，没有参与相关生产或交易的人，会承担更多可以估计的身体或财产损失；排放者也能够改变自己的排放量。",
+      "truthConditions": "归因模型得到正的边际损失估计，同时存在能够改变排放量的技术或行为选择。",
+      "falsifier": "边际损失不为正，或者排放者无法控制排放量。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述排放与第三方损失之间的关系：排放增加是否会增加旁人的身体或财产损失，以及排放者是否能够改变排放量。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_bottom_decile_loss": {
+      "id": "carbon_bottom_decile_loss",
+      "kind": "empirical",
+      "statement": "即使把现金返还算进去，在收入最低的10%家庭中，仍有至少十分之一在方案实施后的前三年，无法同时支付最低食物、住所、必要医疗，以及维持就业所需的能源和交通费用。",
+      "truthConditions": "家庭微观数据已经计算返还、替代行为和现有救助后，受影响比例仍不低于 10%。",
+      "falsifier": "这些家庭都能同时支付上述最低费用，或者受影响比例低于 10%。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问现金返还以后，最低收入家庭中是否仍有一部分人无法同时支付题目列出的必要生活和就业支出。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_leakage": {
+      "id": "carbon_leakage",
+      "kind": "empirical",
+      "statement": "部分企业把生产转移到没有这项收费的地区，国内商品也被高排放的进口商品替代。这些变化抵消了境内减排的80%以上，因此全球累计排放几乎没有下降。",
+      "truthConditions": "供应链和贸易数据按消费口径核算后，抵消比例不低于 80%。",
+      "falsifier": "抵消比例明显低于 80%，而且全球累计排放仍明显下降。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问境内减排是否被生产转移和进口替代大幅抵消，以至于全球累计排放几乎没有下降。",
+      "plainTruthConditions": "需要有质量足够的研究或数据支持这个结果；比较对象应当足够相似，而且主要的其他原因已经被排除或单独计算。",
+      "plainFalsifier": "如果更可靠的研究没有发现这个结果、发现了相反结果，或者主要变化其实由其他原因造成，这句话就不成立。"
+    },
+    "carbon_tracking_discretion": {
+      "id": "carbon_tracking_discretion",
+      "kind": "stipulated",
+      "statement": "主管机关可以用不公开的计算模型，调整用来估算企业排放量的系数，并在复核完成前先追缴费用；企业看不到模型采用了哪些参数。",
+      "truthConditions": "制度同时赋予机关调整系数和先行追缴的能力，而且模型参数不公开。",
+      "falsifier": "模型参数公开，调整受到明确规则限制，并且追缴前可以得到独立复核。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这是题目固定的执行条件：机关可以使用企业看不到的模型调整系数，并在独立复核完成前先追缴费用。",
+      "plainTruthConditions": "查看题目或制度文本：这句话列出的条件必须全部存在。",
+      "plainFalsifier": "只要其中任何一项条件与题设不符，这句话就不成立。"
+    },
+    "severe_harm_removes_options": {
+      "id": "severe_harm_removes_options",
+      "kind": "descriptive",
+      "statement": "死亡会结束一个人之后的全部行动；重伤通常会减少他实际能够做出的选择和行动。",
+      "truthConditions": "事先明确“死亡”“重伤”和“能够实际完成的行动”后，观察结果符合上述关系。",
+      "falsifier": "死亡后同一个人仍能继续行动，或者重伤通常不减少任何可以实际完成的行动。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述死亡和重伤对行动能力的影响：死亡终止以后的一切行动，重伤通常会减少一个人实际能做的事情。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "criminal_penalty_reduces_options": {
+      "id": "criminal_penalty_reduces_options",
+      "kind": "descriptive",
+      "statement": "罚款、拘留或刑事记录会改变一个人可支配的资源、可采取的行动或未来机会。",
+      "truthConditions": "至少一种法定后果对资源、行动范围或未来机会产生可以观察的变化。",
+      "falsifier": "所有这些法定后果都不改变任何资源、行动范围或未来机会。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述刑罚或刑事记录会怎样改变一个人的资源、行动范围和未来机会，不判断这种改变是否正当。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "unchecked_power_changes_dependence": {
+      "id": "unchecked_power_changes_dependence",
+      "kind": "descriptive",
+      "statement": "当一方可以单方面干预另一方，又不用说明理由时，后者的选择会受到前者是否使用这项能力的影响。",
+      "truthConditions": "干预能力真实存在，可以单方启动，被干预者也不能依靠现有规则阻止。",
+      "falsifier": "干预必须得到被干预者同意，或者有可以执行的规则阻止单方启动。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述一种权力关系：当一方可以随时干预且不用说明理由，另一方的选择就会受到这项能力本身的影响。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "participation_is_membership_mechanism": {
+      "id": "participation_is_membership_mechanism",
+      "kind": "descriptive",
+      "statement": "投票、参加听证、提出申诉和担任公职，都是公民影响共同规则和公共机构运作的具体方式。",
+      "truthConditions": "制度规则使这些活动能够改变决定、人员安排或正式记录。",
+      "falsifier": "这些活动在制度上不能改变任何决定、人员安排或正式记录。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明公民通过哪些具体渠道影响共同规则和公共机构，不判断这些渠道应当如何分配。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "decision_makers_are_fallible": {
+      "id": "decision_makers_are_fallible",
+      "kind": "descriptive",
+      "statement": "个人和机构在证据不完整时作出的判断，有时会被后来出现的证据推翻。",
+      "truthConditions": "存在按照同一事实标准、后来被新证据推翻的判断案例。",
+      "falsifier": "此类判断从来没有被后来证据推翻。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说个人和机构可能判断错误，而且后来出现的新证据有时会推翻原判断。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "deprivation_reduces_capacity": {
+      "id": "deprivation_reduces_capacity",
+      "kind": "descriptive",
+      "statement": "缺少食物、住所或必要医疗，会降低人的存活机会、健康状况，或减少他实际能够完成的行动。",
+      "truthConditions": "按事先确定的指标观察到存活、健康或可执行行动中的至少一项下降。",
+      "falsifier": "这些缺失不改变任何一项指标。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述基本生活匮乏对生存、健康和实际行动能力的影响，不直接推出国家应采取哪种救助政策。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "cooperation_requires_inputs": {
+      "id": "cooperation_requires_inputs",
+      "kind": "descriptive",
+      "statement": "有些公共制度只有持续得到劳动、税款或照护投入，才能维持原有服务数量。",
+      "truthConditions": "预算关系或生产关系显示，投入减少会使服务数量下降。",
+      "falsifier": "服务数量与任何持续投入都没有关系。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明某些公共制度必须持续获得劳动、税款或照护投入，才能维持原有服务。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "voluntary_acquisition_tracks_choice": {
+      "id": "voluntary_acquisition_tracks_choice",
+      "kind": "descriptive",
+      "statement": "在没有欺诈和强迫的生产或交换中，资源转移是参与者根据自己的行动和同意完成的。",
+      "truthConditions": "参与者能够拒绝交易，而且资源转移与其行动和同意相符。",
+      "falsifier": "参与者不能拒绝，或者资源转移与其行动和同意没有关系。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述没有欺诈和强迫时，资源转移通常来自参与者自己的行动和同意。它还没有说明由此产生多强的财产权。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "birth_time_not_action": {
+      "id": "birth_time_not_action",
+      "kind": "descriptive",
+      "statement": "一个人出生在什么时间，不是他在出生前能够选择或改变的事情。",
+      "truthConditions": "按照“选择”的通常定义，出生前不存在这个人的选择行为。",
+      "falsifier": "存在这个人在出生前选择自己出生时间的行为。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明一个人的出生时间不是他本人能够事先选择或改变的事情。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "correction_requires_information": {
+      "id": "correction_requires_information",
+      "kind": "descriptive",
+      "statement": "如果一个错误从未被发现，或者发现后没有告知能够修改它的人，那么制度就不会根据这个错误作出纠正。",
+      "truthConditions": "纠正过程至少需要发现错误和把信息传递给有修改能力的人这两个环节。",
+      "falsifier": "一个从未被发现、也从未被传递的信息，仍能触发对该错误的纠正。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明纠错需要信息：如果错误从未被发现，也没有传给能够修改它的人，制度就不会据此纠正错误。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "common_rules_affect_subjects": {
+      "id": "common_rules_affect_subjects",
+      "kind": "descriptive",
+      "statement": "强制性的共同规则会改变受规则约束者可以做什么、拥有多少资源，或会承担什么法律后果。",
+      "truthConditions": "规则至少对行动、资源或法律后果中的一项产生可以观察的变化。",
+      "falsifier": "规则不改变任何受约束者的行动、资源或法律后果。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述强制性共同规则会实际改变受规则者的行动、资源或法律后果。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "ineffective_policy_uses_resources": {
+      "id": "ineffective_policy_uses_resources",
+      "kind": "descriptive",
+      "statement": "执行一项强制政策，至少需要人员、时间、信息系统或财政支出中的一种资源。",
+      "truthConditions": "预算或工作流程记录显示至少有一种投入。",
+      "falsifier": "政策执行完全不需要任何人员、时间、系统或财政投入。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明执行任何强制政策都要占用至少一种现实资源，即使政策最后没有达到目标。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "organized_violence_disrupts_exchange": {
+      "id": "organized_violence_disrupts_exchange",
+      "kind": "descriptive",
+      "statement": "持续的组织性暴力会减少人员流动、交易、公共服务运行或不同群体之间的合作，至少影响其中一项。",
+      "truthConditions": "相关指标在有组织暴力持续期间出现下降。",
+      "falsifier": "这些指标都不受持续有组织暴力影响。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述持续的组织性暴力会怎样妨碍人员流动、交易、公共服务或群体合作。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "dependency_allows_compliance_pressure": {
+      "id": "dependency_allows_compliance_pressure",
+      "kind": "descriptive",
+      "statement": "当一方能够切断另一方获得食物、住所或必要医疗的唯一来源时，这项能力会提高后者拒绝要求所要付出的代价。",
+      "truthConditions": "资源被切断后，拒绝要求所带来的预期损失上升。",
+      "falsifier": "切断资源的能力不改变拒绝要求的任何代价。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述控制唯一生存来源会产生什么后果：被控制者拒绝要求时会付出更高代价。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "controllable_activity_causes_third_party_loss": {
+      "id": "controllable_activity_causes_third_party_loss",
+      "kind": "descriptive",
+      "statement": "如果改变一项可控制活动的规模，会随之改变第三方遭受的身体或财产损失，那么两者之间存在可以通过干预改变的因果关系。",
+      "truthConditions": "采用能够识别因果关系的方法后，改变活动规模会改变损失结果。",
+      "falsifier": "改变活动规模不会改变第三方损失。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只问损失是否能够通过改变活动规模而改变。若能改变，就说明活动与第三方损失之间存在可干预的因果关系。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "personal_choice_locates_primary_consequences": {
+      "id": "personal_choice_locates_primary_consequences",
+      "kind": "descriptive",
+      "statement": "在已经排除威胁、欺诈、针对个人的骚扰，以及未经同意的身体或财产影响后，一个成年人是否采用某种生活方式，主要改变的是他本人的行动安排和生活计划。",
+      "truthConditions": "比较选择前后，主要变化发生在行为者本人的行动、资源使用或计划安排中，而且题目确实排除了所列第三方影响。",
+      "falsifier": "主要变化发生在未同意第三方的身体、财产或可执行行动中，或者题目没有排除所列影响。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话已经排除威胁、欺诈、骚扰和未经同意的伤害，只问剩余生活方式的主要后果是不是落在行为者本人身上。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "agency_requires_minimum_capabilities": {
+      "id": "agency_requires_minimum_capabilities",
+      "kind": "descriptive",
+      "statement": "一个人如果死亡、长期失去意识，或者无法获得维持生存所需的食物、住所和必要医疗，他能够形成并实际执行的生活计划会变少。",
+      "truthConditions": "按照事先确定的生活计划和执行条件，至少一种状态会使可以实际执行的计划集合缩小。",
+      "falsifier": "这些状态都不改变任何可以形成或执行的生活计划。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述行动能力的最低条件：死亡、长期失去意识或缺少维持生存的基本资源，会减少人能够形成和执行的生活计划。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "contestability_changes_decision_input": {
+      "id": "contestability_changes_decision_input",
+      "kind": "descriptive",
+      "statement": "当事人如果能看到决定理由、提交反证，并得到独立机构复核，他提供的信息就有可能改变决定；如果这些渠道都不存在，他的信息就无法通过这些渠道影响决定。",
+      "truthConditions": "制度流程确实允许理由送达、反证提交和独立复核，而且信息有进入决定记录的路径。",
+      "falsifier": "即使渠道存在，信息也不能进入决定；或者渠道不存在时，信息仍能通过同样渠道改变决定。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只比较两种程序：有理由说明、反证和独立复核时，当事人的信息可能改变决定；没有这些渠道时，信息无法通过该程序发挥作用。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "unreviewable_power_blocks_counterevidence": {
+      "id": "unreviewable_power_blocks_counterevidence",
+      "kind": "descriptive",
+      "statement": "如果公权力不告诉当事人个案决定依据，也没有独立复核，当事人掌握的反证就无法进入这套复核程序并改变决定。",
+      "truthConditions": "制度缺少决定依据送达和独立复核入口，因此反证没有进入该程序的路径。",
+      "falsifier": "存在可以使用的理由送达和独立复核入口，而且反证能够进入决定过程。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明：如果机关既不告知决定依据，也不提供独立复核，当事人的反证就没有正式渠道进入并改变决定。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "policy_revision_requires_performance_signals": {
+      "id": "policy_revision_requires_performance_signals",
+      "kind": "descriptive",
+      "statement": "一个制度要根据执行结果修改政策，至少需要记录结果、把结果和目标比较，再把比较信息传给能够修改政策的人。",
+      "truthConditions": "政策修改流程中同时存在记录、比较和传递这三个环节。",
+      "falsifier": "制度能够根据从未记录、比较或传递的结果修改政策。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明制度要根据结果改进政策，至少需要记录结果、与目标比较，并把信息交给有权修改政策的人。",
+      "plainTruthConditions": "按题目给出的定义和观察方式，确实能看到这句话描述的关系。",
+      "plainFalsifier": "如果按同样定义观察不到这种关系，或能观察到相反关系，这句话就不成立。"
+    },
+    "speech_penalizes_contestable_opinion": {
+      "id": "speech_penalizes_contestable_opinion",
+      "kind": "stipulated",
+      "statement": "在题设范围内，一段表达即使不含威胁、骚扰、可核实的虚假事实或暴力指挥，只要被认定为严重贬低或侮辱，仍可能受到罚款或拘留。",
+      "truthConditions": "法律适用条件只要求表达被认定为严重贬低或侮辱，并且题设明确排除了威胁、骚扰、可核实的虚假事实与暴力指挥。",
+      "falsifier": "法律只处罚题设已经排除的威胁、骚扰、可核实的虚假事实或暴力指挥，不处罚剩余意见。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只确认法律会不会处罚仍可公开争论、但被认定为严重冒犯的意见。",
+      "plainTruthConditions": "按题设文字，不必再证明直接伤害或事实虚假，只要达到冒犯标准就可能受罚。",
+      "plainFalsifier": "如果剩余意见不会仅因严重冒犯而受罚，这句话就不成立。"
+    },
+    "public_inquiry_requires_contestable_dissent": {
+      "id": "public_inquiry_requires_contestable_dissent",
+      "kind": "descriptive",
+      "statement": "要检验一个公共判断能否回应反驳，至少需要有人能够提出与该判断不一致的理由，并让其他人看到和回应这些理由。",
+      "truthConditions": "反驳理由能够被提出、传递并得到回应时，公共判断才实际经历了这类检验。",
+      "falsifier": "在任何反驳理由都不能被提出或传递时，公共判断仍能完成同样的反驳检验。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述公开检验判断所需的信息条件。",
+      "plainTruthConditions": "需要能指出反对意见如何进入讨论并得到回应。",
+      "plainFalsifier": "如果完全没有反对意见进入也能完成同一种检验，这句话就不成立。"
+    },
+    "collective_action_requires_coordination": {
+      "id": "collective_action_requires_coordination",
+      "kind": "descriptive",
+      "statement": "政治团体、宗教团体、工会和其他自愿组织要共同采取行动，成员至少需要能够相互联系、安排活动并交换信息。",
+      "truthConditions": "组织活动实际依赖成员之间的联系、安排或信息交换。",
+      "falsifier": "成员在完全不能相互联系、安排活动或交换信息时，仍能完成同样的共同组织行动。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述多人组织行动所需的基本协调条件。",
+      "plainTruthConditions": "观察这些组织如何招募成员、讨论和安排活动即可核对。",
+      "plainFalsifier": "如果切断这些协调渠道不影响共同活动，这句话就不成立。"
+    },
+    "workplace_cogovernance_scope": {
+      "id": "workplace_cogovernance_scope",
+      "kind": "stipulated",
+      "statement": "题设制度让劳动者和股东分别选出大型企业董事会的一半成员；关闭主要厂区、大规模裁员、重大自动化投资和利润再投资，需要两组董事分别过半同意。",
+      "truthConditions": "法律文本包含两组各半席位和重大事项双重多数规则。",
+      "falsifier": "劳动者没有选举董事，或者重大事项仍可由股东一方单独通过。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只确认共同治理制度实际改变了哪些表决安排。",
+      "plainTruthConditions": "查看席位产生方式和重大事项的表决门槛即可确认。",
+      "plainFalsifier": "只要劳动者没有真实表决席位，或股东仍可单方决定，这句话就不成立。"
+    },
+    "workers_excluded_from_major_decisions": {
+      "id": "workers_excluded_from_major_decisions",
+      "kind": "empirical",
+      "statement": "在政策覆盖的企业中，劳动者目前不能通过一人一票选出的代表，对关闭主要厂区、大规模裁员、重大自动化投资或利润再投资行使表决权；这些决定会改变其就业、工作地点或劳动条件。",
+      "truthConditions": "公司章程与表决记录显示劳动者没有这类代表席位，人员和经营记录显示相关决定会改变就业、地点或劳动条件。",
+      "falsifier": "劳动者已经拥有同等表决席位，或者这些决定不会改变其就业、地点或劳动条件。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话同时检查现有表决权分配，以及重大决定是否会实际改变劳动者处境。",
+      "plainTruthConditions": "需要核对公司治理文件和决定实施后的人员记录。",
+      "plainFalsifier": "如果劳动者已有同等表决权，或决定对其处境没有影响，这句话就不成立。"
+    },
+    "production_rules_affect_direct_producers": {
+      "id": "production_rules_affect_direct_producers",
+      "kind": "descriptive",
+      "statement": "关闭厂区、裁员、自动化投资和利润再投资会改变生产如何组织，也会改变直接参与生产者的工作、收入或工作地点。",
+      "truthConditions": "这些决定实施后，生产流程以及劳动者的工作、收入或地点至少一项发生变化。",
+      "falsifier": "这些决定既不改变生产组织，也不改变直接生产者的工作、收入或地点。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述重大生产规则与直接生产者处境之间的关系。",
+      "plainTruthConditions": "比较决定实施前后的生产流程和人员记录即可核对。",
+      "plainFalsifier": "如果相关记录均没有变化，这句话就不成立。"
+    },
+    "large_firm_unilateral_power": {
+      "id": "large_firm_unilateral_power",
+      "kind": "empirical",
+      "statement": "在政策覆盖的企业中，现有董事会能够在劳动者没有表决或申诉渠道时，单方面决定关闭主要厂区或大规模裁员；多数受影响劳动者无法在三个月内以相近收入和搬迁成本转到其他工作。",
+      "truthConditions": "治理文件显示单方决定权，申诉规则不存在，就业记录显示多数受影响者三个月内找不到收入和搬迁成本相近的工作。",
+      "falsifier": "劳动者有实质表决或申诉渠道，或者多数人能在三个月内低成本转到相近工作。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话检查企业一方是否能单方改变劳动者基本处境，以及劳动者能否低成本退出。",
+      "plainTruthConditions": "需要同时查看治理规则、申诉渠道和受影响者再就业记录。",
+      "plainFalsifier": "只要不存在单方权力，或退出成本很低，这句话就不成立。"
+    },
+    "cogovernance_expected_net_gain": {
+      "id": "cogovernance_expected_net_gain",
+      "kind": "empirical",
+      "statement": "研究把就业、收入、生产率、健康、转制成本、不同群体的得失和估计不确定性按预先公开的同一量表合并后，题设制度的结果净值显著高于零。",
+      "truthConditions": "透明且可复核的比较覆盖主要受影响群体、分配和不确定性，并得到稳定的正净结果。",
+      "falsifier": "比较遗漏主要群体或成本，结果对主要参数不稳定，或者按同一量表得到的结果净值不高于零。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话检查的是所有受影响者的可比较结果，而不是只看劳动者或股东一方。",
+      "plainTruthConditions": "需要一份覆盖主要得失、分配和不确定性的公开比较。",
+      "plainFalsifier": "如果遗漏重要损失，或完整比较后净结果不为正，这句话就不成立。"
+    },
+    "tested_governance_coordinates_critical_functions": {
+      "id": "tested_governance_coordinates_critical_functions",
+      "kind": "empirical",
+      "statement": "在政策覆盖的企业中，现有治理程序连续十年按公开指标维持关键供应、按期发薪和安全事故纠正；资金、行业和监管差异不能解释这些结果的主要部分。",
+      "truthConditions": "连续记录显示三类结果稳定存在，比较研究排除了主要替代解释。",
+      "falsifier": "结果并不稳定、无法核查，或主要由资金、行业、监管等其他因素造成。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话不把历史本身当成功能，只检查现有程序是否有持续、可核查的协调结果。",
+      "plainTruthConditions": "需要长期公开记录和能够区分其他原因的比较。",
+      "plainFalsifier": "如果只是存在得久，却没有可辨认结果，这句话就不成立。"
+    },
+    "cogovernance_lacks_equivalent_transition_evidence": {
+      "id": "cogovernance_lacks_equivalent_transition_evidence",
+      "kind": "stipulated",
+      "statement": "题设制度会在两年内全国生效；目前没有同规模本地试点证明双重多数程序在供应中断、紧急停产和按期发薪方面能达到现有程序的结果。",
+      "truthConditions": "实施期限为两年，而且不存在覆盖相近企业规模与关键情境的本地试点证据。",
+      "falsifier": "政策允许先充分试点，或者已经有同规模证据覆盖这些关键情境。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只固定实施速度和替代程序尚未经过同规模验证的状态。",
+      "plainTruthConditions": "核对实施时间表和已有试点范围即可确认。",
+      "plainFalsifier": "如果已有等规模验证或先试点后扩展，这句话就不成立。"
+    },
+    "staged_cogovernance_reform_available": {
+      "id": "staged_cogovernance_reform_available",
+      "kind": "stipulated",
+      "statement": "可以先在自愿参加的企业试行劳动者三分之一席位，保留现有紧急处置程序，并根据五年公开评估决定是否扩大；这条路径仍会增加劳动者表决权。",
+      "truthConditions": "法律和执行条件允许该试点，试点保留紧急程序并设有公开评估与扩展入口。",
+      "falsifier": "试点在法律或执行上不可行，不能增加劳动者表决权，或者无法保留关键程序。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明存在一条可逆、分阶段且仍增加劳动者参与的替代路径。",
+      "plainTruthConditions": "需要确认试点具有明确参与规则、时间、评估和扩展机制。",
+      "plainFalsifier": "如果替代路径无法实际运行或不增加参与，这句话就不成立。"
+    },
+    "staged_cogovernance_has_better_expected_results": {
+      "id": "staged_cogovernance_has_better_expected_results",
+      "kind": "empirical",
+      "statement": "研究把就业、收入、生产率、健康、转制成本、不同群体的得失和估计不确定性按预先公开的同一量表合并后，分阶段路径的结果净值显著高于题设方案。",
+      "truthConditions": "透明比较覆盖主要群体、分配与不确定性，并稳定显示分阶段路径的结果净值更高。",
+      "falsifier": "比较遗漏主要得失、结果不稳定，或分阶段路径的结果净值不高于题设方案。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较题设方案与一条具体替代路径对所有受影响者的结果。",
+      "plainTruthConditions": "需要在相同时间口径下完整比较两条路径。",
+      "plainFalsifier": "如果完整比较不能显示分阶段路径更好，这句话就不成立。"
+    },
+    "investors_acquired_governance_claims_without_coercion": {
+      "id": "investors_acquired_governance_claims_without_coercion",
+      "kind": "stipulated",
+      "statement": "本题假定股东通过没有欺诈或强迫的投资与交换取得股份，股份原本包含选举全部董事的表决份额；题设制度会把其中一半董事席位改由劳动者选举。",
+      "truthConditions": "股份取得没有欺诈或强迫，原治理文件把全部董事选举份额交给股东，新制度改变其中一半。",
+      "falsifier": "股份来自欺诈或强迫，股东原本没有这些表决份额，或新制度不改变其份额。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只固定股份取得方式和制度会改变的治理份额。",
+      "plainTruthConditions": "核对取得过程、公司章程与新旧席位规则即可确认。",
+      "plainFalsifier": "任一固定条件不成立时，这句话就不成立。"
+    },
+    "institutional_practice_carries_coordination_knowledge": {
+      "id": "institutional_practice_carries_coordination_knowledge",
+      "kind": "descriptive",
+      "statement": "一个反复处理供应中断、紧急停产和工资支付的程序，会把参与者积累的分工、信息传递和纠错方式保存在规则与惯例中。",
+      "truthConditions": "规则与惯例记录了分工、信息路径和纠错步骤，并在重复事件中实际被使用。",
+      "falsifier": "程序没有保存这些内容，或这些内容在重复事件中从未发挥作用。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话描述实践如何承载可观察的协调知识，不把制度年龄本身当作证据。",
+      "plainTruthConditions": "查看程序文件和真实事件中的使用记录即可核对。",
+      "plainFalsifier": "如果惯例只是形式存在、没有承载或使用协调信息，这句话就不成立。"
+    },
+    "comparable_wellbeing_effects_do_not_depend_on_identity": {
+      "id": "comparable_wellbeing_effects_do_not_depend_on_identity",
+      "kind": "descriptive",
+      "statement": "在测量口径和变化幅度相同时，一项健康、痛苦、收入或实际机会的变化，不会仅因承受者属于不同群体而变成另一种可测量结果。",
+      "truthConditions": "对不同群体使用同一指标和尺度时，相同变化得到相同测量结果。",
+      "falsifier": "只改变承受者身份、不改变指标和幅度，测量结果本身就发生变化。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明比较结果时采用相同口径，不先决定政策取舍。",
+      "plainTruthConditions": "确认比较对各群体使用相同定义、单位和时间范围。",
+      "plainFalsifier": "如果身份变化会在相同口径下自动改变测量结果，这句话就不成立。"
+    },
+    "local_adjustment_uses_changing_information": {
+      "id": "local_adjustment_uses_changing_information",
+      "kind": "descriptive",
+      "statement": "课程需求、供应短缺、技术选择和可用替代方案会随时间与地点变化；直接参与者能够观察到其中一部分尚未进入全国汇总的数据。",
+      "truthConditions": "本地记录先于全国数据出现变化，而且直接参与者实际掌握尚未汇总的需求、短缺、技术或替代信息。",
+      "falsifier": "相关条件不会随时间地点变化，或者全国汇总能同时、完整地获得全部相关信息。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述信息分布和更新速度，不判断应由谁作决定。",
+      "plainTruthConditions": "比较本地记录出现变化的时间与全国数据更新时间即可核对。",
+      "plainFalsifier": "如果全国数据没有时滞和遗漏，或本地没有额外信息，这句话就不成立。"
+    },
+    "carbon_actors_choose_adjustment": {
+      "id": "carbon_actors_choose_adjustment",
+      "kind": "stipulated",
+      "statement": "题设碳费没有为每家企业或家庭指定生产、运输、取暖或减排方法；缴费者可以自行选择减少燃料、改用替代方案或继续使用并支付费用。",
+      "truthConditions": "政策只规定统一收费条件，没有逐户指定技术、产量或消费办法。",
+      "falsifier": "机关会逐户指定技术、产量、运输或取暖方式，并禁止自行调整。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只确认政策是否给各方保留了选择具体调整方式的空间。",
+      "plainTruthConditions": "查看政策是否只定收费规则、把具体响应留给缴费者。",
+      "plainFalsifier": "如果具体响应由机关逐户命令，这句话就不成立。"
+    },
+    "income_least_advantaged_best": {
+      "id": "income_least_advantaged_best",
+      "kind": "empirical",
+      "statement": "在财政成本相同的可行方案中，题设基本现金使长期收入、实际机会和公共参与综合指标处于最低十分位的人群，获得最高的二十年预期指标。",
+      "truthConditions": "透明比较覆盖可行替代方案与二十年结果，并稳定显示最低十分位群体在题设方案下的预期指标最高。",
+      "falsifier": "有可行替代方案能让该群体得到更高指标，或者结果对主要参数不稳定。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只比较不同可行制度下处境最低群体的长期前景，不比较社会总量。",
+      "plainTruthConditions": "需要用同一口径比较最低十分位群体在各方案下的长期收入、机会和参与。",
+      "plainFalsifier": "如果另一方案让该群体长期前景更高，这句话就不成立。"
+    },
+    "workplace_least_advantaged_best": {
+      "id": "workplace_least_advantaged_best",
+      "kind": "empirical",
+      "statement": "在可行的企业治理方案中，题设共同治理使工资、就业稳定性和职业转换机会综合指标处于最低十分位的劳动者，获得最高的十年预期指标。",
+      "truthConditions": "透明比较覆盖可行治理方案，并稳定显示最低十分位劳动者在题设方案下的十年预期指标最高。",
+      "falsifier": "有可行治理方案能让该群体得到更高指标，或者比较遗漏主要就业与转换影响。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只比较不同治理制度下处境最低劳动者的长期前景。",
+      "plainTruthConditions": "需要用同一口径比较最低十分位劳动者在各治理方案下的结果。",
+      "plainFalsifier": "如果另一可行方案使其长期指标更高，这句话就不成立。"
+    },
+    "speech_only_comprehensive_doctrine_reason": {
+      "id": "speech_only_comprehensive_doctrine_reason",
+      "kind": "stipulated",
+      "statement": "立法记录给出的唯一理由是某一宗教、民族或国家象征具有不可质疑的神圣地位；记录没有提供可公开核对的伤害、平等自由或共同安全理由。",
+      "truthConditions": "立法说明只援引特定神圣地位，而且没有提出能够由共同证据核对的其他政治理由。",
+      "falsifier": "立法记录还提供了可公开核对的伤害、平等自由或共同安全理由。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只描述强制法律公开给出的理由类型。",
+      "plainTruthConditions": "查看正式立法说明和辩论记录即可确认。",
+      "plainFalsifier": "如果存在独立于特定信仰的公开理由，这句话就不成立。"
+    },
+    "education_opportunity_program_scope": {
+      "id": "education_opportunity_program_scope",
+      "kind": "stipulated",
+      "statement": "题设基金按家庭收入、地区教育资源和既有入学就业差距的全国公式分配，取代现有地方专项资金；支出类别三年调整一次，地方机构只能在规定类别内选择课程和人员。",
+      "truthConditions": "法律文本同时包含全国公式、替代地方专项、三年周期和类别内地方选择。",
+      "falsifier": "资金不按全国公式分配、不替代地方专项，或地方可以随时把资金转向公式外用途。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只确认资金公式、替代范围、调整周期和地方可选择空间。",
+      "plainTruthConditions": "核对分配公式、被替代资金和地方使用权限即可确认。",
+      "plainFalsifier": "任一核心规则不存在时，这句话就不成立。"
+    },
+    "education_program_equal_sex_access": {
+      "id": "education_program_equal_sex_access",
+      "kind": "stipulated",
+      "statement": "题设制度要求接受公共资金的项目，对达到同一公开准备标准的人开放相同课程和升学资格，不得只因性别拒绝。",
+      "truthConditions": "法律文本明确使用同一准备标准，并禁止仅按性别拒绝相同课程或资格。",
+      "falsifier": "项目仍可仅按性别拒绝达到同一准备标准的人，或规则不涉及相同课程和资格。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只确认题设制度会不会实际取消指定的性别准入排除。",
+      "plainTruthConditions": "核对适用项目、准备标准和禁止排除条款即可确认。",
+      "plainFalsifier": "如果制度仍允许这种排除，这句话就不成立。"
+    },
+    "education_social_origin_gap": {
+      "id": "education_social_origin_gap",
+      "kind": "empirical",
+      "statement": "在能力、学习投入和既有学业表现相近的青年中，来自最低收入五分位家庭或教育资源不足地区者，进入同等学历课程、完成职业训练和获得对应就业的比例持续较低。",
+      "truthConditions": "连续数据控制能力、投入和既有表现后，家庭收入或地区资源仍稳定预测入学、完成或就业差距。",
+      "falsifier": "控制这些条件后差距消失、不稳定，或主要由未计入的准备与投入差异造成。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话比较准备和投入相近的青年，检查家庭与地区背景是否仍对应系统性机会差距。",
+      "plainTruthConditions": "需要可比青年群体的长期入学、训练完成和就业记录。",
+      "plainFalsifier": "如果相近准备者不再因家庭或地区出现差距，这句话就不成立。"
+    },
+    "education_program_reduces_origin_gap": {
+      "id": "education_program_reduces_origin_gap",
+      "kind": "empirical",
+      "statement": "与维持现行制度相比，题设基金在十年内把家庭收入和地区背景对应的同等学历入学、职业训练完成及对应就业差距至少缩小30%。",
+      "truthConditions": "可比研究把人口、经济和学校变化分开计算后，三项差距的综合幅度至少下降30%。",
+      "falsifier": "差距下降不足30%、没有下降，或变化主要由其他因素造成。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只检查题设方案是否实际缩小指定机会差距。",
+      "plainTruthConditions": "需要与现行制度的可比十年结果，并排除主要其他原因。",
+      "plainFalsifier": "如果方案不能稳定缩小差距，这句话就不成立。"
+    },
+    "education_sex_exclusion": {
+      "id": "education_sex_exclusion",
+      "kind": "empirical",
+      "statement": "当前部分接受公共资金的中学和职业训练项目，会仅因学生性别，拒绝准备程度达到同一公开标准的申请者进入相同课程或取得相同升学资格。",
+      "truthConditions": "招生规则或记录显示，达到同一准备标准者仍因性别被拒绝相同课程或资格。",
+      "falsifier": "所有项目都按相同准备标准开放，或者拒绝来自与课程直接相关的其他条件。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只检查相同准备条件下是否存在按性别排除课程或资格。",
+      "plainTruthConditions": "查看公开招生标准、申请记录和拒绝理由即可确认。",
+      "plainFalsifier": "如果性别不是拒绝条件，这句话就不成立。"
+    },
+    "education_least_advantaged_best": {
+      "id": "education_least_advantaged_best",
+      "kind": "empirical",
+      "statement": "在财政成本相同的可行教育方案中，题设基金使长期收入、学习机会和公共参与综合指标处于最低十分位的青年，获得最高的二十年预期指标。",
+      "truthConditions": "透明比较覆盖可行替代方案，并稳定显示最低十分位青年在题设方案下的二十年预期指标最高。",
+      "falsifier": "有可行替代方案让该群体得到更高指标，或者比较遗漏主要长期影响。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只比较各教育方案下处境最低青年的长期前景。",
+      "plainTruthConditions": "需要用同一口径比较处境最低青年在各方案下的长期结果。",
+      "plainFalsifier": "如果另一方案使该群体长期指标更高，这句话就不成立。"
+    },
+    "education_formula_lags_local_needs": {
+      "id": "education_formula_lags_local_needs",
+      "kind": "empirical",
+      "statement": "地方课程需求、教师短缺和岗位技能需求通常在一年内变化，而全国支出类别三年才调整一次；至少20%的基金因此不能转向当地新增的课程或训练需求。",
+      "truthConditions": "地方数据在一年内出现显著变化，类别三年固定，审计显示至少20%资金无法转向新增需求。",
+      "falsifier": "需求变化更慢、类别可及时调整，或无法转向新增需求的资金低于20%。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话检查全国规则的更新时间是否落后于地方变化，并造成资金用途错位。",
+      "plainTruthConditions": "比较地方需求更新时间、全国类别周期和实际资金受限比例即可确认。",
+      "plainFalsifier": "如果公式能及时吸收地方变化，这句话就不成立。"
+    },
+    "tested_local_education_support": {
+      "id": "tested_local_education_support",
+      "kind": "empirical",
+      "statement": "被题设取代的部分地方专项已连续十年按公开指标缩小训练辍学和就业断档，并能在六个月内根据当地课程与岗位变化调整资金用途。",
+      "truthConditions": "连续记录显示两类差距缩小，调整记录显示六个月内改变用途，而且主要替代解释已被排除。",
+      "falsifier": "结果不稳定、无法核查，或地方专项不能在六个月内调整。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话不把地方制度本身当作证据，只检查其是否有持续、可核查的功能。",
+      "plainTruthConditions": "需要十年结果记录和真实资金调整记录。",
+      "plainFalsifier": "如果地方专项只是存在得久却没有这些结果，这句话就不成立。"
+    },
+    "education_replacement_unproven": {
+      "id": "education_replacement_unproven",
+      "kind": "stipulated",
+      "statement": "题设基金会在两年内取代全部地方专项；目前没有同规模试点证明全国公式能保留地方专项的辍学、就业衔接和快速调整结果。",
+      "truthConditions": "替代期限为两年，而且没有覆盖相近规模与功能的试点证据。",
+      "falsifier": "政策允许先充分试点，或已经有同规模证据覆盖这些功能。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只固定替代速度与新制度尚未经过同规模验证的状态。",
+      "plainTruthConditions": "核对实施时间表和试点范围即可确认。",
+      "plainFalsifier": "如果已有等规模验证或不立即替代，这句话就不成立。"
+    },
+    "staged_education_reform_available": {
+      "id": "staged_education_reform_available",
+      "kind": "stipulated",
+      "statement": "可以先在自愿参加的地区并行试行全国公式五年，保留原地方专项，根据公开结果再决定扩大；试点期间仍执行相同的性别准入规则。",
+      "truthConditions": "法律和执行条件允许并行试点、保留地方专项、公开评估和后续扩展。",
+      "falsifier": "并行试点不可行、不能保留关键功能，或必须推迟性别准入变化。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只说明存在一条可逆、分阶段且不推迟性别准入变化的替代路径。",
+      "plainTruthConditions": "需要明确的试点范围、期限、保留项和评估入口。",
+      "plainFalsifier": "如果替代路径无法实际运行，这句话就不成立。"
+    },
+    "education_fund_future_deprivation": {
+      "id": "education_fund_future_deprivation",
+      "kind": "empirical",
+      "statement": "题设遗产税在未来二十年减少的投资和岗位，会使后续人口中至少与当前受益人数相当的一部分人，无法稳定获得食物、住所、必要能源或必要医疗。",
+      "truthConditions": "因果研究把其他经济变化分开后，仍得到投资、岗位与后续基本生活损失的连贯估计。",
+      "falsifier": "没有可识别的投资岗位下降，或后续基本生活损失人数低于当前受益人数。",
+      "note": "",
+      "responseGuide": "这里只判断这句话是否符合事实，不判断政策好坏。",
+      "plainExplanation": "这句话只检查筹资方式是否会给后来的人造成可估计的基本生活损失。",
+      "plainTruthConditions": "需要把税收对投资、岗位和基本生活的长期影响连起来估计。",
+      "plainFalsifier": "如果没有这些长期损失，这句话就不成立。"
+    }
+  },
+  "claims": {
+    "speech_support": {
+      "id": "speech_support",
+      "kind": "policy",
+      "policyId": "speech_restriction",
+      "direction": "support",
+      "shortLabel": "应采纳",
+      "text": "国家应该通过这项法律，禁止公开严重贬损特定宗教、民族或国家象征的表达。",
+      "explanation": "这是本轮需要说明的政策结论 V。系统不会仅凭你支持它，就推断你接受某一种价值观。"
+    },
+    "speech_oppose": {
+      "id": "speech_oppose",
+      "kind": "policy",
+      "policyId": "speech_restriction",
+      "direction": "oppose",
+      "shortLabel": "不应采纳",
+      "text": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。",
+      "explanation": "这是本轮需要说明的政策结论 V。反对同一政策也可能出于不同理由，系统会继续追问。"
+    },
+    "surveillance_support": {
+      "id": "surveillance_support",
+      "kind": "policy",
+      "policyId": "metadata_surveillance",
+      "direction": "support",
+      "shortLabel": "应采纳",
+      "text": "国家应该要求保存所有成年人的通信元数据五年，并允许安全机关按题设方式查询。",
+      "explanation": "这里的“元数据”只包括通信时间、双方标识和位置等信息，不包括通信内容。"
+    },
+    "surveillance_oppose": {
+      "id": "surveillance_oppose",
+      "kind": "policy",
+      "policyId": "metadata_surveillance",
+      "direction": "oppose",
+      "shortLabel": "不应采纳",
+      "text": "国家不应该要求保存所有成年人的通信元数据五年，也不应该允许安全机关按题设方式查询。",
+      "explanation": "这里的“元数据”只包括通信时间、双方标识和位置等信息，不包括通信内容。"
+    },
+    "income_support": {
+      "id": "income_support",
+      "kind": "policy",
+      "policyId": "income_floor",
+      "direction": "support",
+      "shortLabel": "应采纳",
+      "text": "国家应该向每名成年人发放一笔不附带工作条件的基本现金，并按题设方式筹资。",
+      "explanation": "这是一项政策结论。支持它可能来自减轻匮乏、减少支配或其他不同理由。"
+    },
+    "income_oppose": {
+      "id": "income_oppose",
+      "kind": "policy",
+      "policyId": "income_floor",
+      "direction": "oppose",
+      "shortLabel": "不应采纳",
+      "text": "国家不应该向每名成年人发放这笔不附带工作条件的基本现金。",
+      "explanation": "这是一项政策结论。反对它可能来自财产控制、互惠、长期成本或其他不同理由。"
+    },
+    "carbon_support": {
+      "id": "carbon_support",
+      "kind": "policy",
+      "policyId": "carbon_fee",
+      "direction": "support",
+      "shortLabel": "应采纳",
+      "text": "国家应该按化石燃料的含碳量收费，并把净收入平均返还给每个人。",
+      "explanation": "这是本轮需要说明的政策结论 V。系统会把减排效果、分配影响和价值原则分开询问。"
+    },
+    "carbon_oppose": {
+      "id": "carbon_oppose",
+      "kind": "policy",
+      "policyId": "carbon_fee",
+      "direction": "oppose",
+      "shortLabel": "不应采纳",
+      "text": "国家不应该按题设方案征收碳费并平均返还收入。",
+      "explanation": "反对当前方案不等于否认气候变化，也可能只是反对其效果、分配或执行方式。"
+    },
+    "prevent_severe_harm": {
+      "id": "prevent_severe_harm",
+      "kind": "bridge",
+      "shortLabel": "没有较温和替代时，应预防死亡和重伤",
+      "text": "如果一项措施能够明显减少死亡或重伤，而且没有同样有效、但对个人限制更小的替代办法，那么国家至少有一项理由采用这项措施。",
+      "explanation": "事实部分只说“措施能减少严重伤害，而且没有同效的较温和办法”。桥接原则另外加入了一个价值判断：这样的事实会给国家行动提供理由。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，某项交通规则确实能明显减少致命事故，又没有同样有效的更温和办法。接受这条原则的人会认为，这至少支持采用该规则；但它仍可能被成本、程序或其他价值反驳。"
+    },
+    "protect_nonharmful_choice": {
+      "id": "protect_nonharmful_choice",
+      "kind": "bridge",
+      "shortLabel": "不直接伤害他人的选择，原则上由本人决定",
+      "text": "如果一个成年人的行为不威胁、骚扰、欺骗或控制他人，也不直接损害他人的身体和财产，那么国家至少有一项理由保持克制，不用刑罚、普遍监控或其他强制手段大幅限制这种行为及其正常交往。",
+      "explanation": "这条原则不是说所有个人选择都不能受限制。它只处理题设已排除威胁、欺诈、骚扰和未同意伤害的情况。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个成年人选择一种多数人不喜欢、但不伤害他人的生活方式。接受这条原则的人会认为，多数人的反感本身不足以支持刑罚。"
+    },
+    "constrain_discretionary_power": {
+      "id": "constrain_discretionary_power",
+      "kind": "bridge",
+      "shortLabel": "没有明确规则和独立监督的公权力，应受到限制",
+      "text": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。",
+      "explanation": "这里关注的不只是权力有没有被滥用，还关注它是否能够被随意使用。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个机关可以秘密查询任何人的记录，却不用说明原因，也没有独立机构复核。即使目前没有发现滥用，这条原则仍会支持限制该权限。"
+    },
+    "equal_public_participation": {
+      "id": "equal_public_participation",
+      "kind": "bridge",
+      "shortLabel": "制度造成可以避免的公共参与障碍时，应当修正",
+      "text": "如果一种本可避免的制度安排，长期使某些公民更难进入公共机构、使用公共服务或参与公共决策，那么国家至少有一项理由修正这种安排。",
+      "explanation": "这条原则不要求每个人得到完全相同的结果。它要求制度不要持续制造与公共参与有关、而且可以避免的障碍。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，所有听证会都安排在某个群体长期无法进入的场所。即使法律没有明文排斥他们，制度仍可能需要调整。"
+    },
+    "review_high_cost_coercion": {
+      "id": "review_high_cost_coercion",
+      "kind": "bridge",
+      "shortLabel": "可能造成重大误伤的强制决定，必须允许复核",
+      "text": "如果国家要对个人施加罚款、拘留、限制出境等强制措施，而决定所依据的事实可能判断错误，并且错误会造成重大损失，那么国家至少有一项理由设置及时、独立、允许当事人申辩的审查程序。",
+      "explanation": "它把“判断可能出错且误伤代价很大”连接到“必须有复核和申诉”。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，系统可能把无辜者误判为高风险对象，并因此冻结账户。接受这条原则的人会要求当事人能看到理由、提交反证并得到独立复核。"
+    },
+    "secure_material_capacity": {
+      "id": "secure_material_capacity",
+      "kind": "bridge",
+      "shortLabel": "制度应尽量避免人失去基本生活条件",
+      "text": "如果一项社会可以负担的措施能明显减少人们缺少食物、住房、必要能源或基本医疗的情况，而且不会造成更多同样严重的匮乏，国家至少有一项理由采用它。反过来，若一项政策会让人失去这些基本条件且没有充分补偿，国家至少有一项理由修改或放弃它。",
+      "explanation": "这条原则只给基本生活条件以规范分量，并不预先指定必须采用现金、公共服务或其他某一种工具。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项方案能让大量家庭不再缺少食物和住所，同时没有制造更大规模的同类匮乏。这条原则会给方案提供一项支持理由。"
+    },
+    "require_reciprocal_contribution": {
+      "id": "require_reciprocal_contribution",
+      "kind": "bridge",
+      "shortLabel": "有能力且从共同制度受益的人，应承担相称贡献",
+      "text": "如果一项共同制度必须依靠成员持续贡献才能维持，而某个人与其他贡献者有相近的能力和机会，却长期拒绝作出任何贡献，那么制度至少有一项理由要求他承担相称的负担。",
+      "explanation": "这里的关键条件是能力、机会和已有负担相近。照护劳动、疾病或缺少机会都可能构成相关区别。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，两个人同样受益、能力和机会也相近；一人长期贡献，另一人可以贡献却始终拒绝。这条原则会支持向后者提出贡献要求。"
+    },
+    "protect_legitimate_control": {
+      "id": "protect_legitimate_control",
+      "kind": "bridge",
+      "shortLabel": "正当取得的资源，不应被随意拿走",
+      "text": "如果一个人通过没有欺诈、没有强迫的生产或交换取得资源，那么国家要征收这些资源，至少需要比“多数人更喜欢这样”更充分的理由。",
+      "explanation": "这不是绝对所有权原则。它只说取得方式会产生一项需要认真对待的控制主张。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，某人通过自愿交换获得一笔收入。即使征收能满足多数人的偏好，接受这条原则的人仍会要求说明更强的公共理由。"
+    },
+    "account_for_future_harm": {
+      "id": "account_for_future_harm",
+      "kind": "bridge",
+      "shortLabel": "未来发生的严重损失，也必须算在内",
+      "text": "如果今天的行动会在可以估计的未来，增加他人死亡、重伤、失去基本生活条件或遭受重大财产损失的概率，那么决策不能仅仅因为这些损失发生得较晚，就把它们忽略。",
+      "explanation": "这条原则不否认概率、机会成本和时间差可能影响权衡。它只否认“发生得晚”本身足以把重大损失排除在外。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，今天得到一点便利，会在五十年后明显增加严重伤害。接受这条原则的人会要求把未来损失纳入同一决策。"
+    },
+    "preserve_error_correction": {
+      "id": "preserve_error_correction",
+      "kind": "bridge",
+      "shortLabel": "制度必须保留发现并纠正错误的渠道",
+      "text": "如果禁止某类不含威胁的表达，会明显减少可核实错误被发现、公开和纠正的机会，那么国家至少有一项理由不实施这项禁令。",
+      "explanation": "这里的价值判断是：让公共错误能够被看见和修正，本身值得制度保护。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项表达禁令同时压低了有证据的腐败报道，而没有其他举报渠道补上缺口。这条原则会支持反对禁令。"
+    },
+    "democratic_authorization": {
+      "id": "democratic_authorization",
+      "kind": "bridge",
+      "shortLabel": "公开而平等的民主程序，本身会给政策增加一项支持理由",
+      "text": "如果一项强制政策通过公开程序制定，受影响者拥有大体平等的参与机会，而且政策以后还能被审查和撤换，那么这套程序本身至少会给政策增加一项支持理由。",
+      "explanation": "它不是说多数决定一定正确，也不是说民主程序能压倒所有个人权利。它只把共同参与视为一项独立理由。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项规则经过公开讨论、平等投票并可在以后撤销。即使规则内容仍有争议，这个程序本身也可能给它增加一些正当性。"
+    },
+    "avoid_ineffective_coercion": {
+      "id": "avoid_ineffective_coercion",
+      "kind": "bridge",
+      "shortLabel": "强制政策长期无效时，不应只因惯性继续",
+      "text": "如果可靠证据显示，一项强制政策不能实现它公开宣称的目标，而且还持续消耗大量人员、时间或财政资源，那么国家至少有一项理由停止或不采用这项政策。",
+      "explanation": "这里不是说所有效果较小的政策都必须取消，而是针对目标已经明确落空、资源仍在持续投入的情况。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项政策多年没有改变目标指标，可靠评估也预测继续执行不会改善结果。接受这条原则的人会认为，机构惯性不足以支持继续。"
+    },
+    "preserve_cooperation_conditions": {
+      "id": "preserve_cooperation_conditions",
+      "kind": "bridge",
+      "shortLabel": "制度应保护人们在没有组织性暴力的情况下共同生活",
+      "text": "如果一种可以避免的行为模式，会明显提高组织性暴力或公共制度崩溃的概率，而且限制这种行为不会造成更大的同类风险，那么国家至少有一项理由限制它。",
+      "explanation": "这里保护的是和平合作的基本条件，不是让执政者免受反对、批评或非暴力抗议。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，某类行动能够独立预测随后发生的组织性暴力，而较小限制不足以降低风险。这条原则会给限制提供一项理由。"
+    },
+    "enable_exit_from_dependency": {
+      "id": "enable_exit_from_dependency",
+      "kind": "bridge",
+      "shortLabel": "人不应因基本生存受控而被迫服从",
+      "text": "如果一种制度安排让一方能够通过切断食物、住所或必要医疗，迫使另一方服从，那么国家至少有一项理由为后者提供真正可用的退出选择。",
+      "explanation": "重点不是一般意义上的依赖，而是某一方能够用基本生存资源作为服从工具。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，雇主或伴侣控制当事人唯一的住所和医疗来源，并以切断资源迫使其接受要求。稳定的替代收入可能构成退出选项。"
+    },
+    "prevent_cost_shifting": {
+      "id": "prevent_cost_shifting",
+      "kind": "bridge",
+      "shortLabel": "可控制的活动，不应把损失单方面留给旁人",
+      "text": "如果一项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，而且活动者能够改变活动规模，那么制度至少有一项理由要求活动者承担相应成本。",
+      "explanation": "这条原则把可控制的因果影响和负担分配联系起来，但不等于只要造成损失就有罪或应受惩罚。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，某种排放会增加周边居民的健康和财产损失，而排放者可以减少排放。接受这条原则的人会支持让排放者承担部分成本。"
+    },
+    "respect_personal_authorship": {
+      "id": "respect_personal_authorship",
+      "kind": "bridge",
+      "shortLabel": "主要影响本人生活的选择，应尽量留给本人",
+      "text": "如果一项选择主要改变行为者自己的生活，而且不直接控制他人的身体、财产或同等选择空间，那么制度至少有一项理由把决定留给本人，而不是替他作决定。",
+      "explanation": "这条原则比“个人喜欢什么就一定可以”更窄。它要求先排除对他人的直接控制和未同意损害。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个成年人选择职业、服饰或生活方式，主要后果由本人承担，也不妨碍他人的同等选择。这里会产生把决定留给本人的理由。"
+    },
+    "protect_agency_preconditions": {
+      "id": "protect_agency_preconditions",
+      "kind": "bridge",
+      "shortLabel": "制度应保护人作出并执行选择所需的最低能力",
+      "text": "如果一种本可避免的制度安排，会让人失去形成、修改或执行生活计划所必需的最低身体或物质能力，而且修正它不会让别人失去同等程度的能力，那么制度至少有一项理由修正这种安排。",
+      "explanation": "它不是直接保护某个具体偏好，而是保护人能够作出和执行选择所需要的最低条件。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个人因缺少必要医疗而完全无法工作、迁居或照顾自己。改善这一条件可能被视为恢复其行动能力。"
+    },
+    "equal_standing_under_coercion": {
+      "id": "equal_standing_under_coercion",
+      "kind": "bridge",
+      "shortLabel": "国家强制个人时，应让当事人知道理由、提出质疑",
+      "text": "如果国家要强制改变某人的行动、资源或法律资格，那么制度至少有一项理由让当事人知道决定依据、提出质疑，并让相关证据有机会改变决定。",
+      "explanation": "“把当事人当作理由主体”在这里不是抽象称赞，而是三个具体要求：知道理由、能提出反证、反证能被考虑。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个人被限制出境。接受这条原则的人会要求他知道依据，并能提交证据由独立机构复核。"
+    },
+    "require_answerable_power": {
+      "id": "require_answerable_power",
+      "kind": "bridge",
+      "shortLabel": "能够改变个人基本处境的公权力，必须给理由并接受复核",
+      "text": "如果公权力能够单方面改变个人的重要选择、资格或资源，而当事人不能及时知道理由，也不能申请独立复核，那么制度至少有一项理由用公开规则、理由说明和独立审查来限制这种权力。",
+      "explanation": "这条原则把“权力影响很大”与“权力必须能够回答质疑”连接起来。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，机关可以秘密冻结账户，又无需告知证据。接受这条原则的人会要求公开规则和独立复核。"
+    },
+    "preserve_institutional_learning": {
+      "id": "preserve_institutional_learning",
+      "kind": "bridge",
+      "shortLabel": "制度要长期可靠，就必须能够发现错误并据此修改",
+      "text": "如果一个制度只有在能够发现、传递和改正错误时，才可能长期可靠，那么制度至少有一项理由保留让错误被看见、并能触发修改的渠道；除非这些渠道会造成更大的同类损失。",
+      "explanation": "这条原则关注的不只是言论本身，而是制度是否有信息回路来发现失败并修订规则。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，政策结果从不记录，也没有人能把失败信息送到决策者手中，制度就无法根据实际效果学习。"
+    },
+    "assign_burdens_to_controllers": {
+      "id": "assign_burdens_to_controllers",
+      "kind": "bridge",
+      "shortLabel": "谁能控制造成损失的活动，谁就更有理由承担相应负担",
+      "text": "如果某个人能够控制自己的活动，而这项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，那么制度至少有一项理由让能够改变活动的人承担相应负担，而不是把损失全部留给第三方。",
+      "explanation": "它强调的是“谁能够改变风险来源”，并不直接等同于道德责备或刑罚。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，企业能够通过设备升级减少污染，而污染损失落在周边居民身上。这条原则会支持把部分治理成本交给企业。"
+    },
+    "equal_agency": {
+      "id": "equal_agency",
+      "kind": "terminal",
+      "shortLabel": "每个人都应平等决定自己的无害生活选择",
+      "text": "只要一个人能够形成和修改自己的生活计划，他就和其他人一样，应当能够自己决定那些不伤害他人的个人选择，而不是由别人代替。",
+      "explanation": "这是一个可能的基础价值。它强调每个人对自己生活的平等决定资格，而不是说所有行为都不受限制。",
+      "stressTest": {
+        "scenario": "一名成年人选择一种多数人认为低俗、无益，但不威胁、不欺骗、也不控制他人的生活方式。禁止它只会让多数人感觉更舒服，不会减少可测量的身体或财产损失。",
+        "question": "换成这个对象后，你还接受“无害的个人选择应由本人决定”吗？",
+        "distinctions": [
+          "当事人不是能够独立决定的成年人",
+          "行为其实造成了未经同意的伤害",
+          "这项选择剥夺了他人的同等选择空间"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，多数人认为某种生活方式低俗或无益，但它不威胁、欺骗或伤害他人。接受这条价值的人会认为，多数人的反感不足以替当事人作决定。"
+    },
+    "non_domination": {
+      "id": "non_domination",
+      "kind": "terminal",
+      "shortLabel": "任何人都不应受制于他人不受约束的权力",
+      "text": "任何人都不应处在这样一种关系中：别人可以随意干预他的基本选择，却不用遵守明确规则，也不用给出能够被质疑的理由。",
+      "explanation": "重点不是权力已经造成多少干预，而是某个人是否掌握一种可以随时使用、又不必回答质疑的控制能力。",
+      "stressTest": {
+        "scenario": "一位管理者承诺不会滥用随时查看员工私人通信的权限，过去也没有查阅记录。但这项权限没有明确规则、没有使用日志，也没有外部审查。",
+        "question": "即使管理者目前很克制，你仍认为这项不受约束的权限应被限制吗？",
+        "distinctions": [
+          "员工可以无成本、无报复风险地撤回同意",
+          "权限必须由多人共同决定才能启动",
+          "每次使用都会自动接受独立审查"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，管理者可以随时查看员工私人通信，既没有规则，也没有日志和外部审查。即使他承诺不会滥用，这种权力结构本身仍可能成问题。"
+    },
+    "bodily_security": {
+      "id": "bodily_security",
+      "kind": "terminal",
+      "shortLabel": "避免死亡和重伤具有很高的价值分量",
+      "text": "避免人的死亡、重伤和严重身体损害，是制度必须给予很高重视的一项理由。",
+      "explanation": "这是一项价值承诺，不是对某项政策效果的事实判断。某项政策是否真的减少伤害，仍要另行判断。",
+      "stressTest": {
+        "scenario": "一项措施能够确定避免少量重伤，但会长期限制所有成年人的一项日常选择，而且没有完全无代价的替代办法。",
+        "question": "在这个案例中，“避免重伤”是否仍至少算作支持该措施的一项理由？",
+        "distinctions": [
+          "风险由当事人充分知情并自愿承担",
+          "措施本身会造成同等程度的身体损害",
+          "存在同样有效、限制更小的替代办法"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项措施能避免重伤。接受这项价值，只表示“避免重伤”会支持措施；并不表示措施一定应实施。"
+    },
+    "equal_civic_status": {
+      "id": "equal_civic_status",
+      "kind": "terminal",
+      "shortLabel": "所有公民都应有平等参与公共生活的资格",
+      "text": "公共制度应把每个公民都当作具有同等资格的参与者，而不应把某些人长期放在较低等级的位置。",
+      "explanation": "这不要求所有人得到完全相同的结果，但要求制度不能系统地把某些人排除在参与、申诉或担任公职之外。",
+      "stressTest": {
+        "scenario": "一个群体依法拥有投票权，但所有公共听证会长期只在该群体成员无法进入的场所举行。没有人公开宣布要排斥他们。",
+        "question": "即使法律文字对所有人相同，你仍认为制度需要修正这种安排吗？",
+        "distinctions": [
+          "进入差异完全来自个人可以控制的选择",
+          "调整会剥夺另一群体的同等参与机会",
+          "差异只发生一次，而且事前无法预见"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个群体在纸面上有投票权，但所有听证会都安排在他们无法进入的地方。形式权利相同，不等于实际参与资格相同。"
+    },
+    "procedural_justification": {
+      "id": "procedural_justification",
+      "kind": "terminal",
+      "shortLabel": "国家强制个人时，必须给理由并允许申诉",
+      "text": "国家对个人施加强制时，应向当事人说明决定依据，并提供能够由独立机构审查、允许当事人质疑的程序。",
+      "explanation": "它认为程序是否允许申辩，本身就重要，而不能只看官员最后有没有判断正确。",
+      "stressTest": {
+        "scenario": "一位判断几乎从不出错的官员，可以秘密决定谁被限制出境。决定通常能预防真实风险，但当事人既不知道证据，也不能申诉。",
+        "question": "即使官员准确率很高，你仍认为当事人应当获得理由和独立审查吗？",
+        "distinctions": [
+          "即时危险使事前审查在时间上完全不可能",
+          "事后审查能够完整恢复全部损失",
+          "公开证据会直接暴露具体受害者"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个人被秘密限制出境，即使官员通常判断准确，当事人仍可能有理由要求知道证据并申诉。"
+    },
+    "material_floor": {
+      "id": "material_floor",
+      "kind": "terminal",
+      "shortLabel": "任何人都不应因可避免的匮乏而失去基本生活",
+      "text": "任何人都不应因为本可避免的资源匮乏，而失去维持生存、身体健康和最低限度实际选择所需要的食物、住所、能源或医疗。",
+      "explanation": "这是对基本生活条件的价值判断，不等于任何具体福利方案都有效或没有代价。",
+      "stressTest": {
+        "scenario": "一个人因为连续作出高风险选择而失去食物和住所。提供最低救助不会补偿他的全部损失，也不会阻止以后追究责任。",
+        "question": "即使匮乏和他的选择有关，你仍认为最低救助有一项独立理由吗？",
+        "distinctions": [
+          "救助会立即让其他人陷入同等严重的匮乏",
+          "当事人拒绝所有不会增加风险的可行替代",
+          "资源总量不足以同时维持所有人的最低生活"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个人即将失去食物和住所。接受这项价值的人会认为，避免这种最低生活能力的崩溃本身构成一项理由。"
+    },
+    "reciprocity": {
+      "id": "reciprocity",
+      "kind": "terminal",
+      "shortLabel": "从共同制度受益且有能力的人，应承担相称贡献",
+      "text": "在必须依靠共同负担才能维持的制度中，能力和机会相近的人，应承担大致相称的贡献责任。",
+      "explanation": "这项价值允许疾病、照护劳动、缺少机会和既有负担构成相关差别，不要求每个人机械地付出完全相同。",
+      "stressTest": {
+        "scenario": "两个人从同一公共制度获得相同收益，能力和机会也相近。一人持续贡献，另一人能够贡献却始终拒绝。",
+        "question": "在这些条件下，制度是否有理由要求后者作出相称贡献？",
+        "distinctions": [
+          "他未被记录的照护劳动已经构成贡献",
+          "制度收益并不是由共同贡献维持的",
+          "退出制度真实可行，而且不会把成本留给其他人"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，两个人同样从公共制度受益，能力和机会也相近；一人持续贡献，另一人能够贡献却始终拒绝。这里会出现互惠问题。"
+    },
+    "legitimate_control": {
+      "id": "legitimate_control",
+      "kind": "terminal",
+      "shortLabel": "个人对正当取得的资源拥有需要被尊重的控制主张",
+      "text": "一个人通过没有欺诈、没有强迫的方式取得资源后，他对这些资源的控制，不应被国家或他人随意取消。",
+      "explanation": "这不是绝对财产权。它只说正当取得会产生一项反对随意征收或剥夺的理由。",
+      "stressTest": {
+        "scenario": "某人通过自愿交换积累了大量非必需资源。征收其中一小部分，只用于多数人偏好的公共装饰项目，不会改变任何人的食物、住所、身体状态或法律资格。",
+        "question": "在这个案例中，正当取得仍然构成一项反对征收的理由吗？",
+        "distinctions": [
+          "取得过程包含没有补偿的第三方损失",
+          "控制该资源本身阻断了他人的同等资格",
+          "既有公开规则已经明确约定这项负担"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一个人通过自愿交换积累了收入。即使征收能满足多数人的偏好，他对这笔资源仍可能保有一项需要权衡的控制主张。"
+    },
+    "future_equal_weight": {
+      "id": "future_equal_weight",
+      "kind": "terminal",
+      "shortLabel": "不能只因一个人出生较晚，就轻视他的重大损失",
+      "text": "仅仅因为一些人出生得较晚，不能因此把他们可以预见的死亡、重伤或其他重大损失看得更轻。",
+      "explanation": "它允许概率、不确定性和机会成本影响判断，但否认“出生时间”本身会降低一个人的地位。",
+      "stressTest": {
+        "scenario": "今天获得一项小幅便利，会在五十年后确定使另一群人遭受严重身体损害；两代人的人数相同。",
+        "question": "你仍认为未来这群人的损失必须被认真纳入同一权衡吗？",
+        "distinctions": [
+          "未来损害概率极低而且无法可靠估计",
+          "延迟行动会让当前人遭受同等严重的损害",
+          "未来人拥有更容易、成本更低的规避办法"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，今天的一点便利会在五十年后确定造成严重伤害。接受这项价值的人会要求把未来受害者按同样的地位纳入考虑。"
+    },
+    "error_correction": {
+      "id": "error_correction",
+      "kind": "terminal",
+      "shortLabel": "公共制度必须保留发现、公开和纠正错误的能力",
+      "text": "公共制度应保留发现、公开和纠正错误的渠道，即使这些渠道会带来不适、冒犯或短期冲突。",
+      "explanation": "这项价值不自动压倒直接威胁、欺诈或隐私伤害。它只确认公共纠错能力本身具有分量。",
+      "stressTest": {
+        "scenario": "一份证据充分的调查，会让一个广受尊敬的机构短期失去信任；如果不公开，已经确认的错误会继续存在。",
+        "question": "在这个案例中，公共纠错是否仍支持公开调查结果？",
+        "distinctions": [
+          "公开会直接暴露具体无辜者的身份",
+          "证据还没有达到可核实的程度",
+          "可以稍后公开，而且等待不会让错误扩大"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一份有充分证据的调查会让机构短期失去信任，但隐瞒会让已知错误继续。这里会出现公开与维持表面稳定的冲突。"
+    },
+    "democratic_authorship": {
+      "id": "democratic_authorship",
+      "kind": "terminal",
+      "shortLabel": "受共同规则约束的人，应有平等机会参与制定和撤换规则",
+      "text": "受到共同规则约束的人，应有真正而且大体平等的机会，参与制定、审查和撤换这些规则。",
+      "explanation": "这项价值重视人们作为共同规则参与者的地位，但不把任何多数决定都当作正确。",
+      "stressTest": {
+        "scenario": "一项规则经过事前公开、每人一票并有充分参与的投票通过，但它禁止少数人的一种不伤害他人的生活方式。",
+        "question": "即使这条规则可能侵犯其他价值，民主程序本身是否仍给它增加了一项理由？",
+        "distinctions": [
+          "少数人实际上被排除在程序之外",
+          "议题涉及不能由多数取消的平等资格",
+          "投票信息受到系统性伪造"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项规则经过公开讨论、平等投票并可被以后撤销。即使规则内容有问题，参与结构本身仍可能提供一项理由。"
+    },
+    "non_waste": {
+      "id": "non_waste",
+      "kind": "terminal",
+      "shortLabel": "制度不应只因惯性继续明知无效的强制政策",
+      "text": "当可靠证据已经表明一种强制手段无法实现公开目标，而且它还持续占用本可用于其他目标的资源时，制度不应只因为惯性而继续维持它。",
+      "explanation": "这项价值反对手段和目标已经脱节后，仍继续使用强制和资源。",
+      "stressTest": {
+        "scenario": "一项政策连续多年没有改变目标指标，可信评估也预测继续执行不会改善结果，但取消政策会迫使机构承认过去判断错误。",
+        "question": "在这个案例中，政策无效和持续耗费资源是否仍构成停止它的理由？",
+        "distinctions": [
+          "公开指标遗漏了真实但暂时无法测量的效果",
+          "停止会造成更高的过渡损失",
+          "政策还承担另一个已经公开说明的目标"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项政策多年没有改善目标指标，可靠评估也预测继续无效。机构不愿承认过去错误，并不是继续强制的充分理由。"
+    },
+    "peaceful_cooperation": {
+      "id": "peaceful_cooperation",
+      "kind": "terminal",
+      "shortLabel": "制度应保护人们不靠组织性暴力也能共同生活",
+      "text": "制度必须重视这样一种社会条件：互不相识、意见不同的人，仍能在不诉诸组织性暴力的情况下共同生活、交易和使用公共服务。",
+      "explanation": "这不是要求服从秩序，也不是保护执政者免受批评。关键是避免组织性暴力破坏共同生活的基本条件。",
+      "stressTest": {
+        "scenario": "公开一项真实信息会引发短期大规模抗议，但抗议者没有组织暴力计划，公共机构仍能继续运作。",
+        "question": "在这个案例中，“维护和平合作”是否足以支持压制这项真实信息？",
+        "distinctions": [
+          "已经存在可以核实的组织暴力计划",
+          "公共服务会立即中断并造成严重身体损害",
+          "限制只延迟很短时间，而且保留独立复核"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "非暴力抗议可能带来冲突和不便，但仍不同于组织性暴力。只有后者真正威胁到这里所说的合作条件。"
+    },
+    "protect_open_inquiry": {
+      "id": "protect_open_inquiry",
+      "kind": "bridge",
+      "shortLabel": "可争论的和平意见，不应只因被认为错误或冒犯而受罚",
+      "text": "如果一项意见不威胁、骚扰、欺骗或指挥暴力，而且其真伪或意义仍可公开争论，那么国家至少有一项理由不只因为多数人或官员确信它错误、无益或冒犯就处罚表达者。",
+      "explanation": "这条原则加入了对可错性和公开反驳的保护，但不保护威胁、骚扰、欺骗或情境中的直接暴力动员。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一篇文章严厉批评一项宗教教义，许多人确信它错误且冒犯，但文章没有威胁或骚扰任何人。这条原则会反对仅凭冒犯程度处罚作者。"
+    },
+    "open_inquiry": {
+      "id": "open_inquiry",
+      "kind": "terminal",
+      "shortLabel": "公共判断必须允许和平异议进入检验",
+      "text": "公共制度应允许不含威胁、骚扰、欺骗或暴力指挥的异议被提出和回应，即使多数人确信这种意见错误、无益或冒犯。",
+      "explanation": "这是一个可能的基础价值。它重视公开判断面对反驳的能力，不表示任何时间、地点和表达方式都不受限制。",
+      "stressTest": {
+        "scenario": "一个少数派公开主张多数人确信为错误、无益且冒犯宗教的观点。该主张不含威胁、骚扰、可核实的虚假事实或暴力指挥，禁止它会移除这项观点进入公开反驳的唯一渠道。",
+        "question": "换成这项令人反感的少数意见后，你仍接受“和平异议必须能进入公开检验”吗？",
+        "distinctions": [
+          "表达面向已经激动的人群并直接指挥即时暴力",
+          "表达针对个人反复骚扰",
+          "表达用可核实的虚假事实实施欺骗"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，少数人公开质疑一项被广泛接受的历史解释。只要表达不含威胁或欺骗，这项价值会保护其进入公开回应。"
+    },
+    "protect_civic_association": {
+      "id": "protect_civic_association",
+      "kind": "bridge",
+      "shortLabel": "没有具体违法嫌疑的和平结社，应能保持实际协调能力",
+      "text": "如果一项普遍制度会明显压低没有具体违法嫌疑者参与和平政治、宗教、劳动或其他自愿组织的联系与协调，那么国家至少有一项理由取消这项制度，或把它缩小到有具体依据的对象。",
+      "explanation": "这条原则保护多人共同组织与行动的能力，不表示组织可以威胁、强迫或实施违法行为。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，全民通信记录使没有违法嫌疑的工会成员不再联系和开会。这条原则会形成反对普遍留存的一项理由。"
+    },
+    "civic_association": {
+      "id": "civic_association",
+      "kind": "terminal",
+      "shortLabel": "人们应能为和平共同目标自愿组织",
+      "text": "没有参与威胁、强迫或其他违法行为的人，应能为政治、宗教、劳动或其他和平共同目标自愿联系、组织和行动。",
+      "explanation": "这是一个可能的基础价值。它保护共同组织能力，而不是给组织或成员免除一般法律责任。",
+      "stressTest": {
+        "scenario": "一个主张极不受欢迎政策的团体依法组织集会，成员没有暴力或犯罪嫌疑。保存全部成员的联系和位置会使许多人退出，而机关不能给出针对个人的查询依据。",
+        "question": "换成这个不受欢迎的团体后，你仍接受“和平共同目标可以自愿组织”吗？",
+        "distinctions": [
+          "组织正在准备暴力或强迫",
+          "成员并非自愿参加",
+          "查询已有针对具体个人的独立证据与授权"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一群劳动者自愿成立工会并和平讨论工作条件。这项价值保护他们相互联系和组织的能力。"
+    },
+    "share_productive_governance": {
+      "id": "share_productive_governance",
+      "kind": "bridge",
+      "shortLabel": "共同生产并承担重大后果的人，应分享相关决定权",
+      "text": "如果一群人持续直接参与共同生产，而重大生产决定会改变他们的工作、收入或工作地点，那么制度至少有一项理由让他们通过可撤换代表分享这些决定权，而不是把决定全部交给另一方。",
+      "explanation": "这条原则把直接生产、后果承担与集体决定权联系起来，但不自动决定席位比例、所有权或每项日常经营安排。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，关闭主要工厂会改变所有劳动者的工作和地点，而他们目前没有任何表决代表。这条原则支持给他们实质治理席位。"
+    },
+    "productive_self_governance": {
+      "id": "productive_self_governance",
+      "kind": "terminal",
+      "shortLabel": "直接生产者应对重大生产规则拥有实质共同决定权",
+      "text": "持续参与共同生产并直接承担重大生产决定后果的人，应通过能够撤换的集体代表，对这些重大规则拥有实质共同决定权。",
+      "explanation": "这是一个可能的基础价值。它强调共同生产中的集体能动性，不等于每个人必须管理所有日常决定，也不预先确定所有权形式。",
+      "stressTest": {
+        "scenario": "一家研究机构的研究人员长期共同完成核心工作，资助者却可以单方面关闭项目、改变工作地点并分配全部研究预算；研究人员没有表决代表，退出会失去多年积累的设备与团队。",
+        "question": "换成研究机构后，你仍接受“直接生产者应共同决定重大生产规则”吗？",
+        "distinctions": [
+          "参与者能够无成本带走设备与成果并立即另组机构",
+          "资助者独自承担全部决定后果",
+          "研究人员已经拥有实质且可撤换的表决代表"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一家大型工厂决定关闭主要厂区，劳动者会失去工作并被迫搬迁。这项价值支持让劳动者代表参与决定。"
+    },
+    "preserve_tested_institutional_functions": {
+      "id": "preserve_tested_institutional_functions",
+      "kind": "bridge",
+      "shortLabel": "替代方案未经验证时，应保留制度中可核查的关键功能",
+      "text": "如果一套制度具有持续、可核查的协调或纠错功能，拟议变更会在等效替代得到验证前移除这些功能，而且存在能够修正问题的可逆分阶段路径，那么制度至少有一项理由先保留关键功能并分段改革。",
+      "explanation": "这条原则保护的是经过证据检验的功能，不是制度年龄或传统名称；压迫、排斥和已经失效的安排仍可被改变。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，旧的应急医疗网络有可核查的转诊功能，新系统尚未试点，但可以在纠正准入不平等的同时分区替换。这条原则支持分阶段改革。"
+    },
+    "intergenerational_stewardship": {
+      "id": "intergenerational_stewardship",
+      "kind": "terminal",
+      "shortLabel": "改革应把共同生活所需的有益制度能力交给后来者",
+      "text": "当前人改革制度时，应辨认并尽量把经长期实践证明有益的协调、信任和纠错能力交给后来者，同时纠正其中的压迫、排斥和失效部分。",
+      "explanation": "这是一个可能的基础价值。它要求以可核查功能而非年代为依据，也不允许用连续性替压迫安排免检。",
+      "stressTest": {
+        "scenario": "一个延续多年的行业准入制度能稳定训练技术人员，但它一直排斥某一性别。新方案能保留同样的训练和考核功能，同时立即取消这种排斥。",
+        "question": "在这个案例中，你还会要求原制度完整延续，还是只保留其可核查的有益功能？",
+        "distinctions": [
+          "旧制度的排斥本身正在造成持续损失",
+          "训练功能可以与排斥规则分开保留",
+          "新方案已经证明能维持同等训练质量"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，改革一套旧的地方救济网络时，可以取消歧视性准入，同时保留已经证明有效的转介和申诉能力。"
+    },
+    "compare_impartial_wellbeing": {
+      "id": "compare_impartial_wellbeing",
+      "kind": "bridge",
+      "shortLabel": "应把所有受影响者的可比较得失纳入同一结果判断",
+      "text": "如果可靠证据用一致口径比较了所有主要受影响者的健康、痛苦、收入和实际机会，并计入分配与不确定性，而且一个可行方案的总改善明显大于总损失，那么决策至少有一项理由选择它而不是结果更差的方案。",
+      "explanation": "这条原则要求不偏向某一身份地位，并做结果比较；它不声称总量理由自动压倒权利、程序或其他竞争原则。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一项政策给许多人带来较大且可靠的健康改善，只给少数人带来较小可补偿成本。完整比较会给该政策增加一项支持理由。"
+    },
+    "impartial_wellbeing": {
+      "id": "impartial_wellbeing",
+      "kind": "terminal",
+      "shortLabel": "每个受影响者的福祉变化都应得到不偏不倚的考虑",
+      "text": "评估共同政策时，每个受影响者的健康、痛苦、收入和实际机会变化，都应使用一致口径得到不偏不倚的考虑，不能只因其身份或阵营而被忽略。",
+      "explanation": "这是一个可能的基础价值。它要求同等考虑可比较的福祉变化，但不预先决定如何处理权利、不可通约损失或测量失败。",
+      "stressTest": {
+        "scenario": "两项政策造成完全相同的健康、痛苦、收入和机会变化，唯一区别是受益者从你熟悉的群体换成你非常反感的政治群体。",
+        "question": "只更换受益者身份后，你仍接受用相同口径计算这些福祉变化吗？",
+        "distinctions": [
+          "两组人的实际变化幅度并不相同",
+          "测量口径对其中一组系统失真",
+          "政策同时改变了题设没有固定的其他重要条件"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，同样程度的疾病和收入损失发生在政治对手身上时，也应进入政策结果比较。"
+    },
+    "workplace_cogovernance_support": {
+      "id": "workplace_cogovernance_support",
+      "kind": "policy",
+      "policyId": "workplace_cogovernance",
+      "direction": "support",
+      "shortLabel": "应采纳",
+      "text": "国家应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。",
+      "explanation": "这是本题的支持方向。后续步骤会检查支持它所需的事实和规范原则。",
+      "responseGuide": "请先选择当前方向；这一步不要求你承诺后续每一条理由。"
+    },
+    "workplace_cogovernance_oppose": {
+      "id": "workplace_cogovernance_oppose",
+      "kind": "policy",
+      "policyId": "workplace_cogovernance",
+      "direction": "oppose",
+      "shortLabel": "不应采纳",
+      "text": "国家不应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。",
+      "explanation": "这是本题的反对方向。后续步骤会检查反对它所需的事实和规范原则。",
+      "responseGuide": "请先选择当前方向；这一步不要求你承诺后续每一条理由。"
+    },
+    "equal_basic_liberties": {
+      "id": "equal_basic_liberties",
+      "kind": "terminal",
+      "shortLabel": "每个人都应拥有平等的基本表达、良心与结社自由",
+      "text": "每个人都应拥有一套平等的基本表达、良心和结社自由；不能只因多数人的偏好或总体收益，就让某一群体失去别人仍然保有的同等自由。",
+      "explanation": "这是一个可能的基础价值。它强调基本自由的平等地位，不表示任何威胁、欺骗、暴力或与他人自由冲突的行为都不受限制。",
+      "stressTest": {
+        "scenario": "禁止一个不含威胁、欺骗或暴力指挥的少数派政治团体公开表达，会显著提高多数人的满意度，但不会减少可核实的身体、财产或公共安全损失。其他团体仍可自由表达。",
+        "question": "在总体满意度提高的情况下，你仍接受少数派应保有同等基本自由吗？",
+        "distinctions": [
+          "表达实际威胁他人的同等自由",
+          "团体正在实施欺骗或暴力",
+          "限制同样适用于结构相同的所有团体"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，多数人因反感某一少数宗教而希望禁止其和平集会。这项价值反对只让该群体失去别人仍有的结社自由。"
+    },
+    "difference_principle": {
+      "id": "difference_principle",
+      "kind": "terminal",
+      "shortLabel": "制度差异应使处境最不利者获得尽可能好的长期前景",
+      "text": "比较可行的社会经济制度时，资源、权力或收益差异只有在能使处境最不利者获得尽可能好的长期前景时，才具有充分的制度理由。",
+      "explanation": "这是一个可能的基础价值。它关注最不利群体在可行制度比较中的长期前景，不等于只满足最低生存，也不同于把所有人的结果相加。",
+      "stressTest": {
+        "scenario": "方案A让全社会结果指标增加100点，却让处境最低十分位下降10点；方案B让全社会增加60点，并让最低十分位增加20点。两者同样可行，没有第三种方案。",
+        "question": "面对总量与最不利者前景冲突时，你仍接受先比较最不利者的长期前景吗？",
+        "distinctions": [
+          "最低十分位的下降只是测量误差",
+          "方案B并不可行",
+          "方案B会让另一群体跌到更低位置"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，两个税收方案都可运行；总收益较小的方案却能让长期处境最低群体拥有更高收入和机会。这项价值支持后者。"
+    },
+    "fair_equality_of_opportunity": {
+      "id": "fair_equality_of_opportunity",
+      "kind": "terminal",
+      "shortLabel": "能力与投入相近者不应因社会出身而有系统较差的机会",
+      "text": "能力、准备和投入相近的人，应拥有大体可比的教育与职业前景，不应只因家庭收入或出生地区而长期面对系统较低的机会。",
+      "explanation": "这是一个可能的基础价值。它要求处理社会出身造成的机会结构差异，不保证每个人得到相同结果。",
+      "stressTest": {
+        "scenario": "两名学生的能力、准备和学习投入相同。一人因家庭财富可以进入完整课程和职业网络，另一人仅因出生家庭收入低而没有对应入口。",
+        "question": "只更换家庭出身后，你仍接受两人应拥有大体可比的教育与职业前景吗？",
+        "distinctions": [
+          "两人的准备或投入其实不同",
+          "课程容量不足且分配规则与家庭出身无关",
+          "差距来自本人可控制的后续选择"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，两名准备和投入相近的学生，仅因家庭收入不同而长期获得明显不同的课程与就业入口。这项价值支持缩小该差距。"
+    },
+    "equal_developmental_opportunity": {
+      "id": "equal_developmental_opportunity",
+      "kind": "terminal",
+      "shortLabel": "公共教育不应只按性别排除同等准备者的发展机会",
+      "text": "公共教育提供形成独立判断与职业能力的课程时，不应只按性别排除达到同等准备条件的人取得相同课程和继续升学资格。",
+      "explanation": "这是一个可能的基础价值。它保护同等教育资格，不要求相同职业选择、相同结果或忽略与课程直接相关的准备差异。",
+      "stressTest": {
+        "scenario": "一名男生和一名女生达到同一课程的相同准备标准，座位充足，课程要求也相同。学校只因性别拒绝其中一人取得课程和升学资格。",
+        "question": "只更换学生性别后，你仍接受同等准备者应有相同公共教育资格吗？",
+        "distinctions": [
+          "准备程度并不相同",
+          "课程存在与性别直接相关且可核查的具体条件",
+          "题设中的座位其实不足"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，一名女生达到科学课程的全部公开准备标准，却只因性别不能入学。这项价值支持取消该排除。"
+    },
+    "public_reason_reciprocity": {
+      "id": "public_reason_reciprocity",
+      "kind": "terminal",
+      "shortLabel": "限制基本自由的公共强制必须给出可共同检验的政治理由",
+      "text": "公共制度要强制限制人的基本自由时，应给出自由而平等的公民能够共同检验的政治理由，不能只援引某一群体不可共享的宗教或完整人生信条。",
+      "explanation": "这是一个可能的基础价值。它要求强制理由具有公共可检验性，不禁止个人在生活中持有或表达宗教和其他完整信条。",
+      "stressTest": {
+        "scenario": "70%的选民依照同一宗教教义通过公投，禁止另一群体不含威胁或欺骗的和平仪式。立法记录没有给出独立于该教义的伤害、自由或安全理由。",
+        "question": "即使程序公开且多数赞成，你仍要求限制基本自由的理由能够由不同信仰者共同检验吗？",
+        "distinctions": [
+          "仪式实际造成可核查的他人损失",
+          "限制保护了所有人的同等自由",
+          "立法另有独立于该教义的公共理由"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，法律只因某教义宣布一种和平表达不洁而处罚所有人，却不给出伤害或同等自由理由。这项价值反对这种强制理由。"
+    },
+    "preserve_general_rules_local_adaptation": {
+      "id": "preserve_general_rules_local_adaptation",
+      "kind": "bridge",
+      "shortLabel": "共同目标宜用一般规则约束，并给局部知识保留调整空间",
+      "text": "如果实现共同目标所需的信息分散在不同时间和地点，而且变化快于中央详细分配规则，那么制度至少有一项理由采用公开的一般边界，并让掌握局部信息的人根据反馈调整具体办法。",
+      "explanation": "这条原则把分散信息与制度手段联系起来，不表示地方决定永远正确，也不排除为外部损失、平等资格或基本安全设定共同规则。",
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，国家统一规定污染收费，但不逐厂指定技术，让各厂根据设备和替代方案选择减排办法。这条原则支持这种规则结构。"
+    },
+    "decentralized_adaptation": {
+      "id": "decentralized_adaptation",
+      "kind": "terminal",
+      "shortLabel": "掌握时间地点知识的人应保有根据反馈调整的实际空间",
+      "text": "在公开的一般边界内，最接近不断变化的时间、地点和用途条件的人，应保有根据局部信息与反馈调整具体办法的实际空间。",
+      "explanation": "这是一个可能的基础价值。它重视分散知识的使用，不让地方选择免于伤害、平等资格或共同规则的约束。",
+      "stressTest": {
+        "scenario": "全国规则固定医疗物资总目标，但某地突然暴发疾病。当地医院掌握实时病例与库存信息，中央数据要两个月后才更新；医院若偏离既定品类即可避免短缺。",
+        "question": "在共同总目标不变时，你仍接受掌握实时局部信息者应有调整具体办法的空间吗？",
+        "distinctions": [
+          "地方调整会把同等短缺转移给不知情地区",
+          "当地数据无法核查",
+          "中央系统已经同步掌握相同实时信息"
+        ]
+      },
+      "responseGuide": "请暂时把相关事实当作成立，再判断你是否接受这条包含“应该”的原则。",
+      "example": "例如，不同地区的课程与岗位需求快速变化，当地机构可以在共同资格标准内及时调整具体训练内容。"
+    },
+    "education_opportunity_support": {
+      "id": "education_opportunity_support",
+      "kind": "policy",
+      "policyId": "education_opportunity_fund",
+      "direction": "support",
+      "shortLabel": "应采纳",
+      "text": "国家应该按题设方式建立全国教育机会基金，并执行相同的性别准入规则。",
+      "explanation": "这是本题的支持方向。后续步骤会检查支持它所需的事实和规范原则。",
+      "responseGuide": "请先选择当前方向；这一步不要求你承诺后续每一条理由。"
+    },
+    "education_opportunity_oppose": {
+      "id": "education_opportunity_oppose",
+      "kind": "policy",
+      "policyId": "education_opportunity_fund",
+      "direction": "oppose",
+      "shortLabel": "不应采纳",
+      "text": "国家不应该把全国教育机会基金、地方专项替代和性别准入规则按题设组合一并采纳。",
+      "explanation": "这是本题的反对方向。后续步骤会检查反对它所需的事实和规范原则。",
+      "responseGuide": "请先选择当前方向；这一步不要求你承诺后续每一条理由。"
+    }
+  },
+  "arguments": {
+    "speech_harm_support": {
+      "id": "speech_harm_support",
+      "targetClaimId": "speech_support",
+      "title": "因为禁令确实能减少针对群体的重伤",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“没有较温和替代时，应预防死亡和重伤”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_reduces_serious_assaults",
+        "speech_no_equal_alternative"
+      ],
+      "bridgeClaimId": "prevent_severe_harm",
+      "plainSteps": {
+        "facts": [
+          "在其他条件相近的地区，这项法律实施后，针对特定群体的重伤案件连续三年平均减少了至少20%。研究把同一时期警力和治安预算的变化分开计算后，仍然得到这个结果。",
+          "在相同研究条件下，增加反暴力执法、加强受害者保护和支持反向表达的组合方案，减少重伤案件的幅度仍低于这项禁令。"
+        ],
+        "bridgeLabel": "没有较温和替代时，应预防死亡和重伤",
+        "bridgeText": "如果一项措施能够明显减少死亡或重伤，而且没有同样有效、但对个人限制更小的替代办法，那么国家至少有一项理由采用这项措施。",
+        "targetText": "国家应该通过这项法律，禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "speech_participation_support": {
+      "id": "speech_participation_support",
+      "targetClaimId": "speech_support",
+      "title": "因为禁令能减少某些群体参与公共生活的障碍",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“制度造成可以避免的公共参与障碍时，应当修正”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_preexisting_participation_barrier",
+        "speech_participation_gap_reduced"
+      ],
+      "bridgeClaimId": "equal_public_participation",
+      "plainSteps": {
+        "facts": [
+          "在法律实施前，经常受到贬低或侮辱的群体，参加公开听证、使用公共服务和报名公职的比例长期较低。研究把收入、教育、年龄和地区差异分开计算后，这个差距仍然存在；接触这类表达越多的人，参与差距也越大。",
+          "这项法律实施后，原先经常受到贬低或侮辱的群体，在参加公开听证、使用公共服务和报名公职方面，与其他群体的差距连续三年缩小。"
+        ],
+        "bridgeLabel": "制度造成可以避免的公共参与障碍时，应当修正",
+        "bridgeText": "如果一种本可避免的制度安排，长期使某些公民更难进入公共机构、使用公共服务或参与公共决策，那么国家至少有一项理由修正这种安排。",
+        "targetText": "国家应该通过这项法律，禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "speech_cooperation_support": {
+      "id": "speech_cooperation_support",
+      "targetClaimId": "speech_support",
+      "title": "因为这类表达会增加组织性暴力动员",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“制度应保护人们在没有组织性暴力的情况下共同生活”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_organized_violence_link",
+        "speech_restriction_no_greater_cooperation_risk"
+      ],
+      "bridgeClaimId": "preserve_cooperation_conditions",
+      "plainSteps": {
+        "facts": [
+          "题目所说的这类表达出现后，随后七天内发生组织性暴力动员的概率会上升。研究把已知动员网络的影响分开计算后，这种关系仍然存在。",
+          "按同一套事件标准、同一段时间比较，这项法律新引发的组织性暴力和关键公共服务中断，没有多于它所减少的同类事件。"
+        ],
+        "bridgeLabel": "制度应保护人们在没有组织性暴力的情况下共同生活",
+        "bridgeText": "如果一种可以避免的行为模式，会明显提高组织性暴力或公共制度崩溃的概率，而且限制这种行为不会造成更大的同类风险，那么国家至少有一项理由限制它。",
+        "targetText": "国家应该通过这项法律，禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "speech_choice_oppose": {
+      "id": "speech_choice_oppose",
+      "targetClaimId": "speech_oppose",
+      "title": "因为法律处罚的是没有直接伤害他人的表达",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“不直接伤害他人的选择，原则上由本人决定”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_scope_noncoercive"
+      ],
+      "bridgeClaimId": "protect_nonharmful_choice",
+      "plainSteps": {
+        "facts": [
+          "这项法律只处理公开的严重贬低或侮辱性表达。直接威胁、针对个人的骚扰、能够核实为假的事实陈述，以及指挥组织暴力的内容，都不在本题范围内。"
+        ],
+        "bridgeLabel": "不直接伤害他人的选择，原则上由本人决定",
+        "bridgeText": "如果一个成年人的行为不威胁、骚扰、欺骗或控制他人，也不直接损害他人的身体和财产，那么国家至少有一项理由保持克制，不用刑罚、普遍监控或其他强制手段大幅限制这种行为及其正常交往。",
+        "targetText": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "speech_discretion_oppose": {
+      "id": "speech_discretion_oppose",
+      "targetClaimId": "speech_oppose",
+      "title": "因为模糊标准会让执法机关选择性处理不同说话者",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“没有明确规则和独立监督的公权力，应受到限制”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_open_standard_no_review",
+        "speech_enforcement_variance"
+      ],
+      "bridgeClaimId": "constrain_discretionary_power",
+      "plainSteps": {
+        "facts": [
+          "法律只写了“严重贬低或侮辱”，没有列出足够明确的判断标准。立案机关不必公开具体理由，立案前也没有独立机构复核。",
+          "面对内容相同的表达，不同执法单位会因为说话者身份不同，而给出明显不同的立案概率。"
+        ],
+        "bridgeLabel": "没有明确规则和独立监督的公权力，应受到限制",
+        "bridgeText": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。",
+        "targetText": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "speech_correction_oppose": {
+      "id": "speech_correction_oppose",
+      "targetClaimId": "speech_oppose",
+      "title": "因为禁令会压低有证据的公共错误披露",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度必须保留发现并纠正错误的渠道”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_blocks_verified_reporting"
+      ],
+      "bridgeClaimId": "preserve_error_correction",
+      "plainSteps": {
+        "facts": [
+          "这项法律实施后，包含可核实腐败或机构失误证据的报道变少；其他举报渠道增加的已核实披露，不足以补上这个缺口。"
+        ],
+        "bridgeLabel": "制度必须保留发现并纠正错误的渠道",
+        "bridgeText": "如果禁止某类不含威胁的表达，会明显减少可核实错误被发现、公开和纠正的机会，那么国家至少有一项理由不实施这项禁令。",
+        "targetText": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "surveillance_harm_support": {
+      "id": "surveillance_harm_support",
+      "targetClaimId": "surveillance_support",
+      "title": "因为全民保存能减少已经开始准备、接近实施的致命袭击",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“没有较温和替代时，应预防死亡和重伤”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_prevents_attacks",
+        "surveillance_no_equal_targeted_method"
+      ],
+      "bridgeClaimId": "prevent_severe_harm",
+      "plainSteps": {
+        "facts": [
+          "这项制度使已经开始准备、接近实施的致命袭击，每年减少至少15%。研究把同一时期情报预算增加的影响分开计算后，仍然得到这个结果。",
+          "在预算相同的条件下，只保存有具体嫌疑对象的数据，并加快司法授权，减少袭击的效果仍低于全民保存制度。"
+        ],
+        "bridgeLabel": "没有较温和替代时，应预防死亡和重伤",
+        "bridgeText": "如果一项措施能够明显减少死亡或重伤，而且没有同样有效、但对个人限制更小的替代办法，那么国家至少有一项理由采用这项措施。",
+        "targetText": "国家应该要求保存所有成年人的通信元数据五年，并允许安全机关按题设方式查询。"
+      }
+    },
+    "surveillance_demo_support": {
+      "id": "surveillance_demo_support",
+      "targetClaimId": "surveillance_support",
+      "title": "因为制度经过公开立法、留痕并可被撤销",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“公开而平等的民主程序，本身会给政策增加一项支持理由”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_audit_public"
+      ],
+      "bridgeClaimId": "democratic_authorization",
+      "plainSteps": {
+        "facts": [
+          "这项制度通过公开立法建立。成年人有大体平等的投票和代表机会；每次查询都会自动留下记录，年度统计公开，议会也可以废除制度。但具体查询仍不需要事前独立批准。"
+        ],
+        "bridgeLabel": "公开而平等的民主程序，本身会给政策增加一项支持理由",
+        "bridgeText": "如果一项强制政策通过公开程序制定，受影响者拥有大体平等的参与机会，而且政策以后还能被审查和撤换，那么这套程序本身至少会给政策增加一项支持理由。",
+        "targetText": "国家应该要求保存所有成年人的通信元数据五年，并允许安全机关按题设方式查询。"
+      }
+    },
+    "surveillance_cooperation_support": {
+      "id": "surveillance_cooperation_support",
+      "targetClaimId": "surveillance_support",
+      "title": "因为制度能减少破坏公共服务的组织性袭击",
+      "summary": "这条理由分成两步：先检查 3 项事实判断，再判断你是否接受规范原则“制度应保护人们在没有组织性暴力的情况下共同生活”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_prevents_attacks",
+        "organized_violence_disrupts_exchange",
+        "surveillance_no_greater_cooperation_risk"
+      ],
+      "bridgeClaimId": "preserve_cooperation_conditions",
+      "plainSteps": {
+        "facts": [
+          "这项制度使已经开始准备、接近实施的致命袭击，每年减少至少15%。研究把同一时期情报预算增加的影响分开计算后，仍然得到这个结果。",
+          "持续的组织性暴力会减少人员流动、交易、公共服务运行或不同群体之间的合作，至少影响其中一项。",
+          "按同一套事件标准、同一段时间比较，全民保存制度新引发的组织性暴力和公共服务中断，没有多于它所避免的袭击原本会造成的同类事件。"
+        ],
+        "bridgeLabel": "制度应保护人们在没有组织性暴力的情况下共同生活",
+        "bridgeText": "如果一种可以避免的行为模式，会明显提高组织性暴力或公共制度崩溃的概率，而且限制这种行为不会造成更大的同类风险，那么国家至少有一项理由限制它。",
+        "targetText": "国家应该要求保存所有成年人的通信元数据五年，并允许安全机关按题设方式查询。"
+      }
+    },
+    "surveillance_power_oppose": {
+      "id": "surveillance_power_oppose",
+      "targetClaimId": "surveillance_oppose",
+      "title": "因为机关可以在没有事前独立批准时查询任何人",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“没有明确规则和独立监督的公权力，应受到限制”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_discretionary_queries"
+      ],
+      "bridgeClaimId": "constrain_discretionary_power",
+      "plainSteps": {
+        "facts": [
+          "执行机关可以查询任何成年人的记录，不必公开针对这个人的理由，也不必事先取得独立批准。"
+        ],
+        "bridgeLabel": "没有明确规则和独立监督的公权力，应受到限制",
+        "bridgeText": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。",
+        "targetText": "国家不应该要求保存所有成年人的通信元数据五年，也不应该允许安全机关按题设方式查询。"
+      }
+    },
+    "surveillance_procedure_oppose": {
+      "id": "surveillance_procedure_oppose",
+      "targetClaimId": "surveillance_oppose",
+      "title": "因为系统误判会造成难以恢复的强制损失",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“可能造成重大误伤的强制决定，必须允许复核”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_false_positive_cost",
+        "surveillance_scope"
+      ],
+      "bridgeClaimId": "review_high_cost_coercion",
+      "plainSteps": {
+        "facts": [
+          "由系统标记引发的限制出境、冻结账户或拘留中，至少5%最后被确认找错了人，而且大多数损失无法完全恢复。",
+          "制度保存所有成年人的通信时间、联系对象和位置记录，保存期为五年。查询前不需要先证明某个人有具体嫌疑，也不需要事前得到独立法院批准。"
+        ],
+        "bridgeLabel": "可能造成重大误伤的强制决定，必须允许复核",
+        "bridgeText": "如果国家要对个人施加罚款、拘留、限制出境等强制措施，而决定所依据的事实可能判断错误，并且错误会造成重大损失，那么国家至少有一项理由设置及时、独立、允许当事人申辩的审查程序。",
+        "targetText": "国家不应该要求保存所有成年人的通信元数据五年，也不应该允许安全机关按题设方式查询。"
+      }
+    },
+    "surveillance_association_oppose": {
+      "id": "surveillance_association_oppose",
+      "targetClaimId": "surveillance_oppose",
+      "title": "因为全民保存会压低记者、律师和政治团体的合法联系",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“不直接伤害他人的选择，原则上由本人决定”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_chills_association"
+      ],
+      "bridgeClaimId": "protect_nonharmful_choice",
+      "plainSteps": {
+        "facts": [
+          "制度实施后，没有被指控违法的记者、律师和政治团体，与消息来源的通信变少；减少的主要是那些能从通信时间、联系对象和位置记录中识别出来的联系。"
+        ],
+        "bridgeLabel": "不直接伤害他人的选择，原则上由本人决定",
+        "bridgeText": "如果一个成年人的行为不威胁、骚扰、欺骗或控制他人，也不直接损害他人的身体和财产，那么国家至少有一项理由保持克制，不用刑罚、普遍监控或其他强制手段大幅限制这种行为及其正常交往。",
+        "targetText": "国家不应该要求保存所有成年人的通信元数据五年，也不应该允许安全机关按题设方式查询。"
+      }
+    },
+    "income_material_support": {
+      "id": "income_material_support",
+      "targetClaimId": "income_support",
+      "title": "因为方案能明显减少食物、住所和药物匮乏",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“制度应尽量避免人失去基本生活条件”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_reduces_deprivation",
+        "income_no_larger_same_loss"
+      ],
+      "bridgeClaimId": "secure_material_capacity",
+      "plainSteps": {
+        "facts": [
+          "方案实施三年后，无法稳定获得食物、住所或必要药物的人口比例至少下降了25%。",
+          "把税收负担和人们可能改变行为的影响都算进去后，确实有一部分人会因方案而新陷入食物、住所或必要药物匮乏；但这部分人数少于因方案而摆脱同类匮乏的人数。"
+        ],
+        "bridgeLabel": "制度应尽量避免人失去基本生活条件",
+        "bridgeText": "如果一项社会可以负担的措施能明显减少人们缺少食物、住房、必要能源或基本医疗的情况，而且不会造成更多同样严重的匮乏，国家至少有一项理由采用它。反过来，若一项政策会让人失去这些基本条件且没有充分补偿，国家至少有一项理由修改或放弃它。",
+        "targetText": "国家应该向每名成年人发放一笔不附带工作条件的基本现金，并按题设方式筹资。"
+      }
+    },
+    "income_discretion_support": {
+      "id": "income_discretion_support",
+      "targetClaimId": "income_support",
+      "title": "因为自动发放会减少个案人员随意拒绝救助的权力",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“没有明确规则和独立监督的公权力，应受到限制”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_status_quo_gatekeeping",
+        "income_reduces_caseworker_discretion"
+      ],
+      "bridgeClaimId": "constrain_discretionary_power",
+      "plainSteps": {
+        "facts": [
+          "现有基础救助允许个案工作人员用没有完整定义的“求职诚意”或“家庭支持”等标准拒绝发放，而且拒绝前没有独立复核。",
+          "基本现金只根据年龄和居住记录自动发放。个案工作人员不能依据含义模糊的评价标准拒绝发放。"
+        ],
+        "bridgeLabel": "没有明确规则和独立监督的公权力，应受到限制",
+        "bridgeText": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。",
+        "targetText": "国家应该向每名成年人发放一笔不附带工作条件的基本现金，并按题设方式筹资。"
+      }
+    },
+    "income_exit_support": {
+      "id": "income_exit_support",
+      "targetClaimId": "income_support",
+      "title": "因为稳定现金会提高人们离开暴力或扣薪关系的能力",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“人不应因基本生存受控而被迫服从”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_dependency_control",
+        "income_exit_abuse"
+      ],
+      "bridgeClaimId": "enable_exit_from_dependency",
+      "plainSteps": {
+        "facts": [
+          "在部分受助者中，雇主或伴侣控制着当事人获得食物、住所或必要医疗的唯一来源，并能通过切断这些资源，提高当事人拒绝要求的代价。",
+          "方案实施后，曾遭遇工资扣留、工作场所暴力或伴侣暴力的人，离开相关雇佣或伴侣关系的比例上升。"
+        ],
+        "bridgeLabel": "人不应因基本生存受控而被迫服从",
+        "bridgeText": "如果一种制度安排让一方能够通过切断食物、住所或必要医疗，迫使另一方服从，那么国家至少有一项理由为后者提供真正可用的退出选择。",
+        "targetText": "国家应该向每名成年人发放一笔不附带工作条件的基本现金，并按题设方式筹资。"
+      }
+    },
+    "income_holdings_oppose": {
+      "id": "income_holdings_oppose",
+      "targetClaimId": "income_oppose",
+      "title": "因为新增税收来自没有欺诈或强迫取得的收入",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“个人对正当取得的资源拥有需要被尊重的控制主张”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_financed_from_voluntary_holdings"
+      ],
+      "bridgeClaimId": "legitimate_control",
+      "plainSteps": {
+        "facts": [
+          "新增税款来自劳动报酬、投资收益和自愿交易所得。本题假定这些收入不是靠欺诈或强迫取得的。"
+        ],
+        "bridgeLabel": "个人对正当取得的资源拥有需要被尊重的控制主张",
+        "bridgeText": "一个人通过没有欺诈、没有强迫的方式取得资源后，他对这些资源的控制，不应被国家或他人随意取消。",
+        "targetText": "国家不应该向每名成年人发放这笔不附带工作条件的基本现金。"
+      }
+    },
+    "income_reciprocity_oppose": {
+      "id": "income_reciprocity_oppose",
+      "targetClaimId": "income_oppose",
+      "title": "因为存在有能力、有机会却长期不作贡献的领取者",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“有能力且从共同制度受益的人，应承担相称贡献”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_program_requires_contributions",
+        "income_noncontributors"
+      ],
+      "bridgeClaimId": "require_reciprocal_contribution",
+      "plainSteps": {
+        "facts": [
+          "这项现金支付只有在税收持续流入时才能维持。如果税收下降，而其他条件不变，支付总额就会下降，或者转化为债务。",
+          "部分领取者与持续贡献者有相近的劳动能力、工作机会和照护负担，但连续五年没有从事有偿劳动、照护、学习或社区服务。"
+        ],
+        "bridgeLabel": "有能力且从共同制度受益的人，应承担相称贡献",
+        "bridgeText": "如果一项共同制度必须依靠成员持续贡献才能维持，而某个人与其他贡献者有相近的能力和机会，却长期拒绝作出任何贡献，那么制度至少有一项理由要求他承担相称的负担。",
+        "targetText": "国家不应该向每名成年人发放这笔不附带工作条件的基本现金。"
+      }
+    },
+    "income_future_oppose": {
+      "id": "income_future_oppose",
+      "targetClaimId": "income_oppose",
+      "title": "因为长期债务会把基本生活损失转移给以后的人",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“未来发生的严重损失，也必须算在内”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_future_burden"
+      ],
+      "bridgeClaimId": "account_for_future_harm",
+      "plainSteps": {
+        "facts": [
+          "如果方案保持不变，未来二十年增加的净债务会通过更高税率或削减基础服务，使后续人口中至少与当前受益人数相当的一部分人，无法稳定获得食物、住所、必要能源或必要医疗。"
+        ],
+        "bridgeLabel": "未来发生的严重损失，也必须算在内",
+        "bridgeText": "如果今天的行动会在可以估计的未来，增加他人死亡、重伤、失去基本生活条件或遭受重大财产损失的概率，那么决策不能仅仅因为这些损失发生得较晚，就把它们忽略。",
+        "targetText": "国家不应该向每名成年人发放这笔不附带工作条件的基本现金。"
+      }
+    },
+    "carbon_harm_support": {
+      "id": "carbon_harm_support",
+      "targetClaimId": "carbon_support",
+      "title": "因为方案能减少排放以及相关的身体和财产损失",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“没有较温和替代时，应预防死亡和重伤”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_reduces_damage",
+        "carbon_no_equal_alternative"
+      ],
+      "bridgeClaimId": "prevent_severe_harm",
+      "plainSteps": {
+        "facts": [
+          "与不实施政策相比，这项方案在十年内使累计温室气体排放至少减少15%。研究模型同时显示，由这些排放造成的死亡、重伤和财产损失也会减少。",
+          "在财政成本相同、执行时间同为十年的条件下，已经评估过的其他政策组合——也就是不靠碳排放收费的方案——累计减排量都低于这项方案。"
+        ],
+        "bridgeLabel": "没有较温和替代时，应预防死亡和重伤",
+        "bridgeText": "如果一项措施能够明显减少死亡或重伤，而且没有同样有效、但对个人限制更小的替代办法，那么国家至少有一项理由采用这项措施。",
+        "targetText": "国家应该按化石燃料的含碳量收费，并把净收入平均返还给每个人。"
+      }
+    },
+    "carbon_future_support": {
+      "id": "carbon_future_support",
+      "targetClaimId": "carbon_support",
+      "title": "因为不行动会增加未来人的重大损失",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“未来发生的严重损失，也必须算在内”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_future_loss"
+      ],
+      "bridgeClaimId": "account_for_future_harm",
+      "plainSteps": {
+        "facts": [
+          "不采取政策会提高未来二十年至八十年间，人们遭受高温相关死亡、洪水损失和粮食减产的概率。"
+        ],
+        "bridgeLabel": "未来发生的严重损失，也必须算在内",
+        "bridgeText": "如果今天的行动会在可以估计的未来，增加他人死亡、重伤、失去基本生活条件或遭受重大财产损失的概率，那么决策不能仅仅因为这些损失发生得较晚，就把它们忽略。",
+        "targetText": "国家应该按化石燃料的含碳量收费，并把净收入平均返还给每个人。"
+      }
+    },
+    "carbon_cost_support": {
+      "id": "carbon_cost_support",
+      "targetClaimId": "carbon_support",
+      "title": "因为排放者能控制一项会把损失留给第三方的活动",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“可控制的活动，不应把损失单方面留给旁人”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_external_costs"
+      ],
+      "bridgeClaimId": "prevent_cost_shifting",
+      "plainSteps": {
+        "facts": [
+          "化石燃料造成的碳排放增加时，没有参与相关生产或交易的人，会承担更多可以估计的身体或财产损失；排放者也能够改变自己的排放量。"
+        ],
+        "bridgeLabel": "可控制的活动，不应把损失单方面留给旁人",
+        "bridgeText": "如果一项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，而且活动者能够改变活动规模，那么制度至少有一项理由要求活动者承担相应成本。",
+        "targetText": "国家应该按化石燃料的含碳量收费，并把净收入平均返还给每个人。"
+      }
+    },
+    "carbon_material_oppose": {
+      "id": "carbon_material_oppose",
+      "targetClaimId": "carbon_oppose",
+      "title": "因为返还后仍有低收入家庭无法支付必要支出",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度应尽量避免人失去基本生活条件”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_bottom_decile_loss"
+      ],
+      "bridgeClaimId": "secure_material_capacity",
+      "plainSteps": {
+        "facts": [
+          "即使把现金返还算进去，在收入最低的10%家庭中，仍有至少十分之一在方案实施后的前三年，无法同时支付最低食物、住所、必要医疗，以及维持就业所需的能源和交通费用。"
+        ],
+        "bridgeLabel": "制度应尽量避免人失去基本生活条件",
+        "bridgeText": "如果一项社会可以负担的措施能明显减少人们缺少食物、住房、必要能源或基本医疗的情况，而且不会造成更多同样严重的匮乏，国家至少有一项理由采用它。反过来，若一项政策会让人失去这些基本条件且没有充分补偿，国家至少有一项理由修改或放弃它。",
+        "targetText": "国家不应该按题设方案征收碳费并平均返还收入。"
+      }
+    },
+    "carbon_effectiveness_oppose": {
+      "id": "carbon_effectiveness_oppose",
+      "targetClaimId": "carbon_oppose",
+      "title": "因为生产转移会抵消大部分全球减排效果",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“强制政策长期无效时，不应只因惯性继续”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_leakage",
+        "ineffective_policy_uses_resources"
+      ],
+      "bridgeClaimId": "avoid_ineffective_coercion",
+      "plainSteps": {
+        "facts": [
+          "部分企业把生产转移到没有这项收费的地区，国内商品也被高排放的进口商品替代。这些变化抵消了境内减排的80%以上，因此全球累计排放几乎没有下降。",
+          "执行一项强制政策，至少需要人员、时间、信息系统或财政支出中的一种资源。"
+        ],
+        "bridgeLabel": "强制政策长期无效时，不应只因惯性继续",
+        "bridgeText": "如果可靠证据显示，一项强制政策不能实现它公开宣称的目标，而且还持续消耗大量人员、时间或财政资源，那么国家至少有一项理由停止或不采用这项政策。",
+        "targetText": "国家不应该按题设方案征收碳费并平均返还收入。"
+      }
+    },
+    "carbon_power_oppose": {
+      "id": "carbon_power_oppose",
+      "targetClaimId": "carbon_oppose",
+      "title": "因为主管机关能用不公开的模型先追缴、后复核",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“没有明确规则和独立监督的公权力，应受到限制”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_tracking_discretion"
+      ],
+      "bridgeClaimId": "constrain_discretionary_power",
+      "plainSteps": {
+        "facts": [
+          "主管机关可以用不公开的计算模型，调整用来估算企业排放量的系数，并在复核完成前先追缴费用；企业看不到模型采用了哪些参数。"
+        ],
+        "bridgeLabel": "没有明确规则和独立监督的公权力，应受到限制",
+        "bridgeText": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。",
+        "targetText": "国家不应该按题设方案征收碳费并平均返还收入。"
+      }
+    },
+    "choice_to_authorship": {
+      "id": "choice_to_authorship",
+      "targetClaimId": "protect_nonharmful_choice",
+      "title": "因为无害的生活选择主要改变的是本人生活",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“主要影响本人生活的选择，应尽量留给本人”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "personal_choice_locates_primary_consequences"
+      ],
+      "bridgeClaimId": "respect_personal_authorship",
+      "plainSteps": {
+        "facts": [
+          "在已经排除威胁、欺诈、针对个人的骚扰，以及未经同意的身体或财产影响后，一个成年人是否采用某种生活方式，主要改变的是他本人的行动安排和生活计划。"
+        ],
+        "bridgeLabel": "主要影响本人生活的选择，应尽量留给本人",
+        "bridgeText": "如果一项选择主要改变行为者自己的生活，而且不直接控制他人的身体、财产或同等选择空间，那么制度至少有一项理由把决定留给本人，而不是替他作决定。",
+        "targetText": "如果一个成年人的行为不威胁、骚扰、欺骗或控制他人，也不直接损害他人的身体和财产，那么国家至少有一项理由保持克制，不用刑罚、普遍监控或其他强制手段大幅限制这种行为及其正常交往。"
+      }
+    },
+    "authorship_to_equal_agency": {
+      "id": "authorship_to_equal_agency",
+      "targetClaimId": "respect_personal_authorship",
+      "title": "因为个人选择构成了他自己的生活计划",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“每个人都应平等决定自己的无害生活选择”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "personal_choice_locates_primary_consequences"
+      ],
+      "bridgeClaimId": "equal_agency",
+      "plainSteps": {
+        "facts": [
+          "在已经排除威胁、欺诈、针对个人的骚扰，以及未经同意的身体或财产影响后，一个成年人是否采用某种生活方式，主要改变的是他本人的行动安排和生活计划。"
+        ],
+        "bridgeLabel": "每个人都应平等决定自己的无害生活选择",
+        "bridgeText": "只要一个人能够形成和修改自己的生活计划，他就和其他人一样，应当能够自己决定那些不伤害他人的个人选择，而不是由别人代替。",
+        "targetText": "如果一项选择主要改变行为者自己的生活，而且不直接控制他人的身体、财产或同等选择空间，那么制度至少有一项理由把决定留给本人，而不是替他作决定。"
+      }
+    },
+    "severe_harm_to_agency_preconditions": {
+      "id": "severe_harm_to_agency_preconditions",
+      "targetClaimId": "prevent_severe_harm",
+      "title": "因为死亡和重伤会破坏作出选择所需的能力",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度应保护人作出并执行选择所需的最低能力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "severe_harm_removes_options"
+      ],
+      "bridgeClaimId": "protect_agency_preconditions",
+      "plainSteps": {
+        "facts": [
+          "死亡会结束一个人之后的全部行动；重伤通常会减少他实际能够做出的选择和行动。"
+        ],
+        "bridgeLabel": "制度应保护人作出并执行选择所需的最低能力",
+        "bridgeText": "如果一种本可避免的制度安排，会让人失去形成、修改或执行生活计划所必需的最低身体或物质能力，而且修正它不会让别人失去同等程度的能力，那么制度至少有一项理由修正这种安排。",
+        "targetText": "如果一项措施能够明显减少死亡或重伤，而且没有同样有效、但对个人限制更小的替代办法，那么国家至少有一项理由采用这项措施。"
+      }
+    },
+    "deprivation_to_agency_preconditions": {
+      "id": "deprivation_to_agency_preconditions",
+      "targetClaimId": "secure_material_capacity",
+      "title": "因为基本物质匮乏会破坏执行生活计划的能力",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度应保护人作出并执行选择所需的最低能力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "deprivation_reduces_capacity"
+      ],
+      "bridgeClaimId": "protect_agency_preconditions",
+      "plainSteps": {
+        "facts": [
+          "缺少食物、住所或必要医疗，会降低人的存活机会、健康状况，或减少他实际能够完成的行动。"
+        ],
+        "bridgeLabel": "制度应保护人作出并执行选择所需的最低能力",
+        "bridgeText": "如果一种本可避免的制度安排，会让人失去形成、修改或执行生活计划所必需的最低身体或物质能力，而且修正它不会让别人失去同等程度的能力，那么制度至少有一项理由修正这种安排。",
+        "targetText": "如果一项社会可以负担的措施能明显减少人们缺少食物、住房、必要能源或基本医疗的情况，而且不会造成更多同样严重的匮乏，国家至少有一项理由采用它。反过来，若一项政策会让人失去这些基本条件且没有充分补偿，国家至少有一项理由修改或放弃它。"
+      }
+    },
+    "agency_preconditions_to_equal_agency": {
+      "id": "agency_preconditions_to_equal_agency",
+      "targetClaimId": "protect_agency_preconditions",
+      "title": "因为平等决定自己生活，需要最低身体和物质能力",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“每个人都应平等决定自己的无害生活选择”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "agency_requires_minimum_capabilities"
+      ],
+      "bridgeClaimId": "equal_agency",
+      "plainSteps": {
+        "facts": [
+          "一个人如果死亡、长期失去意识，或者无法获得维持生存所需的食物、住所和必要医疗，他能够形成并实际执行的生活计划会变少。"
+        ],
+        "bridgeLabel": "每个人都应平等决定自己的无害生活选择",
+        "bridgeText": "只要一个人能够形成和修改自己的生活计划，他就和其他人一样，应当能够自己决定那些不伤害他人的个人选择，而不是由别人代替。",
+        "targetText": "如果一种本可避免的制度安排，会让人失去形成、修改或执行生活计划所必需的最低身体或物质能力，而且修正它不会让别人失去同等程度的能力，那么制度至少有一项理由修正这种安排。"
+      }
+    },
+    "discretion_to_answerability": {
+      "id": "discretion_to_answerability",
+      "targetClaimId": "constrain_discretionary_power",
+      "title": "因为不受约束的单方权力既制造依赖，也阻断质疑",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“能够改变个人基本处境的公权力，必须给理由并接受复核”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "unchecked_power_changes_dependence"
+      ],
+      "bridgeClaimId": "require_answerable_power",
+      "plainSteps": {
+        "facts": [
+          "当一方可以单方面干预另一方，又不用说明理由时，后者的选择会受到前者是否使用这项能力的影响。"
+        ],
+        "bridgeLabel": "能够改变个人基本处境的公权力，必须给理由并接受复核",
+        "bridgeText": "如果公权力能够单方面改变个人的重要选择、资格或资源，而当事人不能及时知道理由，也不能申请独立复核，那么制度至少有一项理由用公开规则、理由说明和独立审查来限制这种权力。",
+        "targetText": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。"
+      }
+    },
+    "fallibility_to_answerability": {
+      "id": "fallibility_to_answerability",
+      "targetClaimId": "review_high_cost_coercion",
+      "title": "因为可能出错的强制决定需要让反证进入",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“能够改变个人基本处境的公权力，必须给理由并接受复核”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "decision_makers_are_fallible"
+      ],
+      "bridgeClaimId": "require_answerable_power",
+      "plainSteps": {
+        "facts": [
+          "个人和机构在证据不完整时作出的判断，有时会被后来出现的证据推翻。"
+        ],
+        "bridgeLabel": "能够改变个人基本处境的公权力，必须给理由并接受复核",
+        "bridgeText": "如果公权力能够单方面改变个人的重要选择、资格或资源，而当事人不能及时知道理由，也不能申请独立复核，那么制度至少有一项理由用公开规则、理由说明和独立审查来限制这种权力。",
+        "targetText": "如果国家要对个人施加罚款、拘留、限制出境等强制措施，而决定所依据的事实可能判断错误，并且错误会造成重大损失，那么国家至少有一项理由设置及时、独立、允许当事人申辩的审查程序。"
+      }
+    },
+    "answerability_to_equal_standing": {
+      "id": "answerability_to_equal_standing",
+      "targetClaimId": "require_answerable_power",
+      "title": "因为不给理由和复核，会让当事人的反证无法进入决定",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“国家强制个人时，应让当事人知道理由、提出质疑”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "unreviewable_power_blocks_counterevidence"
+      ],
+      "bridgeClaimId": "equal_standing_under_coercion",
+      "plainSteps": {
+        "facts": [
+          "如果公权力不告诉当事人个案决定依据，也没有独立复核，当事人掌握的反证就无法进入这套复核程序并改变决定。"
+        ],
+        "bridgeLabel": "国家强制个人时，应让当事人知道理由、提出质疑",
+        "bridgeText": "如果国家要强制改变某人的行动、资源或法律资格，那么制度至少有一项理由让当事人知道决定依据、提出质疑，并让相关证据有机会改变决定。",
+        "targetText": "如果公权力能够单方面改变个人的重要选择、资格或资源，而当事人不能及时知道理由，也不能申请独立复核，那么制度至少有一项理由用公开规则、理由说明和独立审查来限制这种权力。"
+      }
+    },
+    "standing_to_procedure": {
+      "id": "standing_to_procedure",
+      "targetClaimId": "equal_standing_under_coercion",
+      "title": "因为申辩和独立复核能让当事人的信息影响决定",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“国家强制个人时，必须给理由并允许申诉”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "contestability_changes_decision_input"
+      ],
+      "bridgeClaimId": "procedural_justification",
+      "plainSteps": {
+        "facts": [
+          "当事人如果能看到决定理由、提交反证，并得到独立机构复核，他提供的信息就有可能改变决定；如果这些渠道都不存在，他的信息就无法通过这些渠道影响决定。"
+        ],
+        "bridgeLabel": "国家强制个人时，必须给理由并允许申诉",
+        "bridgeText": "国家对个人施加强制时，应向当事人说明决定依据，并提供能够由独立机构审查、允许当事人质疑的程序。",
+        "targetText": "如果国家要强制改变某人的行动、资源或法律资格，那么制度至少有一项理由让当事人知道决定依据、提出质疑，并让相关证据有机会改变决定。"
+      }
+    },
+    "information_to_institutional_learning": {
+      "id": "information_to_institutional_learning",
+      "targetClaimId": "preserve_error_correction",
+      "title": "因为错误必须被发现并传递，制度才可能修改",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度要长期可靠，就必须能够发现错误并据此修改”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "correction_requires_information"
+      ],
+      "bridgeClaimId": "preserve_institutional_learning",
+      "plainSteps": {
+        "facts": [
+          "如果一个错误从未被发现，或者发现后没有告知能够修改它的人，那么制度就不会根据这个错误作出纠正。"
+        ],
+        "bridgeLabel": "制度要长期可靠，就必须能够发现错误并据此修改",
+        "bridgeText": "如果一个制度只有在能够发现、传递和改正错误时，才可能长期可靠，那么制度至少有一项理由保留让错误被看见、并能触发修改的渠道；除非这些渠道会造成更大的同类损失。",
+        "targetText": "如果禁止某类不含威胁的表达，会明显减少可核实错误被发现、公开和纠正的机会，那么国家至少有一项理由不实施这项禁令。"
+      }
+    },
+    "learning_to_error_correction": {
+      "id": "learning_to_error_correction",
+      "targetClaimId": "preserve_institutional_learning",
+      "title": "因为制度根据结果修订政策，需要完整的信息回路",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“公共制度必须保留发现、公开和纠正错误的能力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "policy_revision_requires_performance_signals"
+      ],
+      "bridgeClaimId": "error_correction",
+      "plainSteps": {
+        "facts": [
+          "一个制度要根据执行结果修改政策，至少需要记录结果、把结果和目标比较，再把比较信息传给能够修改政策的人。"
+        ],
+        "bridgeLabel": "公共制度必须保留发现、公开和纠正错误的能力",
+        "bridgeText": "公共制度应保留发现、公开和纠正错误的渠道，即使这些渠道会带来不适、冒犯或短期冲突。",
+        "targetText": "如果一个制度只有在能够发现、传递和改正错误时，才可能长期可靠，那么制度至少有一项理由保留让错误被看见、并能触发修改的渠道；除非这些渠道会造成更大的同类损失。"
+      }
+    },
+    "cost_to_controller_burden": {
+      "id": "cost_to_controller_burden",
+      "targetClaimId": "prevent_cost_shifting",
+      "title": "因为改变活动规模会改变第三方遭受的损失",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“谁能控制造成损失的活动，谁就更有理由承担相应负担”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "controllable_activity_causes_third_party_loss"
+      ],
+      "bridgeClaimId": "assign_burdens_to_controllers",
+      "plainSteps": {
+        "facts": [
+          "如果改变一项可控制活动的规模，会随之改变第三方遭受的身体或财产损失，那么两者之间存在可以通过干预改变的因果关系。"
+        ],
+        "bridgeLabel": "谁能控制造成损失的活动，谁就更有理由承担相应负担",
+        "bridgeText": "如果某个人能够控制自己的活动，而这项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，那么制度至少有一项理由让能够改变活动的人承担相应负担，而不是把损失全部留给第三方。",
+        "targetText": "如果一项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，而且活动者能够改变活动规模，那么制度至少有一项理由要求活动者承担相应成本。"
+      }
+    },
+    "controller_burden_to_reciprocity": {
+      "id": "controller_burden_to_reciprocity",
+      "targetClaimId": "assign_burdens_to_controllers",
+      "title": "因为一方可控制的活动把共同成本留给了未同意者",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“从共同制度受益且有能力的人，应承担相称贡献”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "controllable_activity_causes_third_party_loss"
+      ],
+      "bridgeClaimId": "reciprocity",
+      "plainSteps": {
+        "facts": [
+          "如果改变一项可控制活动的规模，会随之改变第三方遭受的身体或财产损失，那么两者之间存在可以通过干预改变的因果关系。"
+        ],
+        "bridgeLabel": "从共同制度受益且有能力的人，应承担相称贡献",
+        "bridgeText": "在必须依靠共同负担才能维持的制度中，能力和机会相近的人，应承担大致相称的贡献责任。",
+        "targetText": "如果某个人能够控制自己的活动，而这项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，那么制度至少有一项理由让能够改变活动的人承担相应负担，而不是把损失全部留给第三方。"
+      }
+    },
+    "severe_harm_to_security": {
+      "id": "severe_harm_to_security",
+      "targetClaimId": "prevent_severe_harm",
+      "title": "因为死亡和重伤会大幅减少人的行动能力",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“避免死亡和重伤具有很高的价值分量”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "severe_harm_removes_options"
+      ],
+      "bridgeClaimId": "bodily_security",
+      "plainSteps": {
+        "facts": [
+          "死亡会结束一个人之后的全部行动；重伤通常会减少他实际能够做出的选择和行动。"
+        ],
+        "bridgeLabel": "避免死亡和重伤具有很高的价值分量",
+        "bridgeText": "避免人的死亡、重伤和严重身体损害，是制度必须给予很高重视的一项理由。",
+        "targetText": "如果一项措施能够明显减少死亡或重伤，而且没有同样有效、但对个人限制更小的替代办法，那么国家至少有一项理由采用这项措施。"
+      }
+    },
+    "choice_to_agency": {
+      "id": "choice_to_agency",
+      "targetClaimId": "protect_nonharmful_choice",
+      "title": "因为刑罚会直接替代当事人的无害选择",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“每个人都应平等决定自己的无害生活选择”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "criminal_penalty_reduces_options"
+      ],
+      "bridgeClaimId": "equal_agency",
+      "plainSteps": {
+        "facts": [
+          "罚款、拘留或刑事记录会改变一个人可支配的资源、可采取的行动或未来机会。"
+        ],
+        "bridgeLabel": "每个人都应平等决定自己的无害生活选择",
+        "bridgeText": "只要一个人能够形成和修改自己的生活计划，他就和其他人一样，应当能够自己决定那些不伤害他人的个人选择，而不是由别人代替。",
+        "targetText": "如果一个成年人的行为不威胁、骚扰、欺骗或控制他人，也不直接损害他人的身体和财产，那么国家至少有一项理由保持克制，不用刑罚、普遍监控或其他强制手段大幅限制这种行为及其正常交往。"
+      }
+    },
+    "discretion_to_domination": {
+      "id": "discretion_to_domination",
+      "targetClaimId": "constrain_discretionary_power",
+      "title": "因为不受约束的干预能力会让人受制于他人意志",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“任何人都不应受制于他人不受约束的权力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "unchecked_power_changes_dependence"
+      ],
+      "bridgeClaimId": "non_domination",
+      "plainSteps": {
+        "facts": [
+          "当一方可以单方面干预另一方，又不用说明理由时，后者的选择会受到前者是否使用这项能力的影响。"
+        ],
+        "bridgeLabel": "任何人都不应受制于他人不受约束的权力",
+        "bridgeText": "任何人都不应处在这样一种关系中：别人可以随意干预他的基本选择，却不用遵守明确规则，也不用给出能够被质疑的理由。",
+        "targetText": "如果公权力可以在没有明确规则、公开理由和独立审查的情况下，选择性地干预个人，那么国家至少有一项理由取消这种权力，或给它加上严格限制。"
+      }
+    },
+    "participation_to_status": {
+      "id": "participation_to_status",
+      "targetClaimId": "equal_public_participation",
+      "title": "因为参与渠道决定谁能影响共同规则",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“所有公民都应有平等参与公共生活的资格”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "participation_is_membership_mechanism"
+      ],
+      "bridgeClaimId": "equal_civic_status",
+      "plainSteps": {
+        "facts": [
+          "投票、参加听证、提出申诉和担任公职，都是公民影响共同规则和公共机构运作的具体方式。"
+        ],
+        "bridgeLabel": "所有公民都应有平等参与公共生活的资格",
+        "bridgeText": "公共制度应把每个公民都当作具有同等资格的参与者，而不应把某些人长期放在较低等级的位置。",
+        "targetText": "如果一种本可避免的制度安排，长期使某些公民更难进入公共机构、使用公共服务或参与公共决策，那么国家至少有一项理由修正这种安排。"
+      }
+    },
+    "fallibility_to_procedure": {
+      "id": "fallibility_to_procedure",
+      "targetClaimId": "review_high_cost_coercion",
+      "title": "因为强制决定可能被后来的证据推翻",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“国家强制个人时，必须给理由并允许申诉”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "decision_makers_are_fallible"
+      ],
+      "bridgeClaimId": "procedural_justification",
+      "plainSteps": {
+        "facts": [
+          "个人和机构在证据不完整时作出的判断，有时会被后来出现的证据推翻。"
+        ],
+        "bridgeLabel": "国家强制个人时，必须给理由并允许申诉",
+        "bridgeText": "国家对个人施加强制时，应向当事人说明决定依据，并提供能够由独立机构审查、允许当事人质疑的程序。",
+        "targetText": "如果国家要对个人施加罚款、拘留、限制出境等强制措施，而决定所依据的事实可能判断错误，并且错误会造成重大损失，那么国家至少有一项理由设置及时、独立、允许当事人申辩的审查程序。"
+      }
+    },
+    "deprivation_to_floor": {
+      "id": "deprivation_to_floor",
+      "targetClaimId": "secure_material_capacity",
+      "title": "因为匮乏会损害生存、健康和实际行动能力",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“任何人都不应因可避免的匮乏而失去基本生活”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "deprivation_reduces_capacity"
+      ],
+      "bridgeClaimId": "material_floor",
+      "plainSteps": {
+        "facts": [
+          "缺少食物、住所或必要医疗，会降低人的存活机会、健康状况，或减少他实际能够完成的行动。"
+        ],
+        "bridgeLabel": "任何人都不应因可避免的匮乏而失去基本生活",
+        "bridgeText": "任何人都不应因为本可避免的资源匮乏，而失去维持生存、身体健康和最低限度实际选择所需要的食物、住所、能源或医疗。",
+        "targetText": "如果一项社会可以负担的措施能明显减少人们缺少食物、住房、必要能源或基本医疗的情况，而且不会造成更多同样严重的匮乏，国家至少有一项理由采用它。反过来，若一项政策会让人失去这些基本条件且没有充分补偿，国家至少有一项理由修改或放弃它。"
+      }
+    },
+    "inputs_to_reciprocity": {
+      "id": "inputs_to_reciprocity",
+      "targetClaimId": "require_reciprocal_contribution",
+      "title": "因为共同制度只有得到持续投入才能维持",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“从共同制度受益且有能力的人，应承担相称贡献”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "cooperation_requires_inputs"
+      ],
+      "bridgeClaimId": "reciprocity",
+      "plainSteps": {
+        "facts": [
+          "有些公共制度只有持续得到劳动、税款或照护投入，才能维持原有服务数量。"
+        ],
+        "bridgeLabel": "从共同制度受益且有能力的人，应承担相称贡献",
+        "bridgeText": "在必须依靠共同负担才能维持的制度中，能力和机会相近的人，应承担大致相称的贡献责任。",
+        "targetText": "如果一项共同制度必须依靠成员持续贡献才能维持，而某个人与其他贡献者有相近的能力和机会，却长期拒绝作出任何贡献，那么制度至少有一项理由要求他承担相称的负担。"
+      }
+    },
+    "acquisition_to_control": {
+      "id": "acquisition_to_control",
+      "targetClaimId": "protect_legitimate_control",
+      "title": "因为没有欺诈和强迫的取得过程记录了行动与同意",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“个人对正当取得的资源拥有需要被尊重的控制主张”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "voluntary_acquisition_tracks_choice"
+      ],
+      "bridgeClaimId": "legitimate_control",
+      "plainSteps": {
+        "facts": [
+          "在没有欺诈和强迫的生产或交换中，资源转移是参与者根据自己的行动和同意完成的。"
+        ],
+        "bridgeLabel": "个人对正当取得的资源拥有需要被尊重的控制主张",
+        "bridgeText": "一个人通过没有欺诈、没有强迫的方式取得资源后，他对这些资源的控制，不应被国家或他人随意取消。",
+        "targetText": "如果一个人通过没有欺诈、没有强迫的生产或交换取得资源，那么国家要征收这些资源，至少需要比“多数人更喜欢这样”更充分的理由。"
+      }
+    },
+    "time_to_future_status": {
+      "id": "time_to_future_status",
+      "targetClaimId": "account_for_future_harm",
+      "title": "因为出生时间不是任何人自己选择的",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“不能只因一个人出生较晚，就轻视他的重大损失”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "birth_time_not_action"
+      ],
+      "bridgeClaimId": "future_equal_weight",
+      "plainSteps": {
+        "facts": [
+          "一个人出生在什么时间，不是他在出生前能够选择或改变的事情。"
+        ],
+        "bridgeLabel": "不能只因一个人出生较晚，就轻视他的重大损失",
+        "bridgeText": "仅仅因为一些人出生得较晚，不能因此把他们可以预见的死亡、重伤或其他重大损失看得更轻。",
+        "targetText": "如果今天的行动会在可以估计的未来，增加他人死亡、重伤、失去基本生活条件或遭受重大财产损失的概率，那么决策不能仅仅因为这些损失发生得较晚，就把它们忽略。"
+      }
+    },
+    "information_to_correction": {
+      "id": "information_to_correction",
+      "targetClaimId": "preserve_error_correction",
+      "title": "因为没有被发现和传递的错误无法得到纠正",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“公共制度必须保留发现、公开和纠正错误的能力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "correction_requires_information"
+      ],
+      "bridgeClaimId": "error_correction",
+      "plainSteps": {
+        "facts": [
+          "如果一个错误从未被发现，或者发现后没有告知能够修改它的人，那么制度就不会根据这个错误作出纠正。"
+        ],
+        "bridgeLabel": "公共制度必须保留发现、公开和纠正错误的能力",
+        "bridgeText": "公共制度应保留发现、公开和纠正错误的渠道，即使这些渠道会带来不适、冒犯或短期冲突。",
+        "targetText": "如果禁止某类不含威胁的表达，会明显减少可核实错误被发现、公开和纠正的机会，那么国家至少有一项理由不实施这项禁令。"
+      }
+    },
+    "rules_to_democracy": {
+      "id": "rules_to_democracy",
+      "targetClaimId": "democratic_authorization",
+      "title": "因为共同规则会改变所有受约束者的行动和后果",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“受共同规则约束的人，应有平等机会参与制定和撤换规则”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "common_rules_affect_subjects"
+      ],
+      "bridgeClaimId": "democratic_authorship",
+      "plainSteps": {
+        "facts": [
+          "强制性的共同规则会改变受规则约束者可以做什么、拥有多少资源，或会承担什么法律后果。"
+        ],
+        "bridgeLabel": "受共同规则约束的人，应有平等机会参与制定和撤换规则",
+        "bridgeText": "受到共同规则约束的人，应有真正而且大体平等的机会，参与制定、审查和撤换这些规则。",
+        "targetText": "如果一项强制政策通过公开程序制定，受影响者拥有大体平等的参与机会，而且政策以后还能被审查和撤换，那么这套程序本身至少会给政策增加一项支持理由。"
+      }
+    },
+    "resources_to_nonwaste": {
+      "id": "resources_to_nonwaste",
+      "targetClaimId": "avoid_ineffective_coercion",
+      "title": "因为即使政策无效，强制执行仍会持续消耗资源",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度不应只因惯性继续明知无效的强制政策”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "ineffective_policy_uses_resources"
+      ],
+      "bridgeClaimId": "non_waste",
+      "plainSteps": {
+        "facts": [
+          "执行一项强制政策，至少需要人员、时间、信息系统或财政支出中的一种资源。"
+        ],
+        "bridgeLabel": "制度不应只因惯性继续明知无效的强制政策",
+        "bridgeText": "当可靠证据已经表明一种强制手段无法实现公开目标，而且它还持续占用本可用于其他目标的资源时，制度不应只因为惯性而继续维持它。",
+        "targetText": "如果可靠证据显示，一项强制政策不能实现它公开宣称的目标，而且还持续消耗大量人员、时间或财政资源，那么国家至少有一项理由停止或不采用这项政策。"
+      }
+    },
+    "violence_to_cooperation": {
+      "id": "violence_to_cooperation",
+      "targetClaimId": "preserve_cooperation_conditions",
+      "title": "因为组织性暴力会中断流动、交易和公共服务",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度应保护人们不靠组织性暴力也能共同生活”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "organized_violence_disrupts_exchange"
+      ],
+      "bridgeClaimId": "peaceful_cooperation",
+      "plainSteps": {
+        "facts": [
+          "持续的组织性暴力会减少人员流动、交易、公共服务运行或不同群体之间的合作，至少影响其中一项。"
+        ],
+        "bridgeLabel": "制度应保护人们不靠组织性暴力也能共同生活",
+        "bridgeText": "制度必须重视这样一种社会条件：互不相识、意见不同的人，仍能在不诉诸组织性暴力的情况下共同生活、交易和使用公共服务。",
+        "targetText": "如果一种可以避免的行为模式，会明显提高组织性暴力或公共制度崩溃的概率，而且限制这种行为不会造成更大的同类风险，那么国家至少有一项理由限制它。"
+      }
+    },
+    "dependency_to_domination": {
+      "id": "dependency_to_domination",
+      "targetClaimId": "enable_exit_from_dependency",
+      "title": "因为控制唯一生存来源会提高拒绝要求的代价",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“任何人都不应受制于他人不受约束的权力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "dependency_allows_compliance_pressure"
+      ],
+      "bridgeClaimId": "non_domination",
+      "plainSteps": {
+        "facts": [
+          "当一方能够切断另一方获得食物、住所或必要医疗的唯一来源时，这项能力会提高后者拒绝要求所要付出的代价。"
+        ],
+        "bridgeLabel": "任何人都不应受制于他人不受约束的权力",
+        "bridgeText": "任何人都不应处在这样一种关系中：别人可以随意干预他的基本选择，却不用遵守明确规则，也不用给出能够被质疑的理由。",
+        "targetText": "如果一种制度安排让一方能够通过切断食物、住所或必要医疗，迫使另一方服从，那么国家至少有一项理由为后者提供真正可用的退出选择。"
+      }
+    },
+    "cost_to_control": {
+      "id": "cost_to_control",
+      "targetClaimId": "prevent_cost_shifting",
+      "title": "因为活动者可以改变一项会增加第三方损失的活动",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“从共同制度受益且有能力的人，应承担相称贡献”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "controllable_activity_causes_third_party_loss"
+      ],
+      "bridgeClaimId": "reciprocity",
+      "plainSteps": {
+        "facts": [
+          "如果改变一项可控制活动的规模，会随之改变第三方遭受的身体或财产损失，那么两者之间存在可以通过干预改变的因果关系。"
+        ],
+        "bridgeLabel": "从共同制度受益且有能力的人，应承担相称贡献",
+        "bridgeText": "在必须依靠共同负担才能维持的制度中，能力和机会相近的人，应承担大致相称的贡献责任。",
+        "targetText": "如果一项活动会增加没有同意承担风险的第三方所遭受的身体或财产损失，而且活动者能够改变活动规模，那么制度至少有一项理由要求活动者承担相应成本。"
+      }
+    },
+    "speech_inquiry_oppose": {
+      "id": "speech_inquiry_oppose",
+      "targetClaimId": "speech_oppose",
+      "title": "因为法律会仅凭错误或冒犯判断处罚仍可争论的意见",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“可争论的和平意见，不应只因被认为错误或冒犯而受罚”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_penalizes_contestable_opinion"
+      ],
+      "bridgeClaimId": "protect_open_inquiry",
+      "plainSteps": {
+        "facts": [
+          "在题设范围内，一段表达即使不含威胁、骚扰、可核实的虚假事实或暴力指挥，只要被认定为严重贬低或侮辱，仍可能受到罚款或拘留。"
+        ],
+        "bridgeLabel": "可争论的和平意见，不应只因被认为错误或冒犯而受罚",
+        "bridgeText": "如果一项意见不威胁、骚扰、欺骗或指挥暴力，而且其真伪或意义仍可公开争论，那么国家至少有一项理由不只因为多数人或官员确信它错误、无益或冒犯就处罚表达者。",
+        "targetText": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "inquiry_to_open_inquiry": {
+      "id": "inquiry_to_open_inquiry",
+      "targetClaimId": "protect_open_inquiry",
+      "title": "因为公共判断只有面对异议，才实际经历了反驳检验",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“公共判断必须允许和平异议进入检验”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "public_inquiry_requires_contestable_dissent"
+      ],
+      "bridgeClaimId": "open_inquiry",
+      "plainSteps": {
+        "facts": [
+          "要检验一个公共判断能否回应反驳，至少需要有人能够提出与该判断不一致的理由，并让其他人看到和回应这些理由。"
+        ],
+        "bridgeLabel": "公共判断必须允许和平异议进入检验",
+        "bridgeText": "公共制度应允许不含威胁、骚扰、欺骗或暴力指挥的异议被提出和回应，即使多数人确信这种意见错误、无益或冒犯。",
+        "targetText": "如果一项意见不威胁、骚扰、欺骗或指挥暴力，而且其真伪或意义仍可公开争论，那么国家至少有一项理由不只因为多数人或官员确信它错误、无益或冒犯就处罚表达者。"
+      }
+    },
+    "surveillance_civic_association_oppose": {
+      "id": "surveillance_civic_association_oppose",
+      "targetClaimId": "surveillance_oppose",
+      "title": "因为全民留存会压低没有违法嫌疑者的和平结社",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“没有具体违法嫌疑的和平结社，应能保持实际协调能力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_chills_association"
+      ],
+      "bridgeClaimId": "protect_civic_association",
+      "plainSteps": {
+        "facts": [
+          "制度实施后，没有被指控违法的记者、律师和政治团体，与消息来源的通信变少；减少的主要是那些能从通信时间、联系对象和位置记录中识别出来的联系。"
+        ],
+        "bridgeLabel": "没有具体违法嫌疑的和平结社，应能保持实际协调能力",
+        "bridgeText": "如果一项普遍制度会明显压低没有具体违法嫌疑者参与和平政治、宗教、劳动或其他自愿组织的联系与协调，那么国家至少有一项理由取消这项制度，或把它缩小到有具体依据的对象。",
+        "targetText": "国家不应该要求保存所有成年人的通信元数据五年，也不应该允许安全机关按题设方式查询。"
+      }
+    },
+    "coordination_to_civic_association": {
+      "id": "coordination_to_civic_association",
+      "targetClaimId": "protect_civic_association",
+      "title": "因为多人共同组织行动需要实际联系与协调渠道",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“人们应能为和平共同目标自愿组织”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "collective_action_requires_coordination"
+      ],
+      "bridgeClaimId": "civic_association",
+      "plainSteps": {
+        "facts": [
+          "政治团体、宗教团体、工会和其他自愿组织要共同采取行动，成员至少需要能够相互联系、安排活动并交换信息。"
+        ],
+        "bridgeLabel": "人们应能为和平共同目标自愿组织",
+        "bridgeText": "没有参与威胁、强迫或其他违法行为的人，应能为政治、宗教、劳动或其他和平共同目标自愿联系、组织和行动。",
+        "targetText": "如果一项普遍制度会明显压低没有具体违法嫌疑者参与和平政治、宗教、劳动或其他自愿组织的联系与协调，那么国家至少有一项理由取消这项制度，或把它缩小到有具体依据的对象。"
+      }
+    },
+    "production_to_productive_self_governance": {
+      "id": "production_to_productive_self_governance",
+      "targetClaimId": "share_productive_governance",
+      "title": "因为重大生产规则会同时改变生产组织和直接生产者处境",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“直接生产者应对重大生产规则拥有实质共同决定权”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "production_rules_affect_direct_producers"
+      ],
+      "bridgeClaimId": "productive_self_governance",
+      "plainSteps": {
+        "facts": [
+          "关闭厂区、裁员、自动化投资和利润再投资会改变生产如何组织，也会改变直接参与生产者的工作、收入或工作地点。"
+        ],
+        "bridgeLabel": "直接生产者应对重大生产规则拥有实质共同决定权",
+        "bridgeText": "持续参与共同生产并直接承担重大生产决定后果的人，应通过能够撤换的集体代表，对这些重大规则拥有实质共同决定权。",
+        "targetText": "如果一群人持续直接参与共同生产，而重大生产决定会改变他们的工作、收入或工作地点，那么制度至少有一项理由让他们通过可撤换代表分享这些决定权，而不是把决定全部交给另一方。"
+      }
+    },
+    "institution_to_stewardship": {
+      "id": "institution_to_stewardship",
+      "targetClaimId": "preserve_tested_institutional_functions",
+      "title": "因为长期实践会把协调与纠错知识保存在规则和惯例中",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“改革应把共同生活所需的有益制度能力交给后来者”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "institutional_practice_carries_coordination_knowledge"
+      ],
+      "bridgeClaimId": "intergenerational_stewardship",
+      "plainSteps": {
+        "facts": [
+          "一个反复处理供应中断、紧急停产和工资支付的程序，会把参与者积累的分工、信息传递和纠错方式保存在规则与惯例中。"
+        ],
+        "bridgeLabel": "改革应把共同生活所需的有益制度能力交给后来者",
+        "bridgeText": "当前人改革制度时，应辨认并尽量把经长期实践证明有益的协调、信任和纠错能力交给后来者，同时纠正其中的压迫、排斥和失效部分。",
+        "targetText": "如果一套制度具有持续、可核查的协调或纠错功能，拟议变更会在等效替代得到验证前移除这些功能，而且存在能够修正问题的可逆分阶段路径，那么制度至少有一项理由先保留关键功能并分段改革。"
+      }
+    },
+    "wellbeing_to_impartial_wellbeing": {
+      "id": "wellbeing_to_impartial_wellbeing",
+      "targetClaimId": "compare_impartial_wellbeing",
+      "title": "因为相同福祉变化不会只因承受者身份而改变测量结果",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“每个受影响者的福祉变化都应得到不偏不倚的考虑”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "comparable_wellbeing_effects_do_not_depend_on_identity"
+      ],
+      "bridgeClaimId": "impartial_wellbeing",
+      "plainSteps": {
+        "facts": [
+          "在测量口径和变化幅度相同时，一项健康、痛苦、收入或实际机会的变化，不会仅因承受者属于不同群体而变成另一种可测量结果。"
+        ],
+        "bridgeLabel": "每个受影响者的福祉变化都应得到不偏不倚的考虑",
+        "bridgeText": "评估共同政策时，每个受影响者的健康、痛苦、收入和实际机会变化，都应使用一致口径得到不偏不倚的考虑，不能只因其身份或阵营而被忽略。",
+        "targetText": "如果可靠证据用一致口径比较了所有主要受影响者的健康、痛苦、收入和实际机会，并计入分配与不确定性，而且一个可行方案的总改善明显大于总损失，那么决策至少有一项理由选择它而不是结果更差的方案。"
+      }
+    },
+    "workplace_shared_control_support": {
+      "id": "workplace_shared_control_support",
+      "targetClaimId": "workplace_cogovernance_support",
+      "title": "因为直接生产者会承担重大决定后果，却没有治理表决权",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“共同生产并承担重大后果的人，应分享相关决定权”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "workers_excluded_from_major_decisions",
+        "workplace_cogovernance_scope"
+      ],
+      "bridgeClaimId": "share_productive_governance",
+      "plainSteps": {
+        "facts": [
+          "在政策覆盖的企业中，劳动者目前不能通过一人一票选出的代表，对关闭主要厂区、大规模裁员、重大自动化投资或利润再投资行使表决权；这些决定会改变其就业、工作地点或劳动条件。",
+          "题设制度让劳动者和股东分别选出大型企业董事会的一半成员；关闭主要厂区、大规模裁员、重大自动化投资和利润再投资，需要两组董事分别过半同意。"
+        ],
+        "bridgeLabel": "共同生产并承担重大后果的人，应分享相关决定权",
+        "bridgeText": "如果一群人持续直接参与共同生产，而重大生产决定会改变他们的工作、收入或工作地点，那么制度至少有一项理由让他们通过可撤换代表分享这些决定权，而不是把决定全部交给另一方。",
+        "targetText": "国家应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "workplace_nondomination_support": {
+      "id": "workplace_nondomination_support",
+      "targetClaimId": "workplace_cogovernance_support",
+      "title": "因为企业能在劳动者难以退出时单方改变其基本处境",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“任何人都不应受制于他人不受约束的权力”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "large_firm_unilateral_power",
+        "workplace_cogovernance_scope"
+      ],
+      "bridgeClaimId": "non_domination",
+      "plainSteps": {
+        "facts": [
+          "在政策覆盖的企业中，现有董事会能够在劳动者没有表决或申诉渠道时，单方面决定关闭主要厂区或大规模裁员；多数受影响劳动者无法在三个月内以相近收入和搬迁成本转到其他工作。",
+          "题设制度让劳动者和股东分别选出大型企业董事会的一半成员；关闭主要厂区、大规模裁员、重大自动化投资和利润再投资，需要两组董事分别过半同意。"
+        ],
+        "bridgeLabel": "任何人都不应受制于他人不受约束的权力",
+        "bridgeText": "任何人都不应处在这样一种关系中：别人可以随意干预他的基本选择，却不用遵守明确规则，也不用给出能够被质疑的理由。",
+        "targetText": "国家应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "workplace_wellbeing_support": {
+      "id": "workplace_wellbeing_support",
+      "targetClaimId": "workplace_cogovernance_support",
+      "title": "因为完整比较显示共同治理带来的总改善更大",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“应把所有受影响者的可比较得失纳入同一结果判断”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "cogovernance_expected_net_gain"
+      ],
+      "bridgeClaimId": "compare_impartial_wellbeing",
+      "plainSteps": {
+        "facts": [
+          "研究把就业、收入、生产率、健康、转制成本、不同群体的得失和估计不确定性按预先公开的同一量表合并后，题设制度的结果净值显著高于零。"
+        ],
+        "bridgeLabel": "应把所有受影响者的可比较得失纳入同一结果判断",
+        "bridgeText": "如果可靠证据用一致口径比较了所有主要受影响者的健康、痛苦、收入和实际机会，并计入分配与不确定性，而且一个可行方案的总改善明显大于总损失，那么决策至少有一项理由选择它而不是结果更差的方案。",
+        "targetText": "国家应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "workplace_continuity_oppose": {
+      "id": "workplace_continuity_oppose",
+      "targetClaimId": "workplace_cogovernance_oppose",
+      "title": "因为全国突变会在替代程序验证前移除可核查的协调功能",
+      "summary": "这条理由分成两步：先检查 3 项事实判断，再判断你是否接受规范原则“替代方案未经验证时，应保留制度中可核查的关键功能”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "tested_governance_coordinates_critical_functions",
+        "cogovernance_lacks_equivalent_transition_evidence",
+        "staged_cogovernance_reform_available"
+      ],
+      "bridgeClaimId": "preserve_tested_institutional_functions",
+      "plainSteps": {
+        "facts": [
+          "在政策覆盖的企业中，现有治理程序连续十年按公开指标维持关键供应、按期发薪和安全事故纠正；资金、行业和监管差异不能解释这些结果的主要部分。",
+          "题设制度会在两年内全国生效；目前没有同规模本地试点证明双重多数程序在供应中断、紧急停产和按期发薪方面能达到现有程序的结果。",
+          "可以先在自愿参加的企业试行劳动者三分之一席位，保留现有紧急处置程序，并根据五年公开评估决定是否扩大；这条路径仍会增加劳动者表决权。"
+        ],
+        "bridgeLabel": "替代方案未经验证时，应保留制度中可核查的关键功能",
+        "bridgeText": "如果一套制度具有持续、可核查的协调或纠错功能，拟议变更会在等效替代得到验证前移除这些功能，而且存在能够修正问题的可逆分阶段路径，那么制度至少有一项理由先保留关键功能并分段改革。",
+        "targetText": "国家不应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "workplace_investor_control_oppose": {
+      "id": "workplace_investor_control_oppose",
+      "targetClaimId": "workplace_cogovernance_oppose",
+      "title": "因为制度会改变没有欺诈或强迫取得的治理份额",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“正当取得的资源，不应被随意拿走”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "investors_acquired_governance_claims_without_coercion"
+      ],
+      "bridgeClaimId": "protect_legitimate_control",
+      "plainSteps": {
+        "facts": [
+          "本题假定股东通过没有欺诈或强迫的投资与交换取得股份，股份原本包含选举全部董事的表决份额；题设制度会把其中一半董事席位改由劳动者选举。"
+        ],
+        "bridgeLabel": "正当取得的资源，不应被随意拿走",
+        "bridgeText": "如果一个人通过没有欺诈、没有强迫的生产或交换取得资源，那么国家要征收这些资源，至少需要比“多数人更喜欢这样”更充分的理由。",
+        "targetText": "国家不应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "workplace_wellbeing_oppose": {
+      "id": "workplace_wellbeing_oppose",
+      "targetClaimId": "workplace_cogovernance_oppose",
+      "title": "因为分阶段替代路径的结果净值更高",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“应把所有受影响者的可比较得失纳入同一结果判断”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "staged_cogovernance_has_better_expected_results"
+      ],
+      "bridgeClaimId": "compare_impartial_wellbeing",
+      "plainSteps": {
+        "facts": [
+          "研究把就业、收入、生产率、健康、转制成本、不同群体的得失和估计不确定性按预先公开的同一量表合并后，分阶段路径的结果净值显著高于题设方案。"
+        ],
+        "bridgeLabel": "应把所有受影响者的可比较得失纳入同一结果判断",
+        "bridgeText": "如果可靠证据用一致口径比较了所有主要受影响者的健康、痛苦、收入和实际机会，并计入分配与不确定性，而且一个可行方案的总改善明显大于总损失，那么决策至少有一项理由选择它而不是结果更差的方案。",
+        "targetText": "国家不应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "speech_basic_liberty_oppose": {
+      "id": "speech_basic_liberty_oppose",
+      "targetClaimId": "speech_oppose",
+      "title": "因为法律只让特定表达者失去别人仍有的基本自由",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“每个人都应拥有平等的基本表达、良心与结社自由”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_scope_noncoercive",
+        "speech_penalizes_contestable_opinion"
+      ],
+      "bridgeClaimId": "equal_basic_liberties",
+      "plainSteps": {
+        "facts": [
+          "这项法律只处理公开的严重贬低或侮辱性表达。直接威胁、针对个人的骚扰、能够核实为假的事实陈述，以及指挥组织暴力的内容，都不在本题范围内。",
+          "在题设范围内，一段表达即使不含威胁、骚扰、可核实的虚假事实或暴力指挥，只要被认定为严重贬低或侮辱，仍可能受到罚款或拘留。"
+        ],
+        "bridgeLabel": "每个人都应拥有平等的基本表达、良心与结社自由",
+        "bridgeText": "每个人都应拥有一套平等的基本表达、良心和结社自由；不能只因多数人的偏好或总体收益，就让某一群体失去别人仍然保有的同等自由。",
+        "targetText": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "surveillance_basic_liberty_oppose": {
+      "id": "surveillance_basic_liberty_oppose",
+      "targetClaimId": "surveillance_oppose",
+      "title": "因为全民留存会使部分人无法实际行使同等结社自由",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“每个人都应拥有平等的基本表达、良心与结社自由”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "surveillance_scope",
+        "surveillance_chills_association"
+      ],
+      "bridgeClaimId": "equal_basic_liberties",
+      "plainSteps": {
+        "facts": [
+          "制度保存所有成年人的通信时间、联系对象和位置记录，保存期为五年。查询前不需要先证明某个人有具体嫌疑，也不需要事前得到独立法院批准。",
+          "制度实施后，没有被指控违法的记者、律师和政治团体，与消息来源的通信变少；减少的主要是那些能从通信时间、联系对象和位置记录中识别出来的联系。"
+        ],
+        "bridgeLabel": "每个人都应拥有平等的基本表达、良心与结社自由",
+        "bridgeText": "每个人都应拥有一套平等的基本表达、良心和结社自由；不能只因多数人的偏好或总体收益，就让某一群体失去别人仍然保有的同等自由。",
+        "targetText": "国家不应该要求保存所有成年人的通信元数据五年，也不应该允许安全机关按题设方式查询。"
+      }
+    },
+    "income_least_advantaged_support": {
+      "id": "income_least_advantaged_support",
+      "targetClaimId": "income_support",
+      "title": "因为可行方案中它使处境最不利者的长期前景最高",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度差异应使处境最不利者获得尽可能好的长期前景”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "income_least_advantaged_best"
+      ],
+      "bridgeClaimId": "difference_principle",
+      "plainSteps": {
+        "facts": [
+          "在财政成本相同的可行方案中，题设基本现金使长期收入、实际机会和公共参与综合指标处于最低十分位的人群，获得最高的二十年预期指标。"
+        ],
+        "bridgeLabel": "制度差异应使处境最不利者获得尽可能好的长期前景",
+        "bridgeText": "比较可行的社会经济制度时，资源、权力或收益差异只有在能使处境最不利者获得尽可能好的长期前景时，才具有充分的制度理由。",
+        "targetText": "国家应该向每名成年人发放一笔不附带工作条件的基本现金，并按题设方式筹资。"
+      }
+    },
+    "workplace_least_advantaged_support": {
+      "id": "workplace_least_advantaged_support",
+      "targetClaimId": "workplace_cogovernance_support",
+      "title": "因为可行治理方案中它使处境最低劳动者的长期前景最高",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度差异应使处境最不利者获得尽可能好的长期前景”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "workplace_least_advantaged_best"
+      ],
+      "bridgeClaimId": "difference_principle",
+      "plainSteps": {
+        "facts": [
+          "在可行的企业治理方案中，题设共同治理使工资、就业稳定性和职业转换机会综合指标处于最低十分位的劳动者，获得最高的十年预期指标。"
+        ],
+        "bridgeLabel": "制度差异应使处境最不利者获得尽可能好的长期前景",
+        "bridgeText": "比较可行的社会经济制度时，资源、权力或收益差异只有在能使处境最不利者获得尽可能好的长期前景时，才具有充分的制度理由。",
+        "targetText": "国家应该按题设方式，要求大型企业由劳动者和股东共同决定重大生产事项。"
+      }
+    },
+    "speech_public_reason_oppose": {
+      "id": "speech_public_reason_oppose",
+      "targetClaimId": "speech_oppose",
+      "title": "因为刑罚只援引特定神圣信条，没有可共同检验的政治理由",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“限制基本自由的公共强制必须给出可共同检验的政治理由”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "speech_only_comprehensive_doctrine_reason"
+      ],
+      "bridgeClaimId": "public_reason_reciprocity",
+      "plainSteps": {
+        "facts": [
+          "立法记录给出的唯一理由是某一宗教、民族或国家象征具有不可质疑的神圣地位；记录没有提供可公开核对的伤害、平等自由或共同安全理由。"
+        ],
+        "bridgeLabel": "限制基本自由的公共强制必须给出可共同检验的政治理由",
+        "bridgeText": "公共制度要强制限制人的基本自由时，应给出自由而平等的公民能够共同检验的政治理由，不能只援引某一群体不可共享的宗教或完整人生信条。",
+        "targetText": "国家不应该通过这项法律来禁止公开严重贬损特定宗教、民族或国家象征的表达。"
+      }
+    },
+    "carbon_general_rule_support": {
+      "id": "carbon_general_rule_support",
+      "targetClaimId": "carbon_support",
+      "title": "因为共同收费边界仍让各方按局部信息选择调整办法",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“共同目标宜用一般规则约束，并给局部知识保留调整空间”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "carbon_program_scope",
+        "carbon_actors_choose_adjustment"
+      ],
+      "bridgeClaimId": "preserve_general_rules_local_adaptation",
+      "plainSteps": {
+        "facts": [
+          "方案根据煤、石油和天然气燃烧后会产生多少碳排放来收费，费率在十年内逐步提高。扣除管理成本后的收入平均返还给每个人；进口商品按同一标准处理，政府每三年公开检查一次实际效果。",
+          "题设碳费没有为每家企业或家庭指定生产、运输、取暖或减排方法；缴费者可以自行选择减少燃料、改用替代方案或继续使用并支付费用。"
+        ],
+        "bridgeLabel": "共同目标宜用一般规则约束，并给局部知识保留调整空间",
+        "bridgeText": "如果实现共同目标所需的信息分散在不同时间和地点，而且变化快于中央详细分配规则，那么制度至少有一项理由采用公开的一般边界，并让掌握局部信息的人根据反馈调整具体办法。",
+        "targetText": "国家应该按化石燃料的含碳量收费，并把净收入平均返还给每个人。"
+      }
+    },
+    "local_feedback_to_decentralized_adaptation": {
+      "id": "local_feedback_to_decentralized_adaptation",
+      "targetClaimId": "preserve_general_rules_local_adaptation",
+      "title": "因为条件变化快于汇总数据，直接参与者掌握部分局部信息",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“掌握时间地点知识的人应保有根据反馈调整的实际空间”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "local_adjustment_uses_changing_information"
+      ],
+      "bridgeClaimId": "decentralized_adaptation",
+      "plainSteps": {
+        "facts": [
+          "课程需求、供应短缺、技术选择和可用替代方案会随时间与地点变化；直接参与者能够观察到其中一部分尚未进入全国汇总的数据。"
+        ],
+        "bridgeLabel": "掌握时间地点知识的人应保有根据反馈调整的实际空间",
+        "bridgeText": "在公开的一般边界内，最接近不断变化的时间、地点和用途条件的人，应保有根据局部信息与反馈调整具体办法的实际空间。",
+        "targetText": "如果实现共同目标所需的信息分散在不同时间和地点，而且变化快于中央详细分配规则，那么制度至少有一项理由采用公开的一般边界，并让掌握局部信息的人根据反馈调整具体办法。"
+      }
+    },
+    "education_fair_opportunity_support": {
+      "id": "education_fair_opportunity_support",
+      "targetClaimId": "education_opportunity_support",
+      "title": "因为方案能缩小由家庭和地区背景造成的教育职业机会差距",
+      "summary": "这条理由分成两步：先检查 3 项事实判断，再判断你是否接受规范原则“能力与投入相近者不应因社会出身而有系统较差的机会”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "education_social_origin_gap",
+        "education_program_reduces_origin_gap",
+        "education_opportunity_program_scope"
+      ],
+      "bridgeClaimId": "fair_equality_of_opportunity",
+      "plainSteps": {
+        "facts": [
+          "在能力、学习投入和既有学业表现相近的青年中，来自最低收入五分位家庭或教育资源不足地区者，进入同等学历课程、完成职业训练和获得对应就业的比例持续较低。",
+          "与维持现行制度相比，题设基金在十年内把家庭收入和地区背景对应的同等学历入学、职业训练完成及对应就业差距至少缩小30%。",
+          "题设基金按家庭收入、地区教育资源和既有入学就业差距的全国公式分配，取代现有地方专项资金；支出类别三年调整一次，地方机构只能在规定类别内选择课程和人员。"
+        ],
+        "bridgeLabel": "能力与投入相近者不应因社会出身而有系统较差的机会",
+        "bridgeText": "能力、准备和投入相近的人，应拥有大体可比的教育与职业前景，不应只因家庭收入或出生地区而长期面对系统较低的机会。",
+        "targetText": "国家应该按题设方式建立全国教育机会基金，并执行相同的性别准入规则。"
+      }
+    },
+    "education_sex_access_support": {
+      "id": "education_sex_access_support",
+      "targetClaimId": "education_opportunity_support",
+      "title": "因为公共教育仍仅按性别排除达到同等准备标准的人",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“公共教育不应只按性别排除同等准备者的发展机会”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "education_sex_exclusion",
+        "education_program_equal_sex_access"
+      ],
+      "bridgeClaimId": "equal_developmental_opportunity",
+      "plainSteps": {
+        "facts": [
+          "当前部分接受公共资金的中学和职业训练项目，会仅因学生性别，拒绝准备程度达到同一公开标准的申请者进入相同课程或取得相同升学资格。",
+          "题设制度要求接受公共资金的项目，对达到同一公开准备标准的人开放相同课程和升学资格，不得只因性别拒绝。"
+        ],
+        "bridgeLabel": "公共教育不应只按性别排除同等准备者的发展机会",
+        "bridgeText": "公共教育提供形成独立判断与职业能力的课程时，不应只按性别排除达到同等准备条件的人取得相同课程和继续升学资格。",
+        "targetText": "国家应该按题设方式建立全国教育机会基金，并执行相同的性别准入规则。"
+      }
+    },
+    "education_least_advantaged_support": {
+      "id": "education_least_advantaged_support",
+      "targetClaimId": "education_opportunity_support",
+      "title": "因为可行教育方案中它使处境最低青年的长期前景最高",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“制度差异应使处境最不利者获得尽可能好的长期前景”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "education_least_advantaged_best"
+      ],
+      "bridgeClaimId": "difference_principle",
+      "plainSteps": {
+        "facts": [
+          "在财政成本相同的可行教育方案中，题设基金使长期收入、学习机会和公共参与综合指标处于最低十分位的青年，获得最高的二十年预期指标。"
+        ],
+        "bridgeLabel": "制度差异应使处境最不利者获得尽可能好的长期前景",
+        "bridgeText": "比较可行的社会经济制度时，资源、权力或收益差异只有在能使处境最不利者获得尽可能好的长期前景时，才具有充分的制度理由。",
+        "targetText": "国家应该按题设方式建立全国教育机会基金，并执行相同的性别准入规则。"
+      }
+    },
+    "education_local_knowledge_oppose": {
+      "id": "education_local_knowledge_oppose",
+      "targetClaimId": "education_opportunity_oppose",
+      "title": "因为三年固定的全国类别跟不上地方课程与岗位变化",
+      "summary": "这条理由分成两步：先检查 2 项事实判断，再判断你是否接受规范原则“共同目标宜用一般规则约束，并给局部知识保留调整空间”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "education_opportunity_program_scope",
+        "education_formula_lags_local_needs"
+      ],
+      "bridgeClaimId": "preserve_general_rules_local_adaptation",
+      "plainSteps": {
+        "facts": [
+          "题设基金按家庭收入、地区教育资源和既有入学就业差距的全国公式分配，取代现有地方专项资金；支出类别三年调整一次，地方机构只能在规定类别内选择课程和人员。",
+          "地方课程需求、教师短缺和岗位技能需求通常在一年内变化，而全国支出类别三年才调整一次；至少20%的基金因此不能转向当地新增的课程或训练需求。"
+        ],
+        "bridgeLabel": "共同目标宜用一般规则约束，并给局部知识保留调整空间",
+        "bridgeText": "如果实现共同目标所需的信息分散在不同时间和地点，而且变化快于中央详细分配规则，那么制度至少有一项理由采用公开的一般边界，并让掌握局部信息的人根据反馈调整具体办法。",
+        "targetText": "国家不应该把全国教育机会基金、地方专项替代和性别准入规则按题设组合一并采纳。"
+      }
+    },
+    "education_continuity_oppose": {
+      "id": "education_continuity_oppose",
+      "targetClaimId": "education_opportunity_oppose",
+      "title": "因为全国替代会在验证前移除地方专项的可核查功能",
+      "summary": "这条理由分成两步：先检查 3 项事实判断，再判断你是否接受规范原则“替代方案未经验证时，应保留制度中可核查的关键功能”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "tested_local_education_support",
+        "education_replacement_unproven",
+        "staged_education_reform_available"
+      ],
+      "bridgeClaimId": "preserve_tested_institutional_functions",
+      "plainSteps": {
+        "facts": [
+          "被题设取代的部分地方专项已连续十年按公开指标缩小训练辍学和就业断档，并能在六个月内根据当地课程与岗位变化调整资金用途。",
+          "题设基金会在两年内取代全部地方专项；目前没有同规模试点证明全国公式能保留地方专项的辍学、就业衔接和快速调整结果。",
+          "可以先在自愿参加的地区并行试行全国公式五年，保留原地方专项，根据公开结果再决定扩大；试点期间仍执行相同的性别准入规则。"
+        ],
+        "bridgeLabel": "替代方案未经验证时，应保留制度中可核查的关键功能",
+        "bridgeText": "如果一套制度具有持续、可核查的协调或纠错功能，拟议变更会在等效替代得到验证前移除这些功能，而且存在能够修正问题的可逆分阶段路径，那么制度至少有一项理由先保留关键功能并分段改革。",
+        "targetText": "国家不应该把全国教育机会基金、地方专项替代和性别准入规则按题设组合一并采纳。"
+      }
+    },
+    "education_future_harm_oppose": {
+      "id": "education_future_harm_oppose",
+      "targetClaimId": "education_opportunity_oppose",
+      "title": "因为筹资造成的长期岗位损失会让后来的人失去基本生活条件",
+      "summary": "这条理由分成两步：先检查 1 项事实判断，再判断你是否接受规范原则“未来发生的严重损失，也必须算在内”。系统会在后面的页面逐项解释和提问；现在只需要判断，这是不是你实际采用的理由。",
+      "factIds": [
+        "education_fund_future_deprivation"
+      ],
+      "bridgeClaimId": "account_for_future_harm",
+      "plainSteps": {
+        "facts": [
+          "题设遗产税在未来二十年减少的投资和岗位，会使后续人口中至少与当前受益人数相当的一部分人，无法稳定获得食物、住所、必要能源或必要医疗。"
+        ],
+        "bridgeLabel": "未来发生的严重损失，也必须算在内",
+        "bridgeText": "如果今天的行动会在可以估计的未来，增加他人死亡、重伤、失去基本生活条件或遭受重大财产损失的概率，那么决策不能仅仅因为这些损失发生得较晚，就把它们忽略。",
+        "targetText": "国家不应该把全国教育机会基金、地方专项替代和性别准入规则按题设组合一并采纳。"
+      }
+    }
+  },
+  "policies": [
+    {
+      "id": "speech_restriction",
+      "number": "01",
+      "title": "是否用法律处罚严重贬低或侮辱性的公开表达",
+      "shortTitle": "是否处罚严重贬低宗教、民族或国家象征的公开表达",
+      "proposition": "拟议法律规定：公开表达如果被认定为“严重贬低或侮辱某一宗教、民族或国家象征”，表达者可以被罚款或拘留。",
+      "scope": "本题明确排除四类内容：直接威胁、针对个人的骚扰、能够核实为假的事实陈述，以及指挥组织暴力的内容。请只判断剩下的严重贬低或侮辱性表达。",
+      "supportClaimId": "speech_support",
+      "opposeClaimId": "speech_oppose",
+      "question": "在这些边界都固定的情况下，你目前倾向支持还是反对这项法律？"
+    },
+    {
+      "id": "metadata_surveillance",
+      "number": "02",
+      "title": "是否保存所有成年人的通信时间、联系对象和位置记录",
+      "shortTitle": "是否保存所有成年人的通信记录五年",
+      "proposition": "拟议制度要求通信服务商保存所有成年人的通信时间、联系对象和位置记录，保存期为五年，供安全机关查询。通信内容本身不保存。",
+      "scope": "安全机关查询时不需要先证明某个人有具体嫌疑，也不需要事前取得独立法院批准。",
+      "supportClaimId": "surveillance_support",
+      "opposeClaimId": "surveillance_oppose",
+      "question": "在这些条件下，你目前倾向支持还是反对这项制度？"
+    },
+    {
+      "id": "income_floor",
+      "number": "03",
+      "title": "是否每月向每名成年人发放一笔不附带工作条件的现金",
+      "shortTitle": "是否发放不附带工作条件的基本现金",
+      "proposition": "拟议方案向每名成年人每月发放一笔现金，领取不附带工作条件。金额等于税后可支配收入中间数的15%：把所有人的收入从低到高排列，取正中间的数，再取其中的15%。",
+      "scope": "资金来自累进所得税，也就是收入越高，适用税率越高；残障救助和紧急救助继续保留，不会被这笔现金取代。",
+      "supportClaimId": "income_support",
+      "opposeClaimId": "income_oppose",
+      "question": "在这些条件下，你目前倾向支持还是反对这项方案？"
+    },
+    {
+      "id": "carbon_fee",
+      "number": "04",
+      "title": "是否按化石燃料造成的碳排放收费，并平均返还收入",
+      "shortTitle": "是否按碳排放收费并平均返还收入",
+      "proposition": "拟议方案根据煤、石油和天然气燃烧后会产生多少碳排放来收费，费率在十年内逐步提高；扣除管理成本后的收入，平均返还给每个人。",
+      "scope": "进口商品按相同标准调整；政府每三年公开检查减排效果和不同收入群体的实际得失。",
+      "supportClaimId": "carbon_support",
+      "opposeClaimId": "carbon_oppose",
+      "question": "在这些条件下，你目前倾向支持还是反对这项方案？"
+    },
+    {
+      "id": "workplace_cogovernance",
+      "number": "05",
+      "title": "是否要求大型企业由劳动者与股东共同决定重大生产事项",
+      "shortTitle": "是否要求大型企业实行劳动者与股东共同治理",
+      "proposition": "拟议法律要求雇佣至少1000人的企业，董事会一半席位由本企业劳动者一人一票选出，另一半由股东选出。关闭主要厂区、裁员超过员工总数的10%、重大自动化投资和利润再投资方案，必须同时得到两组董事各自过半数同意。",
+      "scope": "股份所有权、普通分红和日常经营权不变；制度在两年内全国生效，实施前没有同规模本地试点，每五年公开评估一次就业、收入、生产率和企业存续结果。",
+      "supportClaimId": "workplace_cogovernance_support",
+      "opposeClaimId": "workplace_cogovernance_oppose",
+      "question": "在这些条件下，你目前倾向支持还是反对这项共同治理制度？"
+    },
+    {
+      "id": "education_opportunity_fund",
+      "number": "06",
+      "title": "是否建立全国教育机会基金并统一公共课程的性别准入规则",
+      "shortTitle": "是否按全国公式资助教育机会并取消性别准入排除",
+      "proposition": "拟议法律对超过税后年收入中间数20倍的遗产部分征收40%的税，建立全国教育机会基金。基金按家庭收入、地区教育资源和既有入学就业差距分配，取代现有地方专项；接受公共资金的中学和职业训练项目，不得仅因性别拒绝达到同一公开准备标准的人进入相同课程或取得相同升学资格。",
+      "scope": "全国支出类别每三年调整一次，地方机构可在规定类别内选择具体课程和人员，但不能转向类别外用途；两年内完成对地方专项的替代，实施前没有同规模试点。私人教育和家庭教育不被禁止，不设入学配额或结果保证，现有基本救助预算保持不变。",
+      "supportClaimId": "education_opportunity_support",
+      "opposeClaimId": "education_opportunity_oppose",
+      "question": "在这些条件下，你目前倾向支持还是反对这项教育机会方案？"
+    }
+  ],
+  "dilemmas": [
+    {
+      "id": "agency_vs_security",
+      "left": "equal_agency",
+      "right": "bodily_security",
+      "title": "个人的无害选择，还是避免更多重伤",
+      "scenario": "一项全面禁令每年可以确定避免60起重伤，但它会长期禁止所有成年人一种不威胁、不欺骗、也不控制他人的日常选择。较温和的替代办法每年最多避免10起重伤。",
+      "leftAction": "不实施全面禁令，保留成年人这项无害选择",
+      "rightAction": "实施全面禁令，每年多避免50起重伤",
+      "fixedFacts": [
+        "全面禁令与较温和方案相比，每年多避免50起重伤",
+        "被禁止的行为本身不直接伤害他人",
+        "没有同样有效而限制更小的第三种方案"
+      ]
+    },
+    {
+      "id": "domination_vs_security",
+      "left": "non_domination",
+      "right": "bodily_security",
+      "title": "限制不受监督的权力，还是避免更多重伤",
+      "scenario": "安全机关可以秘密定位任何人。过去五年，这项权限每年避免20起重伤，但没有明确个案标准、使用日志或外部审查。加入这些约束后，每年只能避免15起重伤。",
+      "leftAction": "加入明确规则、日志和独立审查，接受每年少避免5起重伤",
+      "rightAction": "保留秘密而单方面的权限，每年多避免5起重伤",
+      "fixedFacts": [
+        "两种制度每年避免重伤的差额为5起",
+        "现行权限可以单方面秘密使用",
+        "不存在效果相同又能同时避免两项代价的第三种方案"
+      ]
+    },
+    {
+      "id": "floor_vs_control",
+      "left": "material_floor",
+      "right": "legitimate_control",
+      "title": "保障基本生活，还是保护正当取得的财产控制",
+      "scenario": "对通过没有欺诈、没有强迫方式取得的高额非必需收入征收2%，可以让五万人不再缺少食物和住所。没有其他办法能在同样时间内筹到相同资金。",
+      "leftAction": "征收2%，让五万人获得食物和住所",
+      "rightAction": "不征收，保护个人对正当取得收入的控制",
+      "fixedFacts": [
+        "收入取得过程没有欺诈或强迫",
+        "征收不会让纳税人跌破基本生活线",
+        "如果不征收，五万人会继续缺少食物和住所"
+      ]
+    },
+    {
+      "id": "floor_vs_reciprocity",
+      "left": "material_floor",
+      "right": "reciprocity",
+      "title": "继续保障最低生活，还是要求有能力者作出贡献",
+      "scenario": "一个人有工作能力、有现实岗位机会，也没有照护负担，但连续五年拒绝任何劳动或社区服务。停止最低现金会让他失去住所；继续支付则由持续贡献的人共同负担。",
+      "leftAction": "继续支付最低现金，避免他失去住所",
+      "rightAction": "把持续支付与相称贡献挂钩",
+      "fixedFacts": [
+        "他的能力、机会和照护负担已经核实",
+        "停止支付会让他失去住所",
+        "继续支付依赖其他人持续贡献"
+      ]
+    },
+    {
+      "id": "future_vs_present_floor",
+      "left": "future_equal_weight",
+      "right": "material_floor",
+      "title": "避免未来严重伤害，还是维持当前基本能源",
+      "scenario": "立即减排会在五十年后避免十万人遭受严重损害，但会让今天一万人在三年内缺少必要能源。没有补偿资金，也没有第三种方案。",
+      "leftAction": "立即减排，避免未来十万人的严重损害",
+      "rightAction": "延后减排，维持当前一万人的必要能源",
+      "fixedFacts": [
+        "两类损害使用同一严重程度标准",
+        "未来损害的人数和概率在题目中固定",
+        "没有补偿或替代方案"
+      ]
+    },
+    {
+      "id": "correction_vs_cooperation",
+      "left": "error_correction",
+      "right": "peaceful_cooperation",
+      "title": "立即公开错误，还是避免公共服务短期停摆",
+      "scenario": "一份证据充分的政府失误报告，如果今天公开，会引发大规模但非暴力的抗议，使关键公共服务停摆七天。延迟六个月公开可以避免停摆，但错误会在这六个月继续影响一万人。",
+      "leftAction": "今天公开，让错误立即进入纠正程序",
+      "rightAction": "延迟六个月公开，避免七天服务停摆",
+      "fixedFacts": [
+        "报告证据已经核实",
+        "抗议不包含组织性暴力",
+        "延迟期间错误会继续影响一万人"
+      ]
+    },
+    {
+      "id": "procedure_vs_security",
+      "left": "procedural_justification",
+      "right": "bodily_security",
+      "title": "先让当事人申辩，还是先处理紧急危险",
+      "scenario": "一项限制出境决定如果等待独立审查，有30%的概率来不及阻止一次致命袭击；立即限制可以把概率降到5%，但当事人要到七天后才能看到证据并申诉。",
+      "leftAction": "先审查再限制，保留事前申辩程序",
+      "rightAction": "立即限制，七天后再提供理由和审查",
+      "fixedFacts": [
+        "两种做法的致命袭击风险相差25个百分点",
+        "事后审查固定在七天后",
+        "事后可以恢复资格，但无法恢复已经失去的机会"
+      ]
+    },
+    {
+      "id": "democracy_vs_agency",
+      "left": "democratic_authorship",
+      "right": "equal_agency",
+      "title": "服从公平公投，还是保留成年人的无害选择",
+      "scenario": "一项规则禁止成年人从事某种没有直接受害者的生活方式。公投参与率为90%，每人一票，规则事前公开，支持和反对双方拥有同等信息渠道，最后70%赞成禁令。",
+      "leftAction": "执行公投结果，把共同决定作为一项权威理由",
+      "rightAction": "拒绝禁令，保留成年人的无害选择",
+      "fixedFacts": [
+        "公投参与、选票权重、规则公开和信息渠道条件都按题设固定",
+        "该生活方式不包含威胁、欺诈或未经同意的伤害",
+        "规则可以在下一次公投中撤销"
+      ]
+    },
+    {
+      "id": "security_vs_democracy",
+      "left": "bodily_security",
+      "right": "democratic_authorship",
+      "title": "立即避免100起死亡，还是遵守公投否决",
+      "scenario": "一项强制疏散制度每年可以确定避免100起死亡，但一场参与充分、每人一票、信息公开的公投否决了它。立即执行会直接违背投票结果；等待重新表决会发生这100起死亡。",
+      "leftAction": "立即执行疏散制度，避免100起死亡",
+      "rightAction": "遵守本次公投结果，等待重新表决",
+      "fixedFacts": [
+        "死亡数量和因果关系按题设固定",
+        "公投程序满足题设中的公平条件",
+        "不存在既避免死亡又遵守本次投票结果的第三种方案"
+      ]
+    },
+    {
+      "id": "inquiry_vs_cooperation",
+      "left": "open_inquiry",
+      "right": "peaceful_cooperation",
+      "title": "保留和平异议，还是避免公共服务中断",
+      "scenario": "一场不含威胁、骚扰、虚假事实或暴力指挥的公开演讲，是某项少数观点进入反驳的唯一渠道；可靠预测显示，演讲仍会使关键公共服务遭到组织性阻断的概率从10%升到40%。临时禁止可以消除增量风险。",
+      "leftAction": "允许演讲，让少数观点进入公开反驳",
+      "rightAction": "临时禁止演讲，把服务中断概率降回10%",
+      "fixedFacts": [
+        "演讲本身不含威胁、骚扰、虚假事实或暴力指挥",
+        "禁止会移除少数观点进入公开反驳的唯一渠道",
+        "没有同时保留演讲并把风险降回10%的第三种方案"
+      ]
+    },
+    {
+      "id": "association_vs_security",
+      "left": "civic_association",
+      "right": "bodily_security",
+      "title": "保护和平结社，还是保存能阻止袭击的联系记录",
+      "scenario": "保存所有人的联系与位置五年，每年可以确定阻止一起致命袭击，但会使大量没有违法嫌疑的政治、宗教和劳动组织成员停止联系。只保存具体嫌疑人的数据无法阻止这起袭击。",
+      "leftAction": "不保存无具体嫌疑者的数据，保留和平组织的实际协调能力",
+      "rightAction": "保存所有人的数据五年，每年阻止一起致命袭击",
+      "fixedFacts": [
+        "受影响组织及其成员没有违法嫌疑",
+        "全民保存每年确定阻止一起致命袭击",
+        "没有同样有效且不压低和平结社的第三种方案"
+      ]
+    },
+    {
+      "id": "production_vs_stewardship",
+      "left": "productive_self_governance",
+      "right": "intergenerational_stewardship",
+      "title": "立即分享生产决定权，还是先验证并保留关键协调功能",
+      "scenario": "立即实行劳动者与股东各半治理，会马上给直接生产者实质表决权，但尚未验证的新程序有30%概率中断一种关键药品供应。五年分阶段试点能把风险降到5%，但期间劳动者只有三分之一席位。",
+      "leftAction": "立即实行各半治理，让劳动者现在获得实质共同决定权",
+      "rightAction": "先实行五年分阶段试点，把关键供应风险降到5%",
+      "fixedFacts": [
+        "两条路径最终都能达到劳动者与股东各半治理",
+        "立即实施的关键药品供应中断概率为30%",
+        "没有既立即各半治理又把风险降到5%的第三种方案"
+      ]
+    },
+    {
+      "id": "wellbeing_vs_control",
+      "left": "impartial_wellbeing",
+      "right": "legitimate_control",
+      "title": "实现更大的总体改善，还是保留既有治理控制",
+      "scenario": "改变一半企业治理席位会给劳动者带来较大且可靠的健康、收入和机会改善，并给投资者带来较小、无法补偿的控制损失；股份均通过没有欺诈或强迫的投资取得。完整比较没有遗漏主要群体。",
+      "leftAction": "改变一半治理席位，选择总体改善明显更大的方案",
+      "rightAction": "保留股东全部治理席位，不改变其既有控制",
+      "fixedFacts": [
+        "完整比较覆盖主要群体、分配和不确定性",
+        "劳动者的总改善明显大于投资者的控制损失",
+        "股份通过没有欺诈或强迫的投资取得"
+      ]
+    },
+    {
+      "id": "basic_liberty_vs_wellbeing",
+      "left": "equal_basic_liberties",
+      "right": "impartial_wellbeing",
+      "title": "保留少数派同等自由，还是提高多数人的总体满意度",
+      "scenario": "禁止一个不含威胁、欺骗或暴力指挥的少数派表达，会让多数人的满意度指标增加30点，但不会减少可核实的身体、财产或安全损失。只有该少数派失去表达资格。",
+      "leftAction": "不实施禁令，保留少数派与其他人同等的表达自由",
+      "rightAction": "实施禁令，获得多数人30点满意度增加",
+      "fixedFacts": [
+        "少数派表达不含威胁、欺骗或暴力指挥",
+        "禁令不减少可核实的身体、财产或安全损失",
+        "没有同时保留表达并获得30点增加的第三种方案"
+      ]
+    },
+    {
+      "id": "least_advantaged_vs_wellbeing",
+      "left": "difference_principle",
+      "right": "impartial_wellbeing",
+      "title": "改善最不利者前景，还是获得更大的社会结果总量",
+      "scenario": "方案A让全社会结果指标增加100点，却让最低十分位下降10点；方案B让全社会增加60点，并让最低十分位增加20点。两者同样可行。",
+      "leftAction": "选择方案B，让处境最不利者的长期前景更高",
+      "rightAction": "选择方案A，获得更大的社会结果总量",
+      "fixedFacts": [
+        "两项方案使用相同测量口径",
+        "方案A总量增加100点且最低十分位下降10点",
+        "没有兼得方案A总量与方案B最低群体结果的第三种方案"
+      ]
+    },
+    {
+      "id": "opportunity_vs_floor",
+      "left": "fair_equality_of_opportunity",
+      "right": "material_floor",
+      "title": "缩小长期机会差距，还是维持当前基本生活资源",
+      "scenario": "固定预算只能用于一项：教育投入可使一万名低收入青年未来入学就业差距缩小一半；维持现有救助可让一千人未来两年继续获得食物和住所。",
+      "leftAction": "把预算用于教育机会，缩小一万名青年的长期差距",
+      "rightAction": "把预算用于现有救助，维持一千人的食物和住所",
+      "fixedFacts": [
+        "预算不能增加或分拆",
+        "教育投入确实把指定差距缩小一半",
+        "削减救助会使一千人失去食物或住所"
+      ]
+    },
+    {
+      "id": "development_vs_stewardship",
+      "left": "equal_developmental_opportunity",
+      "right": "intergenerational_stewardship",
+      "title": "立即取消性别准入排除，还是先保留已验证的训练网络",
+      "scenario": "旧训练网络仅按性别排除一组达到同等准备标准的学生，但有稳定的师徒和就业衔接功能。立即统一准入有20%概率中断该功能五年；分阶段替代能把风险降到5%，却让排除继续三年。",
+      "leftAction": "立即统一准入，马上取消仅按性别的排除",
+      "rightAction": "分阶段替代三年，把训练网络中断风险降到5%",
+      "fixedFacts": [
+        "两条路径最终都取消性别排除",
+        "立即实施的功能中断概率为20%",
+        "没有立即取消排除且把风险降到5%的第三种方案"
+      ]
+    },
+    {
+      "id": "adaptation_vs_opportunity",
+      "left": "decentralized_adaptation",
+      "right": "fair_equality_of_opportunity",
+      "title": "保留地方快速调整，还是执行统一机会分配公式",
+      "scenario": "全国公式能把家庭出身对应的入学差距缩小30%，但三年固定类别使20%资金无法响应当地新增岗位需求。允许地方随时改用途能消除错位，却只能把机会差距缩小10%。",
+      "leftAction": "允许地方随时调整资金用途，消除20%的用途错位",
+      "rightAction": "执行全国公式，把家庭出身对应的机会差距缩小30%",
+      "fixedFacts": [
+        "两种方案财政成本相同",
+        "地方调整把机会差距缩小10%",
+        "没有既消除用途错位又缩小30%差距的第三种方案"
+      ]
+    },
+    {
+      "id": "public_reason_vs_democracy",
+      "left": "public_reason_reciprocity",
+      "right": "democratic_authorship",
+      "title": "拒绝不可共享的强制理由，还是执行公开多数决定",
+      "scenario": "70%的选民通过公开且参与机会平等的公投，禁止另一群体的和平仪式。唯一正式理由来自多数人的宗教教义；仪式不含威胁、欺骗或可核实的他人损失。",
+      "leftAction": "不执行禁令，要求限制基本自由的理由可由不同信仰者共同检验",
+      "rightAction": "执行公投结果，遵守公开且平等参与的多数决定",
+      "fixedFacts": [
+        "公投程序公开且参与机会平等",
+        "仪式不含威胁、欺骗或可核实的他人损失",
+        "立法记录没有独立于多数宗教教义的理由"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "hume-treatise",
+      "author": "David Hume",
+      "year": "1739–1740",
+      "title": "A Treatise of Human Nature, Book III, Part I, Section I",
+      "role": "最小桥接问题的经典起点：从“事实如此”走到“应该如此”时，新增的规范前提必须被说明。"
+    },
+    {
+      "id": "searle-1964",
+      "author": "John R. Searle",
+      "year": "1964",
+      "title": "How to Derive “Ought” from “Is”",
+      "role": "提醒我们检查词语定义和制度规则：有些看似描述性的词已经在定义中包含规范内容。"
+    },
+    {
+      "id": "toulmin-1958",
+      "author": "Stephen E. Toulmin",
+      "year": "1958",
+      "title": "The Uses of Argument",
+      "role": "“资料—保证—结论”的结构启发了 F、B、V 的展示方式。"
+    },
+    {
+      "id": "hare-1952",
+      "author": "R. M. Hare",
+      "year": "1952",
+      "title": "The Language of Morals",
+      "role": "启发使用事实结构相近的案例，检查一条规范原则是否只在特定政治对象上被接受。"
+    },
+    {
+      "id": "dung-1995",
+      "author": "Phan Minh Dung",
+      "year": "1995",
+      "title": "On the Acceptability of Arguments and its Fundamental Role in Nonmonotonic Reasoning, Logic Programming and n-Person Games",
+      "role": "提供支持、反驳和未解决冲突的论证图思路，避免把所有回答压缩为一个分数。"
+    },
+    {
+      "id": "bench-capon-2002",
+      "author": "Trevor Bench-Capon",
+      "year": "2002",
+      "title": "Value Based Argumentation Frameworks",
+      "role": "提供价值取舍的形式化思路：同一政策结论可能由不同价值支持，不同价值也可能在具体案例中发生冲突。"
+    },
+    {
+      "id": "cailloux-meinard-2018",
+      "author": "Olivier Cailloux, Yves Meinard",
+      "year": "2018",
+      "title": "A Formal Framework for Deliberated Judgment",
+      "role": "支持分别记录用户对结论、论证、反论证和未决理由的态度。"
+    },
+    {
+      "id": "garcia-simari-2004",
+      "author": "Alejandro J. García, Guillermo R. Simari",
+      "year": "2004",
+      "title": "Defeasible Logic Programming: An Argumentative Approach",
+      "role": "启发把现实政策理由理解为可以被新证据、例外或更强反对理由推翻的支持，而不是不可更改的严格证明。"
+    },
+    {
+      "id": "walton-krabbe-1995",
+      "author": "Douglas N. Walton, Erik C. W. Krabbe",
+      "year": "1995",
+      "title": "Commitment in Dialogue: Basic Concepts of Interpersonal Reasoning",
+      "role": "启发把接受、拒绝、撤回和修订理解为对话中的公开承诺，而不是直接读取内心。"
+    },
+    {
+      "id": "rawls-1951",
+      "author": "John Rawls",
+      "year": "1951",
+      "title": "Outline of a Decision Procedure for Ethics",
+      "role": "启发在具体判断、一般原则和反例之间往返修订。"
+    },
+    {
+      "id": "agm-1985",
+      "author": "Carlos Alchourrón, Peter Gärdenfors, David Makinson",
+      "year": "1985",
+      "title": "On the Logic of Theory Change: Partial Meet Contraction and Revision Functions",
+      "role": "启发在回答发生冲突时，明确记录修改旧回答、撤回新回答或暂时不判断，而不是自动覆盖旧答案。"
+    },
+    {
+      "id": "mill-on-liberty",
+      "author": "John Stuart Mill",
+      "year": "1859",
+      "title": "On Liberty, Chapters I–II",
+      "role": "用于复核公开讨论、可错性与和平结社这一组可测试理由；不用于预测作者对现代具体政策的确定答案。"
+    },
+    {
+      "id": "mill-utilitarianism",
+      "author": "John Stuart Mill",
+      "year": "1861",
+      "title": "Utilitarianism, Chapter II",
+      "role": "用于复核所有受影响者福祉得到不偏不倚考虑的理由簇。"
+    },
+    {
+      "id": "marx-capital",
+      "author": "Karl Marx",
+      "year": "1867",
+      "title": "Capital, Volume I, Chapters X and XV",
+      "role": "用于复核生产过程、劳动者处境与生产控制关系这一组可测试理由；不把现代共同治理方案归为作者原有政策主张。"
+    },
+    {
+      "id": "burke-reflections",
+      "author": "Edmund Burke",
+      "year": "1790",
+      "title": "Reflections on the Revolution in France",
+      "role": "用于复核制度实践、跨代托管和审慎改革这一组可测试理由；制度年龄本身不作为规范前提。"
+    },
+    {
+      "id": "hayek-knowledge-1945",
+      "author": "Friedrich A. Hayek",
+      "year": "1945",
+      "title": "The Use of Knowledge in Society",
+      "role": "用于复核分散的时间地点知识、反馈协调与一般规则下局部调整这一组可测试理由。"
+    },
+    {
+      "id": "rawls-justice-fairness-1985",
+      "author": "John Rawls",
+      "year": "1985",
+      "title": "Justice as Fairness: Political not Metaphysical",
+      "role": "用于复核平等基本自由、公平机会、最不利者和基本结构中的制度理由。"
+    },
+    {
+      "id": "wollstonecraft-rights-woman",
+      "author": "Mary Wollstonecraft",
+      "year": "1792",
+      "title": "A Vindication of the Rights of Woman, Chapters IX and XII",
+      "role": "用于复核性别化依赖、理性能力与共同教育资格这一组可测试理由。"
+    }
+  ]
+}

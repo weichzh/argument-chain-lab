@@ -39,7 +39,7 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
 
   await expect(page.getByRole('heading', { name: '本轮机械报告' })).toBeVisible();
   await expect(page.locator('.report-step')).toHaveCount(2);
-  await expect(page.getByText('正式题库 0.6.0').first()).toBeVisible();
+  await expect(page.getByText('正式题库 0.7.0').first()).toBeVisible();
   await expect(page.locator('.report-list').filter({ hasText: '已确认' })).toContainText('避免人的死亡、重伤和严重身体损害');
   expect(requests).toHaveLength(0);
 
