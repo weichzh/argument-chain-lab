@@ -22,7 +22,7 @@ export default function Header({
   onLocalData,
 }) {
   const policy = getCurrentPolicy(state);
-  const inProgress = state.phase !== PHASES.LANDING && state.phase !== PHASES.RESULTS;
+  const inProgress = ![PHASES.LANDING, PHASES.POLICY_OVERVIEW, PHASES.RESULTS].includes(state.phase);
   return (
     <header className="app-header">
       <div className="header-brand">

@@ -12,7 +12,7 @@ const readDraft = () => {
   }
 };
 
-export default function Landing({ onStartBank, onStartCustom, aiLoading }) {
+export default function Landing({ onStartBank, onStartCustom, aiLoading, hasSavedProgress }) {
   const [customOpen, setCustomOpen] = useState(false);
   const [draft, setDraft] = useState(readDraft);
 
@@ -36,7 +36,7 @@ export default function Landing({ onStartBank, onStartCustom, aiLoading }) {
     <main className="landing">
       <section className="landing-intro">
         <h1>从一个判断开始，<br />把理由走完整。</h1>
-        <p>逐步确认事实、原则与价值。你可以从题库开始，也可以写下自己的观点。</p>
+        <p>自由选择题目，逐步确认事实、原则与价值。随时离开，下次接着做。</p>
       </section>
 
       <section className="entry-paths" aria-label="选择起点">
@@ -44,11 +44,11 @@ export default function Landing({ onStartBank, onStartCustom, aiLoading }) {
         <article className="entry-row">
           <BookOpen className="entry-icon" size={36} aria-hidden="true" />
           <div>
-            <h2>从题库开始</h2>
-            <p>从公开议题和已审核论证中选择，沿着现有链条逐项核对。</p>
+            <h2>{hasSavedProgress ? '继续上次进度' : '从题库开始'}</h2>
+            <p>{hasSavedProgress ? '回到题目列表，选择要继续或新开始的题目。' : '自由选择公开议题，按自己的顺序逐项核对。'}</p>
           </div>
           <button className="button primary entry-action" type="button" onClick={onStartBank}>
-            从题库开始 <ArrowRight size={18} />
+            {hasSavedProgress ? '继续上次进度' : '从题库开始'} <ArrowRight size={18} />
           </button>
         </article>
 

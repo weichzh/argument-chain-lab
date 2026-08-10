@@ -70,8 +70,8 @@ export function useSession() {
 
   const controls = useMemo(() => ({
     clearLocalData,
-    hasSavedProgress: state.phase !== 'landing',
-  }), [clearLocalData, state.phase]);
+    hasSavedProgress: Boolean(state.startedAt),
+  }), [clearLocalData, state.startedAt]);
 
   return [state, dispatch, controls];
 }

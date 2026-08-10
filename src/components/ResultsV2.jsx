@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import {
   Check,
   Download,
-  RotateCcw,
+  ListChecks,
+  LogOut,
   Send,
   ShieldCheck,
 } from 'lucide-react';
@@ -158,8 +159,8 @@ function MechanicalReport({ state, chains }) {
 
       <section className="report-block">
         <h3>F + B ⇝ V 与事实信条</h3>
-        {chains.length ? chains.map((chain, chainIndex) => (
-          <details className="report-chain" key={chain.id} open={chainIndex === 0}>
+        {chains.length ? chains.map((chain) => (
+          <details className="report-chain" key={chain.id}>
             <summary>
               <span>{policies.find((policy) => policy.id === chain.policyId)?.title || chain.policyId}</span>
               <strong>{statusCopy[chain.status] || chain.status}</strong>
@@ -237,18 +238,19 @@ function MechanicalReport({ state, chains }) {
   );
 }
 
-export default function ResultsV2({ state, dispatch, bankClient, onReset }) {
+export default function ResultsV2({ state, dispatch, bankClient }) {
   const chains = useMemo(() => Object.values(state.records).flatMap((record) => record.chains || []), [state.records]);
   const [selectedId, setSelectedId] = useState(() => (
     chains.find((chain) => chain.status === 'complete')?.id || chains[0]?.id || null
   ));
-  const [resetArmed, setResetArmed] = useState(false);
   const [consent, setConsent] = useState(false);
   const [submitState, setSubmitState] = useState({ loading: false, success: null, error: null });
   const selected = chains.find((chain) => chain.id === selectedId) || chains[0] || null;
   const eligibility = contributionEligibility(state, selected);
   const contribution = buildContributionPackage(state, selected);
   const selectedPolicy = policies.find((policy) => policy.id === selected?.policyId);
+  const finishedPolicies = policies.filter((policy) => state.records[policy.id]?.chains?.length).length;
+  const inProgressPolicies = policies.filter((policy) => state.records[policy.id]?.draft).length;
 
   const submit = async () => {
     if (!consent || !contribution.ok || !bankClient.configured) return;
@@ -270,27 +272,20 @@ export default function ResultsV2({ state, dispatch, bankClient, onReset }) {
     <main className="results-page">
       <header className="results-header">
         <div>
-          <span>完整论证预览</span>
-          <h1>先检查将要保留的论证，<br />再单独决定是否公开贡献。</h1>
-          <p>预览只展示你明确确认的结构。未完成、条件式和有张力的论证仍可本地下载，但不能进入候选区。</p>
+          <span>阶段结果</span>
+          <h1>只看已经结束的部分</h1>
+          <p>未开始和进行中的题目不会计入；你可以随时返回题目列表继续。</p>
         </div>
         <div className="results-header-actions">
-          <button className="button secondary" type="button" onClick={() => downloadJson('argument-chain-local-progress.json', {
-            schema: 'argument-chain-local-progress-export',
-            version: 1,
-            progress: state,
-          })}><Download size={17} />下载本地进度</button>
-          {resetArmed ? <p className="destructive-warning" role="alert">这会清除本轮进度和当前页面的 AI 配置。</p> : null}
-          <button className={`button ${resetArmed ? 'danger-outline' : 'quiet'}`} type="button" onClick={() => {
-            if (!resetArmed) {
-              setResetArmed(true);
-              return;
-            }
-            onReset();
-          }}><RotateCcw size={17} />{resetArmed ? '确认重新开始' : '重新开始'}</button>
-          {resetArmed ? <button className="button quiet" type="button" onClick={() => setResetArmed(false)}>取消</button> : null}
+          <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />返回题目列表</button>
+          <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><LogOut size={17} />退出</button>
         </div>
       </header>
+
+      <div className="results-progress">
+        <strong>{finishedPolicies} / {policies.length}</strong>
+        <span>道题已结束{inProgressPolicies ? ` · ${inProgressPolicies} 道进行中未计入` : ''}</span>
+      </div>
 
       {chains.length > 1 ? (
         <label className="chain-selector">
@@ -313,11 +308,19 @@ export default function ResultsV2({ state, dispatch, bankClient, onReset }) {
         <p>{selectedPolicy?.title}</p>
       </div>
 
-      <ArgumentPreview chain={selected} />
+      <details className="results-disclosure">
+        <summary>查看所选论证结构</summary>
+        <ArgumentPreview chain={selected} />
+      </details>
 
-      <MechanicalReport state={state} chains={chains} />
+      <details className="results-disclosure">
+        <summary>查看详细报告</summary>
+        <MechanicalReport state={state} chains={chains} />
+      </details>
 
-      <section className="contribution-zone">
+      <details className="results-disclosure">
+        <summary>导出或贡献所选论证</summary>
+        <section className="contribution-zone">
         <header>
           <ShieldCheck size={27} />
           <div><h2>贡献到公开题库</h2><p>这是独立于本地保存的公开动作。</p></div>
@@ -355,12 +358,8 @@ export default function ResultsV2({ state, dispatch, bankClient, onReset }) {
             <ul>{eligibility.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
           </div>
         )}
-      </section>
-
-      <footer className="results-footer">
-        {state.policyIndex < policies.length - 1 ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'NEXT_POLICY' })}>继续下一项题库判断</button> : null}
-        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'RETRY_POLICY' })}>回到当前判断继续补充</button>
-      </footer>
+        </section>
+      </details>
     </main>
   );
 }

@@ -314,4 +314,35 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   assert.equal(calculatePriority(state).unanswered, 0, 'An explicit undecided response is answered, not missing.');
 }
 
-console.log('Engine tests passed: four-layer recursion, fixed-point confirmation, conditional/tension states, conflict resolution, model gaps, confirmed-only dilemmas, and preference cycles.');
+{
+  let state = act(createInitialState(), { type: 'START_OVERVIEW' });
+  assert.equal(state.phase, PHASES.POLICY_OVERVIEW);
+  state = act(state, { type: 'OPEN_POLICY', policyId: 'speech_restriction' });
+  state = act(state, { type: 'SET_STANCE', stance: 'support' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
+  state = act(state, { type: 'ANSWER_FACT', response: 'true' });
+  assert.equal(state.currentFactIndex, 1);
+
+  state = act(state, { type: 'OPEN_OVERVIEW' });
+  assert.equal(state.records.speech_restriction.draft.phase, PHASES.FACT);
+  state = act(state, { type: 'OPEN_POLICY', policyId: 'metadata_surveillance' });
+  assert.equal(state.phase, PHASES.STANCE);
+  state = act(state, { type: 'EXIT_TO_LANDING' });
+  assert.equal(state.phase, PHASES.LANDING);
+  assert.equal(state.records.metadata_surveillance.draft.phase, PHASES.STANCE);
+
+  state = act(state, { type: 'OPEN_OVERVIEW' });
+  state = act(state, { type: 'OPEN_POLICY', policyId: 'speech_restriction' });
+  assert.equal(state.phase, PHASES.FACT);
+  assert.equal(state.currentFactIndex, 1, 'Switching questions must resume the exact unfinished fact.');
+  assert.equal(state.pendingFactResponses.speech_reduces_serious_assaults, 'true');
+
+  state = act(state, { type: 'SHOW_RESULTS' });
+  assert.equal(state.phase, PHASES.RESULTS);
+  assert.equal(state.records.speech_restriction.draft.phase, PHASES.FACT);
+  assert.equal(sessionSummary(state).completeChains.length, 0, 'In-progress drafts must not be counted in results.');
+  assert.equal(sessionSummary(state).conditionalChains.length, 0);
+  assert.equal(sessionSummary(state).unresolvedChains.length, 0);
+}
+
+console.log('Engine tests passed: recursion, fixed points, conflict handling, resumable free-order questions, partial results, dilemmas, and cycles.');

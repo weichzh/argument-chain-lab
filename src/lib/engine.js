@@ -14,6 +14,7 @@ const uid = (prefix = 'id') => `${prefix}_${Date.now().toString(36)}_${Math.rand
 
 export const PHASES = Object.freeze({
   LANDING: 'landing',
+  POLICY_OVERVIEW: 'policy_overview',
   STANCE: 'stance',
   DIRECTION: 'direction',
   ARGUMENT: 'argument',
@@ -83,6 +84,7 @@ const ensurePolicyRecord = (state, policyId, patch = {}) => ({
   stance: null,
   direction: null,
   chains: [],
+  draft: null,
   status: 'not_started',
   ...state.records[policyId],
   ...patch,
@@ -266,6 +268,7 @@ const finalizeCurrentChain = (state, stress) => {
       [policy.id]: {
         ...record,
         chains,
+        draft: null,
         status: recordStatus,
       },
     },
@@ -292,6 +295,7 @@ const finalizeAsUnresolved = (state, reason) => {
       [policy.id]: {
         ...record,
         chains,
+        draft: null,
         status: classifyRecordStatus(chains),
       },
     },
@@ -334,6 +338,66 @@ const startPolicy = (state, index) => {
   };
 };
 
+const DRAFT_PHASES = new Set([
+  PHASES.STANCE,
+  PHASES.DIRECTION,
+  PHASES.ARGUMENT,
+  PHASES.FACT,
+  PHASES.BRIDGE,
+  PHASES.DEPTH,
+  PHASES.TERMINAL_CONFIRM,
+  PHASES.STRESS,
+  PHASES.CONFLICT,
+  PHASES.BROKEN,
+]);
+
+const stashCurrentDraft = (state) => {
+  const policy = policies[state.policyIndex];
+  if (!policy || !DRAFT_PHASES.has(state.phase)) return state;
+  const record = ensurePolicyRecord(state, policy.id);
+  return {
+    ...state,
+    records: {
+      ...state.records,
+      [policy.id]: {
+        ...record,
+        draft: {
+          phase: state.phase,
+          currentChain: state.currentChain,
+          currentTargetClaimId: state.currentTargetClaimId,
+          currentArgumentId: state.currentArgumentId,
+          currentFactIndex: state.currentFactIndex,
+          pendingFactResponses: state.pendingFactResponses,
+          pendingConflict: state.pendingConflict,
+          breakReason: state.breakReason,
+        },
+        status: 'in_progress',
+      },
+    },
+  };
+};
+
+const openPolicy = (state, policyIndex) => {
+  const stashed = stashCurrentDraft(state);
+  const policy = policies[policyIndex];
+  const record = stashed.records[policy.id];
+  if (record?.draft) {
+    return {
+      ...stashed,
+      policyIndex,
+      ...record.draft,
+      updatedAt: now(),
+    };
+  }
+  const records = record?.chains?.length
+    ? {
+        ...stashed.records,
+        [policy.id]: { ...record, stance: null, direction: null },
+      }
+    : stashed.records;
+  return startPolicy({ ...stashed, records }, policyIndex);
+};
+
 const startDirection = (state, direction) => {
   const policy = policies[state.policyIndex];
   const targetClaimId = direction === 'support' ? policy.supportClaimId : policy.opposeClaimId;
@@ -357,6 +421,31 @@ export const reducer = (state, action) => {
   switch (action.type) {
     case 'START':
       return startPolicy({ ...createInitialState(), entryPath: 'bank', startedAt: now() }, 0);
+
+    case 'START_OVERVIEW':
+      return {
+        ...createInitialState(),
+        entryPath: 'bank',
+        phase: PHASES.POLICY_OVERVIEW,
+        startedAt: now(),
+        updatedAt: now(),
+      };
+
+    case 'OPEN_OVERVIEW': {
+      const next = stashCurrentDraft(state);
+      return { ...next, phase: PHASES.POLICY_OVERVIEW, updatedAt: now() };
+    }
+
+    case 'OPEN_POLICY': {
+      const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
+      if (policyIndex < 0) return state;
+      return openPolicy(state, policyIndex);
+    }
+
+    case 'EXIT_TO_LANDING': {
+      const next = stashCurrentDraft(state);
+      return { ...next, phase: PHASES.LANDING, updatedAt: now() };
+    }
 
     case 'START_AT_POLICY': {
       const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
@@ -787,6 +876,7 @@ export const reducer = (state, action) => {
             ...state.records,
             [policy.id]: {
               ...record,
+              draft: null,
               status: 'in_progress',
             },
           },
@@ -810,6 +900,13 @@ export const reducer = (state, action) => {
       };
     }
 
+    case 'RESUME_DILEMMAS':
+      return {
+        ...state,
+        phase: state.dilemmaQueue[state.dilemmaIndex] ? PHASES.DILEMMA : PHASES.RESULTS,
+        updatedAt: now(),
+      };
+
     case 'ANSWER_DILEMMA': {
       const dilemmaId = state.dilemmaQueue[state.dilemmaIndex];
       if (!dilemmaId) return { ...state, phase: PHASES.RESULTS, updatedAt: now() };
@@ -831,7 +928,7 @@ export const reducer = (state, action) => {
     }
 
     case 'SHOW_RESULTS':
-      return { ...state, phase: PHASES.RESULTS, updatedAt: now() };
+      return { ...stashCurrentDraft(state), phase: PHASES.RESULTS, updatedAt: now() };
 
     case 'RESET':
       return createInitialState();

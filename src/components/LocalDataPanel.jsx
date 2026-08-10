@@ -28,6 +28,7 @@ export default function LocalDataPanel({
 }) {
   const [clearArmed, setClearArmed] = useState(false);
   if (!open) return null;
+  const hasProgress = Boolean(state.startedAt);
   const close = () => {
     setClearArmed(false);
     onClose();
@@ -54,7 +55,7 @@ export default function LocalDataPanel({
           <div className="data-boundary-row">
             <HardDrive size={22} />
             <div><strong>结构化论证进度</strong><p>保存在当前浏览器，刷新后可以继续。保存进度不等于同意公开贡献。</p></div>
-            <span>{state.phase === 'landing' ? '空' : '本地'}</span>
+            <span>{hasProgress ? '本地' : '空'}</span>
           </div>
           <div className="data-boundary-row">
             <KeyRound size={22} />
@@ -68,7 +69,7 @@ export default function LocalDataPanel({
           </div>
 
           <div className="local-data-actions">
-            <button className="button secondary full" type="button" onClick={() => downloadProgress(state)} disabled={state.phase === 'landing'}><Download size={17} />下载本地进度</button>
+            <button className="button secondary full" type="button" onClick={() => downloadProgress(state)} disabled={!hasProgress}><Download size={17} />下载本地进度</button>
             {clearArmed ? <p className="destructive-warning" role="alert">这会清除当前浏览器中的结构化进度和临时草稿。</p> : null}
             <button className="button danger-outline full" type="button" onClick={clear}><Trash2 size={17} />{clearArmed ? '确认清除本地数据' : '清除本地数据'}</button>
             {clearArmed ? <button className="button quiet full" type="button" onClick={() => setClearArmed(false)}>取消</button> : null}

@@ -120,6 +120,9 @@ function ReadyApp({ bankManifest }) {
   stateRef.current = state;
 
   useEffect(() => () => aiRequestController.current?.abort(), []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [state.phase, state.policyIndex, state.currentFactIndex, state.dilemmaIndex]);
 
   const bankClient = useMemo(() => new HttpBankClient({
     endpoint: import.meta.env.VITE_BANK_ENDPOINT || window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ || '',
@@ -247,11 +250,6 @@ function ReadyApp({ bankManifest }) {
     setPendingAiRequest(null);
   };
 
-  const reset = () => {
-    clearAiRuntime();
-    dispatch({ type: 'RESET' });
-  };
-
   return (
     <div className="app-root">
       <Header
@@ -272,7 +270,8 @@ function ReadyApp({ bankManifest }) {
       {state.phase === PHASES.LANDING ? (
         <Landing
           aiLoading={aiStatus.loading}
-          onStartBank={() => dispatch({ type: 'START' })}
+          hasSavedProgress={sessionControls.hasSavedProgress}
+          onStartBank={() => dispatch({ type: sessionControls.hasSavedProgress ? 'OPEN_OVERVIEW' : 'START_OVERVIEW' })}
           onStartCustom={(request) => runAiRequest(request)}
         />
       ) : null}
@@ -291,7 +290,6 @@ function ReadyApp({ bankManifest }) {
           state={state}
           dispatch={dispatch}
           bankClient={bankClient}
-          onReset={reset}
         />
       ) : null}
 
