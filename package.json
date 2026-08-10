@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node scripts/test-engine.mjs && node scripts/validate-model.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs",
+    "test:e2e": "playwright test",
     "export:model": "node scripts/export-model.mjs",
     "dev:worker": "wrangler -c worker/wrangler.jsonc dev",
     "normalize:community": "node scripts/normalize-community-bank.mjs"

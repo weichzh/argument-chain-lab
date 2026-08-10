@@ -117,6 +117,28 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
 }
 
 {
+  let state = createInitialState();
+  state = act(state, { type: 'START' });
+  state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
+  state = act(state, { type: 'ANSWER_FACT', response: 'true' });
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'SET_DEPTH', decision: 'fixed_point' });
+  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'reject' });
+  state = act(state, { type: 'RESOLVE_BREAK', resolution: 'alternate_argument' });
+  assert.equal(state.currentTargetClaimId, 'protect_nonharmful_choice', 'Rejecting a fixed point should continue from that accepted bridge.');
+  assert.equal(state.currentChain.steps.length, 1, 'The accepted F+B⇝V layer must remain in the recursive chain.');
+  assert.equal(state.fixedPointEvents.at(-1).status, 'rejected');
+}
+
+{
+  let state = completeSpeechChain();
+  state = act(state, { type: 'RETRY_POLICY' });
+  state = act(state, { type: 'SKIP_POLICY', reason: 'Regression check.' });
+  assert.equal(state.records.speech_restriction.status, 'complete', 'An unresolved retry must not downgrade an existing complete record.');
+}
+
+{
   let state = completeSpeechChain();
   state = act(state, { type: 'RETRY_POLICY' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
@@ -183,6 +205,22 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   assert.equal(state.phase, PHASES.POLICY_COMPLETE);
   assert.equal(state.currentChain.status, 'unresolved');
   assert.equal(sessionSummary(state).uniqueCommitments.length, 0, 'Temporarily running out of reasons must not create a fixed point.');
+  assert.equal(state.fixedPointEvents.at(-1).status, 'unconfirmed');
+}
+
+{
+  let state = completeSpeechChain();
+  state = act(state, { type: 'RETRY_POLICY' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
+  state = answerAllFacts(state, 'speech_harm_support');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
+  state = answerAllFacts(state, 'severe_harm_to_security');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'continue' });
+  assert.equal(state.phase, PHASES.ARGUMENT, 'A missing bank argument must not block deeper AI-assisted recursion.');
+  assert.equal(state.currentTargetClaimId, 'bodily_security');
 }
 
 {
@@ -211,6 +249,15 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   const priority = calculatePriority(state);
   assert(priority.ranking.length >= 3);
   assert(priority.cycles.some((cycle) => cycle.includes('equal_agency') && cycle.includes('bodily_security') && cycle.includes('democratic_authorship')));
+}
+
+{
+  const state = {
+    ...createInitialState(),
+    dilemmaQueue: ['agency_vs_security'],
+    dilemmaResponses: { agency_vs_security: { response: 'undecided' } },
+  };
+  assert.equal(calculatePriority(state).unanswered, 0, 'An explicit undecided response is answered, not missing.');
 }
 
 console.log('Engine tests passed: four-layer recursion, fixed-point confirmation, conditional/tension states, conflict resolution, model gaps, confirmed-only dilemmas, and preference cycles.');

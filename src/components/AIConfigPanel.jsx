@@ -55,10 +55,17 @@ export default function AIConfigPanel({ open, value, onApply, onClear, onClose }
 
   useEffect(() => {
     setForm(formFromConfig(value));
+    if (!value) {
+      setShowKey(false);
+      setModelSearch('');
+      setPasteText('');
+      setGeneratedText('');
+      setError(null);
+    }
   }, [value]);
 
   useEffect(() => {
-    if (!open || catalog.length || catalogLoading) return;
+    if (!open || catalog.length || catalogLoading || catalogError) return;
     setCatalogLoading(true);
     loadPiCatalog()
       .then((items) => {
@@ -69,7 +76,7 @@ export default function AIConfigPanel({ open, value, onApply, onClear, onClose }
         setCatalogError(loadError instanceof Error ? loadError.message : String(loadError));
         setCatalogLoading(false);
       });
-  }, [catalog.length, catalogLoading, open]);
+  }, [catalog.length, catalogError, catalogLoading, open]);
 
   const provider = catalog.find((item) => item.id === form.provider);
   const models = useMemo(() => {
@@ -140,6 +147,16 @@ export default function AIConfigPanel({ open, value, onApply, onClear, onClose }
     onApply(parsed.value);
   };
 
+  const clear = () => {
+    setForm(blankForm());
+    setShowKey(false);
+    setModelSearch('');
+    setPasteText('');
+    setGeneratedText('');
+    setError(null);
+    onClear();
+  };
+
   return (
     <div className="side-panel-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
@@ -199,7 +216,12 @@ export default function AIConfigPanel({ open, value, onApply, onClear, onClose }
             <label className="field"><span>JSON 对象</span><textarea rows={4} value={form.providerOptions} onChange={(event) => update('providerOptions', event.target.value)} /></label>
           </details>
 
-          {catalogError ? <p className="field-error" role="alert">{catalogError}</p> : null}
+          {catalogError ? (
+            <div className="field-error" role="alert">
+              <p>{catalogError}</p>
+              <button className="button secondary" type="button" onClick={() => setCatalogError(null)}>重新读取模型目录</button>
+            </div>
+          ) : null}
           {error ? <p className="field-error" role="alert">{error}</p> : null}
 
           <button className="button primary full" type="button" onClick={apply}>应用到当前页面</button>
@@ -209,7 +231,7 @@ export default function AIConfigPanel({ open, value, onApply, onClear, onClose }
             <p className="danger-copy">明文配置可能包含密钥。本站不保存它；请只在你信任的位置保管。</p>
             <div className="button-row">
               <button className="button secondary" type="button" onClick={generate}><Download size={17} />生成配置文本</button>
-              {value ? <button className="button quiet" type="button" onClick={onClear}><Trash2 size={17} />移除当前配置</button> : null}
+              {value ? <button className="button quiet" type="button" onClick={clear}><Trash2 size={17} />移除当前配置</button> : null}
             </div>
             {generatedText ? (
               <div className="generated-config">

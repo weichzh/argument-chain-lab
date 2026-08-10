@@ -6,11 +6,18 @@ import {
   Send,
   ShieldCheck,
 } from 'lucide-react';
-import { argumentsById, claims, facts, policies } from '../data/model.js';
+import {
+  argumentsById,
+  claims,
+  dilemmas,
+  facts,
+  policies,
+} from '../data/model.js';
 import {
   buildContributionPackage,
   contributionEligibility,
 } from '../lib/contribution.js';
+import { sessionSummary } from '../lib/engine.js';
 
 const statusCopy = {
   complete: '严格完整',
@@ -23,6 +30,25 @@ const factResponseCopy = {
   true: '成立',
   false: '不成立',
   unknown: '不能判断',
+};
+
+const bridgeResponseCopy = {
+  accept: '接受',
+  reject: '拒绝',
+  uncertain: '暂时不能判断',
+};
+
+const fixedPointCopy = {
+  confirmed: '已确认',
+  rejected: '已拒绝',
+  retracted: '压力测试后撤回',
+  unconfirmed: '未确认',
+};
+
+const originCopy = (argument, modelVersion) => {
+  if (argument?.origin === 'session_overlay') return '本轮 AI 会话扩展';
+  if (argument?.origin === 'community') return '公开贡献题库';
+  return `正式题库 ${modelVersion}`;
 };
 
 const downloadJson = (filename, value) => {
@@ -74,6 +100,140 @@ function ArgumentPreview({ chain }) {
         </section>
       ) : null}
     </div>
+  );
+}
+
+const terminalStatus = {
+  provisional_fixed_point: 'confirmed',
+  rejected_as_fixed_point: 'rejected',
+  retracted_after_stress: 'retracted',
+  unconfirmed: 'unconfirmed',
+};
+
+function MechanicalReport({ state, chains }) {
+  const analysis = useMemo(() => sessionSummary(state), [state]);
+  const events = state.fixedPointEvents || [];
+  const eventKeys = new Set(events.map((event) => `${event.chainId}:${event.status}`));
+  const fixedPoints = [
+    ...events,
+    ...chains.flatMap((chain) => {
+      const status = terminalStatus[chain.terminal?.status];
+      if (!status || eventKeys.has(`${chain.id}:${status}`)) return [];
+      return [{
+        id: `derived_${chain.id}_${status}`,
+        policyId: chain.policyId,
+        chainId: chain.id,
+        claimId: chain.terminal.claimId,
+        status,
+      }];
+    }),
+  ];
+  const relationRows = state.dilemmaQueue.map((id) => {
+    const item = dilemmas.find((entry) => entry.id === id);
+    if (!item) return null;
+    const response = state.dilemmaResponses[id]?.response;
+    const left = claims[item.left]?.shortLabel || claims[item.left]?.text || item.left;
+    const right = claims[item.right]?.shortLabel || claims[item.right]?.text || item.right;
+    if (response === 'left_strong') return { id, text: `${left} ≻ ${right}`, note: '明显优先' };
+    if (response === 'left_slight') return { id, text: `${left} ≻ ${right}`, note: '略微优先' };
+    if (response === 'right_strong') return { id, text: `${right} ≻ ${left}`, note: '明显优先' };
+    if (response === 'right_slight') return { id, text: `${right} ≻ ${left}`, note: '略微优先' };
+    if (response === 'undecided') return { id, text: `${left} ? ${right}`, note: '本题无法比较' };
+    return { id, text: `${left} ? ${right}`, note: '未回答' };
+  }).filter(Boolean);
+
+  return (
+    <section className="mechanical-report" aria-labelledby="mechanical-report-title">
+      <header className="report-header">
+        <span>协议输出</span>
+        <h2 id="mechanical-report-title">本轮机械报告</h2>
+        <p>只列出已记录的命题、回答、固定点和局部关系，不生成政治身份诊断或价值总分。</p>
+      </header>
+
+      <div className="report-summary" aria-label="论证状态汇总">
+        {['complete', 'conditional', 'tension', 'unresolved'].map((status) => (
+          <div key={status}><strong>{chains.filter((chain) => chain.status === status).length}</strong><span>{statusCopy[status]}</span></div>
+        ))}
+      </div>
+
+      <section className="report-block">
+        <h3>F + B ⇝ V 与事实信条</h3>
+        {chains.length ? chains.map((chain, chainIndex) => (
+          <details className="report-chain" key={chain.id} open={chainIndex === 0}>
+            <summary>
+              <span>{policies.find((policy) => policy.id === chain.policyId)?.title || chain.policyId}</span>
+              <strong>{statusCopy[chain.status] || chain.status}</strong>
+            </summary>
+            {chain.steps.map((step, stepIndex) => {
+              const argument = argumentsById[step.argumentId];
+              return (
+                <div className="report-step" key={step.id}>
+                  <div className="report-step-heading">
+                    <strong>第 {stepIndex + 1} 层</strong>
+                    <span>来源：{originCopy(argument, state.modelVersion)}</span>
+                  </div>
+                  {(argument?.factIds || []).map((factId) => (
+                    <div className="report-proposition" key={factId}>
+                      <b>F</b>
+                      <div>
+                        <p>{facts[factId]?.statement}</p>
+                        <dl>
+                          <dt>回答</dt><dd>{factResponseCopy[step.factResponses?.[factId]] || '未回答'}</dd>
+                          <dt>成立条件</dt><dd>{facts[factId]?.plainTruthConditions || facts[factId]?.truthConditions}</dd>
+                          <dt>否定条件</dt><dd>{facts[factId]?.plainFalsifier || facts[factId]?.falsifier}</dd>
+                        </dl>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="report-proposition">
+                    <b>B</b>
+                    <div><p>{claims[step.bridgeClaimId]?.text}</p><small>回答：{bridgeResponseCopy[step.bridgeResponse] || '未回答'}</small></div>
+                  </div>
+                  <div className="report-proposition">
+                    <b>V</b>
+                    <div><p>{claims[step.targetClaimId]?.text}</p><small>链条方向：{chain.direction === 'support' ? '支持' : chain.direction === 'oppose' ? '反对' : '未决定'}</small></div>
+                  </div>
+                </div>
+              );
+            })}
+          </details>
+        )) : <p className="empty-state">本轮没有形成论证链。</p>}
+      </section>
+
+      <section className="report-block">
+        <h3>固定点与修订历史</h3>
+        {fixedPoints.length ? (
+          <ul className="report-list">
+            {fixedPoints.map((event) => (
+              <li key={event.id}>
+                <strong>{fixedPointCopy[event.status] || event.status}</strong>
+                <span>{claims[event.claimId]?.text || event.claimId}</span>
+                <small>{policies.find((policy) => policy.id === event.policyId)?.title || event.policyId}</small>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="empty-state">本轮没有提名或确认固定点。</p>}
+      </section>
+
+      <section className="report-block">
+        <h3>冲突、缺口、例外与条件</h3>
+        {analysis.tensions.length ? (
+          <ul className="report-list">
+            {analysis.tensions.map((item) => <li key={item.id}><strong>{item.title}</strong><span>{item.detail}</span></li>)}
+          </ul>
+        ) : <p className="empty-state">本轮没有记录这些未解决项。</p>}
+      </section>
+
+      <section className="report-block">
+        <h3>两难题的局部价值关系</h3>
+        {relationRows.length ? (
+          <ul className="report-list relations">
+            {relationRows.map((row) => <li key={row.id}><strong>{row.text}</strong><span>{row.note}</span></li>)}
+          </ul>
+        ) : <p className="empty-state">本轮没有满足双端点条件的两难题。</p>}
+        {analysis.priority.cycles.length ? <p className="cycle-note">检测到循环：{analysis.priority.cycles.map((cycle) => cycle.map((id) => claims[id]?.shortLabel || id).join(' → ')).join('；')}</p> : null}
+      </section>
+    </section>
   );
 }
 
@@ -154,6 +314,8 @@ export default function ResultsV2({ state, dispatch, bankClient, onReset }) {
       </div>
 
       <ArgumentPreview chain={selected} />
+
+      <MechanicalReport state={state} chains={chains} />
 
       <section className="contribution-zone">
         <header>

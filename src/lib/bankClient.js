@@ -5,10 +5,10 @@ export class BankClient {
 }
 
 export class HttpBankClient extends BankClient {
-  constructor({ endpoint, fetchImpl = globalThis.fetch } = {}) {
+  constructor({ endpoint, fetchImpl } = {}) {
     super();
     this.endpoint = endpoint?.trim() || '';
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = fetchImpl || ((...args) => globalThis.fetch(...args));
   }
 
   get configured() {

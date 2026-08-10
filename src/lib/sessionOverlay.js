@@ -10,7 +10,7 @@ const exactKeys = (value, allowed) => (
   isPlainObject(value) && Object.keys(value).every((key) => allowed.includes(key))
 );
 
-export const validateArgumentCandidate = (candidate, expectedScope) => {
+export const validateArgumentCandidate = (candidate, expectedScope, expectedDirection = null) => {
   if (!exactKeys(candidate, ['scope', 'direction', 'target', 'argument', 'facts', 'bridge', 'stressTest'])) {
     return { ok: false, error: 'AI 返回的候选包含未知字段或结构不完整。' };
   }
@@ -19,6 +19,9 @@ export const validateArgumentCandidate = (candidate, expectedScope) => {
   }
   if (!['support', 'oppose'].includes(candidate.direction)) {
     return { ok: false, error: '候选方向无效。' };
+  }
+  if (expectedDirection && candidate.direction !== expectedDirection) {
+    return { ok: false, error: '候选方向与当前论证方向不一致。' };
   }
   if (!exactKeys(candidate.target, ['shortLabel', 'text'])
     || !hasText(candidate.target.shortLabel, 160)
@@ -58,6 +61,16 @@ export const validateArgumentCandidate = (candidate, expectedScope) => {
   }
   return { ok: true, value: candidate };
 };
+
+export const candidateRequestMatchesState = (state, context) => Boolean(context)
+  && state.updatedAt === context.updatedAt
+  && state.policyIndex === context.policyIndex
+  && state.phase === context.phase
+  && (state.currentChain?.id || null) === context.chainId
+  && state.currentTargetClaimId === context.targetClaimId
+  && state.currentArgumentId === context.argumentId
+  && state.currentFactIndex === context.factIndex
+  && (state.currentChain?.steps.length || 0) === context.stepCount;
 
 const localId = (kind) => `local_${kind}_${crypto.randomUUID()}`;
 

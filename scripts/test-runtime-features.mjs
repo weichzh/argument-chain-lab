@@ -25,6 +25,7 @@ import { HttpBankClient } from '../src/lib/bankClient.js';
 import { buildContributionPackage } from '../src/lib/contribution.js';
 import { createInitialState, PHASES, reducer } from '../src/lib/engine.js';
 import {
+  candidateRequestMatchesState,
   mergeCandidateIntoOverlay,
   validateArgumentCandidate,
 } from '../src/lib/sessionOverlay.js';
@@ -95,6 +96,7 @@ const candidate = {
 };
 
 assert.equal(validateArgumentCandidate(candidate, 'new_root').ok, true);
+assert.equal(validateArgumentCandidate({ ...candidate, direction: 'oppose' }, 'new_root', 'support').ok, false);
 const installed = mergeCandidateIntoOverlay(normalizeSessionOverlay(), candidate);
 assert(installed.policyId.startsWith('local_policy_'));
 assert(Object.keys(installed.overlay.facts).every((id) => id.startsWith('local_fact_')));
@@ -130,6 +132,45 @@ assert.equal(state.phase, PHASES.TERMINAL_CONFIRM);
 state = reducer(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
 state = reducer(state, { type: 'ANSWER_STRESS', response: 'apply' });
 assert.equal(state.currentChain.status, 'complete');
+
+const staleContext = {
+  updatedAt: state.updatedAt,
+  policyIndex: state.policyIndex,
+  phase: state.phase,
+  chainId: state.currentChain.id,
+  targetClaimId: state.currentTargetClaimId,
+  argumentId: state.currentArgumentId,
+  factIndex: state.currentFactIndex,
+  stepCount: state.currentChain.steps.length,
+};
+assert.equal(candidateRequestMatchesState(state, staleContext), true);
+assert.equal(candidateRequestMatchesState({ ...state, phase: PHASES.RESULTS }, staleContext), false);
+
+configureFormalModel(model);
+let recursiveState = reducer(reducer(createInitialState(), { type: 'START' }), { type: 'SET_STANCE', stance: 'support' });
+const recursiveCandidate = {
+  ...candidate,
+  scope: 'current_target',
+  target: {
+    shortLabel: claims[recursiveState.currentTargetClaimId].shortLabel,
+    text: claims[recursiveState.currentTargetClaimId].text,
+  },
+  bridge: { ...candidate.bridge, kind: 'bridge' },
+};
+const recursiveInstalled = mergeCandidateIntoOverlay(
+  normalizeSessionOverlay(),
+  recursiveCandidate,
+  { currentTargetClaimId: recursiveState.currentTargetClaimId },
+);
+applySessionOverlay(recursiveInstalled.overlay);
+recursiveState = reducer(recursiveState, { type: 'SET_SESSION_OVERLAY', overlay: recursiveInstalled.overlay });
+recursiveState = reducer(recursiveState, { type: 'USE_CANDIDATE_ARGUMENT', argumentId: recursiveInstalled.argumentId });
+for (const _fact of recursiveCandidate.facts) recursiveState = reducer(recursiveState, { type: 'ANSWER_FACT', response: 'true' });
+recursiveState = reducer(recursiveState, { type: 'ANSWER_BRIDGE', response: 'accept' });
+recursiveState = reducer(recursiveState, { type: 'SET_DEPTH', decision: 'deeper' });
+assert.equal(recursiveState.phase, PHASES.ARGUMENT);
+assert.equal(recursiveState.currentTargetClaimId, recursiveInstalled.overlay.arguments[recursiveInstalled.argumentId].bridgeClaimId);
+applySessionOverlay(installed.overlay);
 
 const contribution = buildContributionPackage(state, state.currentChain);
 assert.equal(contribution.ok, true, contribution.reasons?.join('; '));

@@ -1585,6 +1585,180 @@ details > summary {
   color: var(--green);
 }
 
+.mechanical-report {
+  margin-top: 56px;
+  border-top: 2px solid var(--ink);
+}
+
+.report-header {
+  padding: 30px 0 24px;
+}
+
+.report-header > span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.report-header h2 {
+  margin: 8px 0;
+  font-size: 25px;
+}
+
+.report-header p {
+  max-width: 780px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.report-summary > div {
+  min-height: 82px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.report-summary > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.report-summary strong {
+  font-size: 24px;
+}
+
+.report-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-block {
+  padding: 30px 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.report-block > h3 {
+  margin: 0 0 18px;
+  font-size: 18px;
+}
+
+.report-chain {
+  border-top: 1px solid var(--line);
+}
+
+.report-chain:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.report-chain > summary {
+  min-height: 56px;
+  padding: 10px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  cursor: pointer;
+}
+
+.report-chain > summary strong,
+.report-step-heading span,
+.report-proposition small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-step {
+  padding: 22px 0 30px;
+  border-top: 1px dashed var(--line);
+}
+
+.report-step-heading {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.report-proposition {
+  padding: 12px 0;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.report-proposition > b {
+  color: var(--blue);
+}
+
+.report-proposition p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.report-proposition dl {
+  margin: 9px 0 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 5px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.report-proposition dt {
+  font-weight: 720;
+}
+
+.report-proposition dd {
+  margin: 0;
+}
+
+.report-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-list li {
+  padding: 13px 0;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) minmax(120px, auto);
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.report-list li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.report-list li span,
+.report-list li small,
+.cycle-note {
+  color: var(--muted);
+}
+
+.report-list.relations li {
+  grid-template-columns: minmax(0, 1fr) 150px;
+}
+
+.cycle-note {
+  margin: 16px 0 0;
+  font-size: 12px;
+}
+
 .contribution-zone {
   margin-top: 56px;
   padding: 34px 0;
@@ -2015,6 +2189,31 @@ details > summary {
 
   .preview-node em {
     grid-column: 2;
+  }
+
+  .report-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-summary > div:nth-child(3) {
+    border-left: 0;
+  }
+
+  .report-summary > div:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .report-chain > summary,
+  .report-step-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .report-proposition dl,
+  .report-list li,
+  .report-list.relations li {
+    grid-template-columns: 1fr;
   }
 }
 

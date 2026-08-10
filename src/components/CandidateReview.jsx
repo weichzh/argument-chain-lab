@@ -34,9 +34,9 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
           <div className="candidate-section">
             <div className="candidate-symbol target">V</div>
             <div className="candidate-fields">
-              <label className="field"><span>结论名称</span><input value={candidate.target.shortLabel} onChange={(event) => update(['target', 'shortLabel'], event.target.value)} /></label>
+              <label className="field"><span>结论名称</span><input value={candidate.target.shortLabel} readOnly={review.scope === 'current_target'} onChange={(event) => update(['target', 'shortLabel'], event.target.value)} /></label>
               <label className="field"><span>待说明的结论</span><textarea rows={3} value={candidate.target.text} readOnly={review.scope === 'current_target'} onChange={(event) => update(['target', 'text'], event.target.value)} /></label>
-              <label className="field"><span>论证方向</span><select value={candidate.direction} onChange={(event) => update(['direction'], event.target.value)}><option value="support">支持</option><option value="oppose">反对</option></select></label>
+              {review.scope === 'new_root' ? <label className="field"><span>论证方向</span><select value={candidate.direction} onChange={(event) => update(['direction'], event.target.value)}><option value="support">支持</option><option value="oppose">反对</option></select></label> : null}
               <label className="field"><span>理由标题</span><input value={candidate.argument.title} onChange={(event) => update(['argument', 'title'], event.target.value)} /></label>
               <label className="field"><span>理由摘要</span><textarea rows={3} value={candidate.argument.summary} onChange={(event) => update(['argument', 'summary'], event.target.value)} /></label>
             </div>

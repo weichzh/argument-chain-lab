@@ -5,7 +5,11 @@ let modelsCollectionPromise;
 const loadModelsCollection = async () => {
   if (!modelsCollectionPromise) {
     modelsCollectionPromise = import('@earendil-works/pi-ai/providers/all')
-      .then(({ builtinModels }) => builtinModels());
+      .then(({ builtinModels }) => builtinModels())
+      .catch((error) => {
+        modelsCollectionPromise = undefined;
+        throw error;
+      });
   }
   return modelsCollectionPromise;
 };
@@ -46,16 +50,26 @@ ${userText}
 约束：
 1. scope 必须精确等于 "${scope}"。
 2. 如果 scope 是 current_target，target.text 必须与上下文中的 currentTarget.text 完全相同。
-3. 不要在字段中保留 API Key、服务商、对话内容、用户身份、时间或设备信息。
-4. 只生成当前继续流程所必需的一条理由，不要生成整份人格或政治画像。
-5. 调用工具提交候选。`;
+3. 如果 scope 是 current_target，direction 必须与上下文中的 currentDirection 完全相同。
+4. 不要在字段中保留 API Key、服务商、对话内容、用户身份、时间或设备信息。
+5. 只生成当前继续流程所必需的一条理由，不要生成整份人格或政治画像。
+6. 调用工具提交候选。`;
 
-export const proposeWithPiAgent = async ({ config, userText, scope, context, signal }) => {
+export const proposeWithPiAgent = async ({
+  config,
+  userText,
+  scope,
+  context,
+  expectedDirection = null,
+  signal,
+}) => {
+  signal?.throwIfAborted();
   const [{ Agent }, { Type }, models] = await Promise.all([
     import('@earendil-works/pi-agent-core'),
     import('@earendil-works/pi-ai'),
     loadModelsCollection(),
   ]);
+  signal?.throwIfAborted();
   const catalogModel = models.getModel(config.provider, config.model);
   if (!catalogModel) throw new Error('在 pi-ai 目录中找不到所选模型，请重新选择。');
   const model = config.baseUrl
@@ -102,7 +116,7 @@ export const proposeWithPiAgent = async ({ config, userText, scope, context, sig
       }, { additionalProperties: false }),
     }, { additionalProperties: false }),
     async execute(_toolCallId, params) {
-      const validation = validateArgumentCandidate(params, scope);
+      const validation = validateArgumentCandidate(params, scope, expectedDirection);
       if (!validation.ok) throw new Error(validation.error);
       capturedCandidate = validation.value;
       return {

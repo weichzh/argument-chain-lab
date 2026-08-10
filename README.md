@@ -56,6 +56,8 @@ F₁ ∧ F₂ ∧ … ∧ B  ⇝  V
 npm install
 npm test
 npm run build
+npx playwright install chromium
+npm run test:e2e
 npm run dev
 ```
 
@@ -89,6 +91,7 @@ window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ = 'https://bank.example.com';
 - `src/lib/aiAgent.js`：浏览器内 `pi-ai`／`pi-agent-core` 集成。
 - `shared/`：浏览器、Worker 和审核脚本共享的贡献契约。
 - `worker/`：只接收明确贡献的 Cloudflare Worker 与 R2 写入边界。
+- `tests/`：正式浏览器回归测试，覆盖核心论证、明确贡献同意、刷新恢复和移动端密钥清理。
 - `docs/adr/`：隐私、题库、AI 与贡献边界的架构决定。
 
 更完整的模型、协议和部署说明见 `docs/MODEL.md`、`docs/PROTOCOL.md` 与 `docs/DEPLOY.md`。

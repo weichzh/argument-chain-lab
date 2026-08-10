@@ -284,7 +284,7 @@ function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
   );
 }
 
-function DepthQuestion({ state, dispatch, onAskAi, aiLoading }) {
+function DepthQuestion({ state, dispatch }) {
   const bridge = claims[state.currentChain?.steps.at(-1)?.bridgeClaimId];
   const deeperCount = getArgumentsForClaim(bridge?.id).length;
   return (
@@ -292,34 +292,31 @@ function DepthQuestion({ state, dispatch, onAskAi, aiLoading }) {
       <QuestionHeader state={state} label="继续追问" title="这条原则还需要更深的规范理由吗？" statement={bridge?.text} />
       <ChoiceList options={[
         { id: 'fixed', label: '它可以作为本轮当前基本价值候选', detail: '下一步仍会独立确认并做相似案例检验。', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'fixed_point' }) },
-        { id: 'deeper', label: '继续追问为什么', detail: deeperCount ? `题库还有 ${deeperCount} 条可检查理由。` : '题库没有现成理由，请在下面写下你的想法。', disabled: deeperCount === 0, onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'deeper' }) },
+        { id: 'deeper', label: '继续追问为什么', detail: deeperCount ? `题库还有 ${deeperCount} 条可检查理由。` : '题库没有现成理由，可继续让 AI 梳理。', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'deeper' }) },
         { id: 'uncertain', label: '暂时无法判断', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'uncertain' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }
 
-function TerminalQuestion({ state, dispatch, onAskAi, aiLoading }) {
+function TerminalQuestion({ state, dispatch }) {
   const claimId = state.currentChain?.terminal?.claimId || state.currentChain?.steps.at(-1)?.bridgeClaimId;
   const claim = claims[claimId];
-  const canContinue = getArgumentsForClaim(claimId).length > 0;
   return (
     <>
       <QuestionHeader state={state} label="独立确认" title="即使暂时不给出更深理由，你现在仍直接接受它吗？" statement={claim?.text} />
       <p className="explanation-line">这不是客观公理声明，只记录本轮追问暂时停在哪里。</p>
       <ChoiceList options={[
         { id: 'accept', label: '是，我现在直接接受它', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'accept' }) },
-        ...(canContinue ? [{ id: 'continue', label: '不是，继续追问更深理由', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'continue' }) }] : []),
+        { id: 'continue', label: '不是，继续追问更深理由', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'continue' }) },
         { id: 'reject', label: '我不愿把它作为当前基本价值', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'reject' }) },
         { id: 'uncertain', label: '暂时不能确认', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'uncertain' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }
 
-function StressQuestion({ state, dispatch, onAskAi, aiLoading }) {
+function StressQuestion({ state, dispatch }) {
   const claim = claims[state.currentChain?.terminal?.claimId];
   const stress = claim?.stressTest || {};
   const [distinctionOpen, setDistinctionOpen] = useState(false);
@@ -342,12 +339,11 @@ function StressQuestion({ state, dispatch, onAskAi, aiLoading }) {
           <button className="button primary" type="button" disabled={!distinction.trim()} onClick={() => dispatch({ type: 'ANSWER_STRESS', response: 'qualified_exception', distinction: distinction.trim() })}>确认区别并继续</button>
         </div>
       ) : null}
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }
 
-function ConflictQuestion({ state, dispatch, onAskAi, aiLoading }) {
+function ConflictQuestion({ state, dispatch }) {
   const conflict = state.pendingConflict;
   const text = conflict?.kind === 'fact'
     ? facts[conflict.propositionId]?.statement
@@ -361,12 +357,11 @@ function ConflictQuestion({ state, dispatch, onAskAi, aiLoading }) {
         { id: 'suspend', label: '把这句话暂时设为不能判断', onSelect: () => dispatch({ type: 'RESOLVE_CONFLICT', resolution: 'suspend' }) },
         { id: 'scope', label: '两个情境的范围其实不同', detail: '保留差异，并把缺少的条件记录为未解决张力。', onSelect: () => dispatch({ type: 'RESOLVE_CONFLICT', resolution: 'scope_gap' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }
 
-function BrokenQuestion({ state, dispatch, onAskAi, aiLoading }) {
+function BrokenQuestion({ state, dispatch }) {
   return (
     <>
       <QuestionHeader state={state} label="论证中断" title="当前这条理由还不能走完整。" statement={state.breakReason} />
@@ -375,7 +370,6 @@ function BrokenQuestion({ state, dispatch, onAskAi, aiLoading }) {
         { id: 'stance', label: '重新判断当前立场', onSelect: () => dispatch({ type: 'RESOLVE_BREAK', resolution: 'revise_stance' }) },
         { id: 'stop', label: '保留为未解决并结束这项政策', onSelect: () => dispatch({ type: 'RESOLVE_BREAK', resolution: 'finalize' }) },
       ]} />
-      <FreeInput state={state} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
 }

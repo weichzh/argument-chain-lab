@@ -52,6 +52,7 @@ export const createInitialState = () => ({
   pendingConflict: null,
   conflicts: [],
   modelGaps: [],
+  fixedPointEvents: [],
   breakReason: null,
   dilemmaQueue: [],
   dilemmaIndex: 0,
@@ -61,6 +62,21 @@ export const createInitialState = () => ({
 });
 
 const now = () => new Date().toISOString();
+
+const recordFixedPoint = (state, claimId, status) => ({
+  ...state,
+  fixedPointEvents: [
+    ...(state.fixedPointEvents || []),
+    {
+      id: uid('fixed_point'),
+      policyId: policies[state.policyIndex]?.id || state.currentChain?.policyId || null,
+      chainId: state.currentChain?.id || null,
+      claimId,
+      status,
+      recordedAt: now(),
+    },
+  ],
+});
 
 const ensurePolicyRecord = (state, policyId, patch = {}) => ({
   policyId,
@@ -268,14 +284,15 @@ const finalizeAsUnresolved = (state, reason) => {
     completedAt: now(),
   };
   const record = ensurePolicyRecord(state, policy.id);
+  const chains = [...record.chains, chain];
   return {
     ...state,
     records: {
       ...state.records,
       [policy.id]: {
         ...record,
-        chains: [...record.chains, chain],
-        status: record.status === 'complete' ? 'complete' : 'unresolved',
+        chains,
+        status: classifyRecordStatus(chains),
       },
     },
     currentChain: chain,
@@ -573,22 +590,6 @@ export const reducer = (state, action) => {
         };
       }
       if (action.decision === 'deeper') {
-        const candidates = getArgumentsForClaim(bridgeClaimId);
-        if (!candidates.length) {
-          return {
-            ...state,
-            currentChain: {
-              ...state.currentChain,
-              terminal: {
-                claimId: bridgeClaimId,
-                status: 'terminal_candidate',
-                confirmedAt: null,
-              },
-            },
-            phase: PHASES.TERMINAL_CONFIRM,
-            updatedAt: now(),
-          };
-        }
         return {
           ...state,
           currentTargetClaimId: bridgeClaimId,
@@ -607,12 +608,13 @@ export const reducer = (state, action) => {
       const candidateClaimId = state.currentChain?.terminal?.claimId || lastStep?.bridgeClaimId;
       if (!lastStep || !candidateClaimId) return state;
       if (action.response === 'accept') {
+        const recorded = recordFixedPoint(state, candidateClaimId, 'confirmed');
         return {
-          ...state,
+          ...recorded,
           currentChain: {
-            ...state.currentChain,
+            ...recorded.currentChain,
             terminal: {
-              ...(state.currentChain.terminal || {}),
+              ...(recorded.currentChain.terminal || {}),
               claimId: candidateClaimId,
               status: 'provisional_fixed_point',
               confirmedAt: now(),
@@ -623,12 +625,11 @@ export const reducer = (state, action) => {
         };
       }
       if (action.response === 'continue') {
-        const candidates = getArgumentsForClaim(candidateClaimId);
-        if (!candidates.length) return state;
+        const recorded = recordFixedPoint(state, candidateClaimId, 'rejected');
         return {
-          ...state,
+          ...recorded,
           currentChain: {
-            ...state.currentChain,
+            ...recorded.currentChain,
             terminal: null,
           },
           currentTargetClaimId: candidateClaimId,
@@ -641,12 +642,13 @@ export const reducer = (state, action) => {
         };
       }
       if (action.response === 'reject') {
+        const recorded = recordFixedPoint(state, candidateClaimId, 'rejected');
         return {
-          ...state,
+          ...recorded,
           currentChain: {
-            ...state.currentChain,
+            ...recorded.currentChain,
             terminal: {
-              ...(state.currentChain.terminal || {}),
+              ...(recorded.currentChain.terminal || {}),
               claimId: candidateClaimId,
               status: 'rejected_as_fixed_point',
               confirmedAt: null,
@@ -657,13 +659,14 @@ export const reducer = (state, action) => {
           updatedAt: now(),
         };
       }
+      const recorded = recordFixedPoint(state, candidateClaimId, 'unconfirmed');
       return finalizeAsUnresolved(
         {
-          ...state,
+          ...recorded,
           currentChain: {
-            ...state.currentChain,
+            ...recorded.currentChain,
             terminal: {
-              ...(state.currentChain.terminal || {}),
+              ...(recorded.currentChain.terminal || {}),
               claimId: candidateClaimId,
               status: 'unconfirmed',
               confirmedAt: null,
@@ -677,12 +680,13 @@ export const reducer = (state, action) => {
     case 'ANSWER_STRESS': {
       if (!state.currentChain?.terminal) return state;
       if (action.response === 'retract') {
+        const recorded = recordFixedPoint(state, state.currentChain.terminal.claimId, 'retracted');
         return {
-          ...state,
+          ...recorded,
           currentChain: {
-            ...state.currentChain,
+            ...recorded.currentChain,
             terminal: {
-              ...state.currentChain.terminal,
+              ...recorded.currentChain.terminal,
               status: 'retracted_after_stress',
             },
           },
@@ -720,6 +724,11 @@ export const reducer = (state, action) => {
             || state.currentChain?.terminal?.status === 'retracted_after_stress'
           )
         );
+        const retryTargetClaimId = shouldDropLast
+          ? lastStep?.targetClaimId
+          : state.currentChain?.terminal?.status === 'rejected_as_fixed_point'
+            ? lastStep?.bridgeClaimId
+            : lastStep?.targetClaimId;
         const currentChain = state.currentChain
           ? {
               ...state.currentChain,
@@ -732,7 +741,7 @@ export const reducer = (state, action) => {
         return {
           ...state,
           currentChain,
-          currentTargetClaimId: lastStep?.targetClaimId || state.currentTargetClaimId,
+          currentTargetClaimId: retryTargetClaimId || state.currentTargetClaimId,
           currentArgumentId: null,
           currentFactIndex: 0,
           pendingFactResponses: {},
@@ -1063,7 +1072,12 @@ export const calculatePriority = (state) => {
 
   const ranking = [...scores.values()].sort((a, b) => b.net - a.net || b.comparisons - a.comparisons || a.id.localeCompare(b.id));
   const cycles = stronglyConnectedComponents(nodes, edges).filter((component) => component.length > 1);
-  return { ranking, edges, cycles, unanswered: items.length - edges.length };
+  return {
+    ranking,
+    edges,
+    cycles,
+    unanswered: items.filter((item) => !state.dilemmaResponses[item.id]).length,
+  };
 };
 
 export const sessionSummary = (state) => {

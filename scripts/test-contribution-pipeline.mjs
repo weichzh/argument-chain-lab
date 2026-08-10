@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
@@ -183,8 +182,10 @@ async function makeRecord(contribution) {
 }
 
 async function testReviewBatch() {
-  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'argument-chain-review-'));
-  assert(temporaryRoot.startsWith(os.tmpdir()));
+  const temporaryBase = path.join(root, '.tmp');
+  await mkdir(temporaryBase, { recursive: true });
+  const temporaryRoot = await mkdtemp(path.join(temporaryBase, 'argument-chain-review-'));
+  assert(temporaryRoot.startsWith(temporaryBase));
   try {
     const input = path.join(temporaryRoot, 'input');
     const bank = path.join(temporaryRoot, 'community.json');

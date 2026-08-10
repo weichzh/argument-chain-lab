@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Assessment from './components/Assessment.jsx';
 import AIConfigPanel from './components/AIConfigPanel.jsx';
 import CandidateReview from './components/CandidateReview.jsx';
@@ -25,7 +25,11 @@ import {
   getCurrentTargetClaim,
   PHASES,
 } from './lib/engine.js';
-import { mergeCandidateIntoOverlay, validateArgumentCandidate } from './lib/sessionOverlay.js';
+import {
+  candidateRequestMatchesState,
+  mergeCandidateIntoOverlay,
+  validateArgumentCandidate,
+} from './lib/sessionOverlay.js';
 
 const buildConfirmedGraph = (state) => (state.currentChain?.steps || []).map((step) => {
   const argument = argumentsById[step.argumentId];
@@ -56,6 +60,7 @@ const buildAiContext = (state) => {
       scope: policy.scope,
     } : null,
     currentTarget: target ? { kind: target.kind, text: target.text } : null,
+    currentDirection: state.currentChain?.direction || null,
     confirmedGraph: buildConfirmedGraph(state),
     necessaryBankSlice: {
       phase: state.phase,
@@ -68,6 +73,18 @@ const buildAiContext = (state) => {
     },
   };
 };
+
+const captureAiRequestContext = (state) => ({
+  updatedAt: state.updatedAt,
+  policyIndex: state.policyIndex,
+  phase: state.phase,
+  chainId: state.currentChain?.id || null,
+  targetClaimId: state.currentTargetClaimId,
+  argumentId: state.currentArgumentId,
+  factIndex: state.currentFactIndex,
+  stepCount: state.currentChain?.steps.length || 0,
+  direction: state.currentChain?.direction || null,
+});
 
 function LoadingScreen({ error, onRetry }) {
   return (
@@ -98,30 +115,71 @@ function ReadyApp({ bankManifest }) {
   const [aiStatus, setAiStatus] = useState({ loading: false, error: null });
   const [candidateReview, setCandidateReview] = useState(null);
   const [pendingAiRequest, setPendingAiRequest] = useState(null);
+  const stateRef = useRef(state);
+  const aiRequestController = useRef(null);
+  stateRef.current = state;
+
+  useEffect(() => () => aiRequestController.current?.abort(), []);
 
   const bankClient = useMemo(() => new HttpBankClient({
     endpoint: import.meta.env.VITE_BANK_ENDPOINT || window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ || '',
   }), []);
 
   const runAiRequest = async (request, config = aiConfig) => {
+    const prepared = request.requestContext ? request : {
+      ...request,
+      requestContext: captureAiRequestContext(state),
+      aiContext: buildAiContext(state),
+    };
     if (!config) {
-      setPendingAiRequest(request);
+      setPendingAiRequest(prepared);
       setConfigOpen(true);
       return;
     }
+    if (!candidateRequestMatchesState(stateRef.current, prepared.requestContext)) {
+      setPendingAiRequest(null);
+      setAiStatus({ loading: false, error: '当前论证步骤已经改变，请在新步骤重新生成候选。' });
+      return;
+    }
+    aiRequestController.current?.abort();
+    const controller = new AbortController();
+    aiRequestController.current = controller;
+    setPendingAiRequest(null);
     setAiStatus({ loading: true, error: null });
     try {
       const candidate = await proposeWithPiAgent({
         config,
-        userText: request.text,
-        scope: request.scope,
-        context: buildAiContext(state),
+        userText: prepared.text,
+        scope: prepared.scope,
+        context: prepared.aiContext,
+        expectedDirection: prepared.scope === 'current_target'
+          ? prepared.requestContext.direction
+          : null,
+        signal: controller.signal,
       });
-      setCandidateReview({ candidate, scope: request.scope, draftKey: request.draftKey });
-      setPendingAiRequest(null);
-      setAiStatus({ loading: false, error: null });
+      if (controller.signal.aborted) return;
+      if (!candidateRequestMatchesState(stateRef.current, prepared.requestContext)) {
+        setAiStatus({ loading: false, error: '生成期间论证步骤已经改变，这份过期候选没有写入当前链。' });
+        return;
+      }
+      setCandidateReview({
+        candidate,
+        scope: prepared.scope,
+        draftKey: prepared.draftKey,
+        requestContext: prepared.requestContext,
+        expectedDirection: prepared.scope === 'current_target'
+          ? prepared.requestContext.direction
+          : null,
+      });
     } catch (error) {
-      setAiStatus({ loading: false, error: error instanceof Error ? error.message : String(error) });
+      if (!controller.signal.aborted && aiRequestController.current === controller) {
+        setAiStatus({ loading: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    } finally {
+      if (aiRequestController.current === controller) {
+        aiRequestController.current = null;
+        setAiStatus((current) => ({ ...current, loading: false }));
+      }
     }
   };
 
@@ -134,7 +192,16 @@ function ReadyApp({ bankManifest }) {
   };
 
   const confirmCandidate = (candidate) => {
-    const validation = validateArgumentCandidate(candidate, candidateReview.scope);
+    if (!candidateReview || !candidateRequestMatchesState(state, candidateReview.requestContext)) {
+      setCandidateReview(null);
+      setAiStatus({ loading: false, error: '当前论证步骤已经改变，请在新步骤重新生成候选。' });
+      return;
+    }
+    const validation = validateArgumentCandidate(
+      candidate,
+      candidateReview.scope,
+      candidateReview.expectedDirection,
+    );
     if (!validation.ok) {
       setAiStatus({ loading: false, error: validation.error });
       return;
@@ -171,8 +238,17 @@ function ReadyApp({ bankManifest }) {
     setAiStatus({ loading: false, error: null });
   };
 
-  const reset = () => {
+  const clearAiRuntime = () => {
+    aiRequestController.current?.abort();
+    aiRequestController.current = null;
     setAiConfig(null);
+    setAiStatus({ loading: false, error: null });
+    setCandidateReview(null);
+    setPendingAiRequest(null);
+  };
+
+  const reset = () => {
+    clearAiRuntime();
     dispatch({ type: 'RESET' });
   };
 
@@ -224,8 +300,11 @@ function ReadyApp({ bankManifest }) {
         open={configOpen}
         value={aiConfig}
         onApply={applyAiConfig}
-        onClear={() => setAiConfig(null)}
-        onClose={() => setConfigOpen(false)}
+        onClear={clearAiRuntime}
+        onClose={() => {
+          setPendingAiRequest(null);
+          setConfigOpen(false);
+        }}
       />
       <LocalDataPanel
         open={localDataOpen}
@@ -233,7 +312,7 @@ function ReadyApp({ bankManifest }) {
         aiConfigured={Boolean(aiConfig)}
         bankVersion={bankManifest.current}
         onClear={() => {
-          setAiConfig(null);
+          clearAiRuntime();
           sessionControls.clearLocalData();
           setLocalDataOpen(false);
         }}
