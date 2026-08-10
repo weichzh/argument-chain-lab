@@ -13,7 +13,7 @@ import {
   communityBankToExtension,
   validateBankManifest,
 } from '../src/data/bank.js';
-import { loadPiCatalog } from '../src/lib/aiAgent.js';
+import { loadPiCatalog, proposeWithPiAgent } from '../src/lib/aiAgent.js';
 import {
   AI_CONFIG_SCHEMA,
   AI_CONFIG_VERSION,
@@ -53,6 +53,18 @@ assert.equal(validateAiConfig({ ...config, accountId: 'forbidden' }).ok, false);
 const catalog = await loadPiCatalog();
 assert(catalog.length > 10, 'pi-ai should expose its built-in provider catalog.');
 assert(catalog.some((provider) => provider.id === 'openai' && provider.models.length > 0));
+const abortedRequest = new AbortController();
+abortedRequest.abort();
+await assert.rejects(
+  proposeWithPiAgent({
+    config,
+    userText: 'This request must never reach a provider.',
+    scope: 'new_root',
+    context: {},
+    signal: abortedRequest.signal,
+  }),
+  { name: 'AbortError' },
+);
 
 const rawDraft = 'RAW_DRAFT_MUST_NOT_BE_PERSISTED_OR_CONTRIBUTED';
 const candidate = {
