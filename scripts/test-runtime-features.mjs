@@ -235,20 +235,11 @@ for (let index = 1; index < communityArguments.length; index += 1) {
   assert.equal(communityArguments[index].targetClaimId, communityArguments[index - 1].bridgeClaimId);
 }
 
-const hostedHtml = await sitesWorker.fetch(new Request('https://argument-chain.example/'), {
-  ASSETS: {
-    fetch: async () => new Response('<meta property="og:image" content="__SITE_ORIGIN__/og.png">', {
-      headers: {
-        'Content-Encoding': 'gzip',
-        'Content-Length': '99',
-        'Content-Type': 'text/html; charset=utf-8',
-      },
-    }),
-  },
+const hostedRuntimeConfig = await sitesWorker.fetch(new Request('https://argument-chain.example/runtime-config.js'), {
+  ASSETS: { fetch: async () => { throw new Error('runtime config must not use hosted persistence'); } },
 });
-assert.equal(await hostedHtml.text(), '<meta property="og:image" content="https://argument-chain.example/og.png">');
-assert.equal(hostedHtml.headers.get('content-encoding'), null);
-assert.equal(hostedHtml.headers.get('content-length'), null);
+assert.equal(await hostedRuntimeConfig.text(), "window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ = '';\n");
+assert.equal(hostedRuntimeConfig.headers.get('content-type'), 'application/javascript; charset=utf-8');
 const hostedAsset = new Response('asset', { headers: { 'Content-Type': 'image/png' } });
 assert.equal(await sitesWorker.fetch(new Request('https://argument-chain.example/og.png'), {
   ASSETS: { fetch: async () => hostedAsset },

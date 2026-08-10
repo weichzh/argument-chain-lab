@@ -1,17 +1,10 @@
 export default {
   async fetch(request, env) {
-    const response = await env.ASSETS.fetch(request);
-    if (!response.headers.get('content-type')?.includes('text/html')) return response;
-
-    const headers = new Headers(response.headers);
-    headers.delete('content-encoding');
-    headers.delete('content-length');
-    const origin = new URL(request.url).origin;
-
-    return new Response((await response.text()).replaceAll('__SITE_ORIGIN__', origin), {
-      headers,
-      status: response.status,
-      statusText: response.statusText,
-    });
+    if (new URL(request.url).pathname === '/runtime-config.js') {
+      return new Response("window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ = '';\n", {
+        headers: { 'Content-Type': 'application/javascript; charset=utf-8' },
+      });
+    }
+    return env.ASSETS.fetch(request);
   },
 };
