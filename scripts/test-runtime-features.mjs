@@ -24,6 +24,7 @@ import {
 import { HttpBankClient } from '../src/lib/bankClient.js';
 import { buildContributionPackage } from '../src/lib/contribution.js';
 import { createInitialState, PHASES, reducer } from '../src/lib/engine.js';
+import sitesWorker from '../public/server/index.js';
 import {
   candidateRequestMatchesState,
   mergeCandidateIntoOverlay,
@@ -233,5 +234,24 @@ const communityArguments = Object.values(extension.arguments);
 for (let index = 1; index < communityArguments.length; index += 1) {
   assert.equal(communityArguments[index].targetClaimId, communityArguments[index - 1].bridgeClaimId);
 }
+
+const hostedHtml = await sitesWorker.fetch(new Request('https://argument-chain.example/'), {
+  ASSETS: {
+    fetch: async () => new Response('<meta property="og:image" content="__SITE_ORIGIN__/og.png">', {
+      headers: {
+        'Content-Encoding': 'gzip',
+        'Content-Length': '99',
+        'Content-Type': 'text/html; charset=utf-8',
+      },
+    }),
+  },
+});
+assert.equal(await hostedHtml.text(), '<meta property="og:image" content="https://argument-chain.example/og.png">');
+assert.equal(hostedHtml.headers.get('content-encoding'), null);
+assert.equal(hostedHtml.headers.get('content-length'), null);
+const hostedAsset = new Response('asset', { headers: { 'Content-Type': 'image/png' } });
+assert.equal(await sitesWorker.fetch(new Request('https://argument-chain.example/og.png'), {
+  ASSETS: { fetch: async () => hostedAsset },
+}), hostedAsset);
 
 console.log('Runtime feature tests passed: formal-bank protection, pi-ai catalog, memory-only config contract, confirmed session overlay, strict contribution, and community-bank links.');
