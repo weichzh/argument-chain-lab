@@ -6,6 +6,7 @@ import {
   claims,
   configureFormalModel,
   facts,
+  formalCertificates,
   getPolicyElements,
   normalizeSessionOverlay,
   policies,
@@ -23,7 +24,7 @@ import {
   validateAiConfig,
 } from '../src/lib/aiConfig.js';
 import { HttpBankClient } from '../src/lib/bankClient.js';
-import { buildContributionPackage } from '../src/lib/contribution.js';
+import { buildContributionPackage, contributionEligibility } from '../src/lib/contribution.js';
 import { createInitialState, getSelectedChain, PHASES, reducer } from '../src/lib/engine.js';
 import sitesWorker from '../public/server/index.js';
 import {
@@ -134,6 +135,18 @@ assert.equal(policies.find((policy) => policy.id === installed.policyId)?.origin
 assert.equal(claims[installed.targetClaimId].text, candidate.target.text);
 assert.equal(claims[installed.overlay.arguments[installed.argumentId].bridgeClaimId].nominatable, true);
 assert.equal(argumentsById[installed.argumentId].factIds.length, candidate.facts.length);
+applySessionOverlay({
+  ...installed.overlay,
+  arguments: {
+    ...installed.overlay.arguments,
+    [installed.argumentId]: {
+      ...installed.overlay.arguments[installed.argumentId],
+      formalization: model.arguments.speech_harm_support.formalization,
+    },
+  },
+});
+assert.equal(formalCertificates[installed.argumentId], undefined, 'Session candidates cannot mint formal certificates.');
+applySessionOverlay(installed.overlay);
 
 let state = reducer(createInitialState(), { type: 'SET_ASSESSMENT_MODE', mode: 'real_world_belief' });
 state = reducer(state, { type: 'SET_SESSION_OVERLAY', overlay: installed.overlay });
@@ -205,12 +218,39 @@ applySessionOverlay(installed.overlay);
 
 const contribution = buildContributionPackage(state, completedChain);
 assert.equal(contribution.ok, true, contribution.reasons?.join('; '));
+const unresolvedDefeater = {
+  ...completedChain,
+  defeaterReview: {
+    argumentId: 'removed_defeater',
+    factResponses: {},
+    bridgeClaimId: 'removed_bridge',
+    bridgeResponse: 'reject',
+    effect: 'reject',
+    stanceBefore: 'support',
+    stanceAfter: 'support',
+  },
+};
+assert.equal(contributionEligibility(state, unresolvedDefeater).eligible, false);
+const establishedRejectedDefeater = {
+  ...completedChain,
+  defeaterReview: {
+    argumentId: 'speech_choice_oppose',
+    factResponses: Object.fromEntries(argumentsById.speech_choice_oppose.factIds.map((factId) => [factId, 'true'])),
+    bridgeClaimId: argumentsById.speech_choice_oppose.bridgeClaimId,
+    bridgeResponse: 'accept',
+    effect: 'reject',
+    stanceBefore: 'support',
+    stanceAfter: 'support',
+  },
+};
+assert.equal(contributionEligibility(state, establishedRejectedDefeater).eligible, false);
 const conditionalContribution = buildContributionPackage(state, {
   ...completedChain,
   steps: completedChain.steps.map((step) => ({ ...step, assessmentMode: 'conditional_scenario' })),
 });
 assert.equal(conditionalContribution.ok, false, 'Conditionally stipulated facts must not enter the public contribution path.');
 assert.equal(validateContributionPackage(contribution.value).ok, true);
+assert.equal(contribution.value.checks.formalizationCoverage, 'none');
 const contributionText = JSON.stringify(contribution.value);
 assert(!contributionText.includes(rawDraft));
 assert(!contributionText.includes(config.apiKey));

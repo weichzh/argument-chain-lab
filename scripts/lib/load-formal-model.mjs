@@ -29,5 +29,19 @@ export async function loadCurrentFormalModel() {
     if (!benchmarkPath.startsWith(boundary)) throw new Error('Bank benchmark path escapes public/bank.');
     model.ideologyBenchmarks = await readJson(benchmarkPath);
   }
-  return { root, manifest, selected, model, modelPath };
+  let formalSchemaPath = null;
+  let formalSchema = null;
+  if (selected.formalSchema || selected.formalSchemes) {
+    if (!selected.formalSchema || !selected.formalSchemes) {
+      throw new Error('Bank formal schema and scheme catalog must be configured together.');
+    }
+    formalSchemaPath = path.resolve(bankDirectory, selected.formalSchema);
+    const formalSchemesPath = path.resolve(bankDirectory, selected.formalSchemes);
+    if (!formalSchemaPath.startsWith(boundary) || !formalSchemesPath.startsWith(boundary)) {
+      throw new Error('Bank formal asset path escapes public/bank.');
+    }
+    formalSchema = await readJson(formalSchemaPath);
+    model.arglogicCatalog = await readJson(formalSchemesPath);
+  }
+  return { root, manifest, selected, model, modelPath, formalSchemaPath, formalSchema };
 }

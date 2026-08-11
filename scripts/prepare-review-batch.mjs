@@ -49,7 +49,7 @@ async function loadCommunityBank(filename) {
     throw new Error(`Community bank is invalid: ${JSON.stringify(validation.issues)}`);
   }
   for (const [index, entry] of value.entries.entries()) {
-    const hash = await hashContributionPackage(entry.contribution);
+    const hash = await hashContributionPackage(entry.contribution, { allowLegacy: true });
     if (!hash.ok || hash.value !== entry.contentHash) {
       throw new Error(`Community bank entry ${index} has a mismatched content hash.`);
     }
@@ -98,8 +98,10 @@ async function main() {
       report.push({ key, outcome: 'rejected', reasonCodes: reasonCodes(validation.issues) });
       continue;
     }
-    const normalized = normalizeContributionPackage(record.contribution);
-    const hash = normalized.ok ? await hashContributionPackage(normalized.value) : normalized;
+    const normalized = normalizeContributionPackage(record.contribution, { allowLegacy: true });
+    const hash = normalized.ok
+      ? await hashContributionPackage(normalized.value, { allowLegacy: true })
+      : normalized;
     if (!normalized.ok || !hash.ok || hash.value !== record.contentHash) {
       rejectedKeys.push(key);
       report.push({ key, outcome: 'rejected', reasonCodes: ['content_hash_mismatch'] });

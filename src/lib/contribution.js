@@ -4,7 +4,23 @@ import {
   CONTRIBUTION_VERSION,
   normalizeContributionPackage,
 } from '../../shared/contribution-contract.js';
-import { argumentsById, claims, facts } from '../data/model.js';
+import {
+  argumentsById,
+  claims,
+  facts,
+  formalCertificates,
+} from '../data/model.js';
+import { ARGLOGIC_VERSION, evaluateFormalCheck } from './formalValidator.js';
+
+const formalCheckFrom = (step) => {
+  const argument = argumentsById[step.argumentId];
+  return evaluateFormalCheck(
+    formalCertificates[argument?.id],
+    argument?.formalization,
+    step.factResponses,
+    step.bridgeResponse,
+  );
+};
 
 const toTarget = (claimId, fallbackKind = 'bridge') => {
   const claim = claims[claimId];
@@ -90,16 +106,52 @@ export const contributionEligibility = (state, chain) => {
   if (chain?.steps?.some((step) => step.assessmentMode !== 'real_world_belief')) {
     reasons.push('只有现实判断模式确认的经验前提可以进入公开贡献。');
   }
+  for (const step of chain?.steps || []) {
+    const argument = argumentsById[step.argumentId];
+    const formalCheck = formalCheckFrom(step);
+    if (argument?.formalization && !formalCertificates[argument.id]) {
+      reasons.push('当前题库缺少这条论证的形式检查证书。');
+      break;
+    }
+    if (argument?.formalization && formalCheck.version !== argument.formalization.languageVersion) {
+      reasons.push('形式检查证书版本与当前题库不一致。');
+      break;
+    }
+    if (formalCheck.errors?.length) {
+      reasons.push(`形式检查仍有错误：${formalCheck.errors.map((item) => item.code).join('、')}。`);
+      break;
+    }
+  }
   if (chain?.scopeConflicts?.length) reasons.push('仍有未说明的适用范围冲突。');
   if (chain?.compatibilityIssues?.length) reasons.push('论证依赖与其他路径不相容的事实情景。');
   if (!chain?.defeaterReview) reasons.push('尚未完成最强反方理由复核。');
+  if (chain?.defeaterReview && !chain.defeaterReview.argumentId
+    && (chain.defeaterReview.effect || chain.defeaterReview.impact) !== 'none_accepted') {
+    reasons.push('最强反方理由的复核结果缺少对应论证。');
+  }
   if (chain?.defeaterReview?.argumentId) {
     const defeater = argumentsById[chain.defeaterReview.argumentId];
-    if ((defeater?.factIds || []).some((factId) => !['true', 'false'].includes(chain.defeaterReview.factResponses?.[factId]))) {
+    const reviewedFactIds = Object.keys(chain.defeaterReview.factResponses || {});
+    if (!defeater
+      || chain.defeaterReview.bridgeClaimId !== defeater.bridgeClaimId
+      || reviewedFactIds.length !== defeater.factIds.length
+      || !defeater.factIds.every((factId) => reviewedFactIds.includes(factId))) {
+      reasons.push('最强反方理由引用了当前题库无法解析的结构。');
+    } else if (defeater.factIds.some((factId) => !['true', 'false'].includes(chain.defeaterReview.factResponses?.[factId]))) {
       reasons.push('最强反方理由仍有事实前提未判断。');
     }
     if (!['accept', 'reject'].includes(chain.defeaterReview.bridgeResponse)) {
       reasons.push('最强反方理由的判断依据仍未决定。');
+    }
+    if (defeater) {
+      const established = defeater.factIds.every((factId) => chain.defeaterReview.factResponses?.[factId] === 'true')
+        && chain.defeaterReview.bridgeResponse === 'accept';
+      const effect = chain.defeaterReview.effect || chain.defeaterReview.impact;
+      if (effect === 'none_accepted'
+        || (established && effect === 'reject')
+        || (!established && ['supplement', 'weaken', 'offset', 'outweigh'].includes(effect))) {
+        reasons.push('最强反方理由是否成立与复核结果不一致。');
+      }
     }
   }
   if (['weaken', 'offset', 'outweigh'].includes(chain?.defeaterReview?.effect || chain?.defeaterReview?.impact)) {
@@ -140,6 +192,7 @@ export const buildContributionPackage = (state, chain) => {
   const eligibility = contributionEligibility(state, chain);
   if (!eligibility.eligible) return { ok: false, reasons: eligibility.reasons };
   const finalIndex = chain.steps.length - 1;
+  const formalizedSteps = chain.steps.filter((step) => argumentsById[step.argumentId]?.formalization).length;
   const value = {
     schema: CONTRIBUTION_SCHEMA,
     version: CONTRIBUTION_VERSION,
@@ -149,6 +202,11 @@ export const buildContributionPackage = (state, chain) => {
     checks: {
       noUnresolvedConflicts: true,
       noModelGaps: true,
+      formalValidationVersion: ARGLOGIC_VERSION,
+      noFormalErrors: true,
+      formalizationCoverage: formalizedSteps === chain.steps.length
+        ? 'complete'
+        : formalizedSteps ? 'partial' : 'none',
     },
     argument: {
       direction: ['support', 'oppose'].includes(chain.direction) ? chain.direction : 'undirected',

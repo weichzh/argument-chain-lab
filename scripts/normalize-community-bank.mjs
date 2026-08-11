@@ -20,12 +20,12 @@ async function main() {
   const seen = new Set();
   const entries = [];
   for (const [index, entry] of bank.entries.entries()) {
-    const normalized = normalizeContributionPackage(entry.contribution);
+    const normalized = normalizeContributionPackage(entry.contribution, { allowLegacy: true });
     if (!normalized.ok) throw new Error(`Entry ${index} is invalid: ${JSON.stringify(normalized.issues)}`);
     if (findSensitiveContent(normalized.value).length) {
       throw new Error(`Entry ${index} contains sensitive content.`);
     }
-    const hash = await hashContributionPackage(normalized.value);
+    const hash = await hashContributionPackage(normalized.value, { allowLegacy: true });
     if (!hash.ok) throw new Error(`Entry ${index} cannot be hashed.`);
     if (seen.has(hash.value)) throw new Error(`Entry ${index} duplicates another contribution.`);
     seen.add(hash.value);

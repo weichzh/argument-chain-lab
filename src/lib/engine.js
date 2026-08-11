@@ -6,12 +6,14 @@ import {
   claims,
   dilemmas,
   facts,
+  formalCertificates,
   getArgumentsForClaim,
   getPolicy,
   getPolicyElements,
   getRelevantDilemmas,
   policies,
 } from '../data/model.js';
+import { evaluateFormalCheck } from './formalValidator.js';
 import { selectNextAdaptivePolicy } from './ideology.js';
 
 const uid = (prefix = 'id') => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -46,9 +48,10 @@ export const PHASES = Object.freeze({
 
 export const createInitialState = () => ({
   modelVersion: MODEL_META.version,
-  storageVersion: 6,
+  storageVersion: 7,
   assessmentMode: assessmentModes.default || 'real_world_belief',
   adaptiveMode: false,
+  migrationNotice: null,
   phase: PHASES.LANDING,
   entryPath: null,
   sessionOverlay: {
@@ -167,6 +170,25 @@ const responseSummary = (responses) => {
   };
 };
 
+const formalCheckFor = (argument, factResponses, bridgeResponse) => evaluateFormalCheck(
+  formalCertificates[argument?.id],
+  argument?.formalization,
+  factResponses,
+  bridgeResponse,
+);
+
+const refreshFormalChecks = (chain) => ({
+  ...chain,
+  steps: (chain.steps || []).map((step) => ({
+    ...step,
+    formalCheck: formalCheckFor(
+      argumentsById[step.argumentId],
+      step.factResponses,
+      step.bridgeResponse,
+    ),
+  })),
+});
+
 const classifyChain = (chain) => {
   if (!chain?.terminal || chain.terminal.status !== 'provisional_fixed_point') return 'unresolved';
   if (!chain.stress) return 'unresolved';
@@ -191,9 +213,10 @@ const matchingStatusFor = (chain, status = chain?.status) => {
 };
 
 const classifyStoredChain = (chain) => {
-  const status = classifyChain(chain);
+  const checked = refreshFormalChecks(chain);
+  const status = classifyChain(checked);
   return {
-    ...chain,
+    ...checked,
     status,
     argumentClosure: status === 'complete' ? 'closed' : status,
     matchingStatus: matchingStatusFor(chain, status),
@@ -287,6 +310,16 @@ const priorResponses = (state, kind, propositionId) => {
     }
     if (kind === 'bridge' && step.bridgeClaimId === propositionId) found.add(step.bridgeResponse);
   });
+  const visitDefeater = (chain) => {
+    const review = chain?.defeaterReview;
+    if (!review) return;
+    if (kind === 'fact' && Object.hasOwn(review.factResponses || {}, propositionId)) {
+      found.add(review.factResponses[propositionId]);
+    }
+    if (kind === 'bridge' && review.bridgeClaimId === propositionId) found.add(review.bridgeResponse);
+  };
+  Object.values(state.records).forEach((record) => record.chains.forEach(visitDefeater));
+  visitDefeater(state.currentChain);
   return [...found];
 };
 
@@ -310,23 +343,66 @@ const replacePriorResponses = (state, kind, propositionId, response, conflictId)
     return step;
   };
 
+  const replaceDefeater = (chain) => {
+    const review = chain.defeaterReview;
+    if (!review) return { chain, changed: false };
+    const changesFact = kind === 'fact' && Object.hasOwn(review.factResponses || {}, propositionId);
+    const changesBridge = kind === 'bridge' && review.bridgeClaimId === propositionId;
+    if (!changesFact && !changesBridge) return { chain, changed: false };
+    const revised = {
+      ...review,
+      factResponses: changesFact
+        ? { ...review.factResponses, [propositionId]: response }
+        : review.factResponses,
+      bridgeResponse: changesBridge ? response : review.bridgeResponse,
+    };
+    const argument = argumentsById[review.argumentId];
+    const established = Boolean(argument)
+      && argument.factIds.every((factId) => revised.factResponses?.[factId] === 'true')
+      && revised.bridgeResponse === 'accept';
+    if (established && (revised.effect || revised.impact) === 'reject') {
+      return {
+        chain: { ...chain, defeaterReview: null },
+        changed: true,
+        stanceAfter: revised.stanceBefore,
+      };
+    }
+    if (!established && !['reject', 'none_accepted'].includes(revised.effect || revised.impact)) {
+      revised.accepted = false;
+      revised.effect = 'reject';
+      revised.stanceAfter = revised.stanceBefore;
+    }
+    return {
+      chain: { ...chain, defeaterReview: revised },
+      changed: true,
+      stanceAfter: revised.stanceAfter,
+    };
+  };
+
   const records = Object.fromEntries(Object.entries(state.records).map(([policyId, record]) => {
+    let revisedStance = null;
     const chains = record.chains.map((chain) => {
       const affected = chain.steps.some((step) => (
         kind === 'fact'
           ? Object.prototype.hasOwnProperty.call(step.factResponses || {}, propositionId)
           : step.bridgeClaimId === propositionId
       ));
-      if (affected) affectedChainIds.add(chain.id);
-      const revised = { ...chain, steps: chain.steps.map(replaceStep) };
+      const defeater = replaceDefeater(chain);
+      if (affected || defeater.changed) affectedChainIds.add(chain.id);
+      if (defeater.changed) revisedStance = defeater.stanceAfter;
+      const revised = { ...defeater.chain, steps: chain.steps.map(replaceStep) };
       return classifyStoredChain(revised);
     });
-    return [policyId, summarizeRecord(record, chains)];
+    const nextRecord = revisedStance
+      ? { ...record, stance: revisedStance, packageStanceAfterDefeater: revisedStance }
+      : record;
+    return [policyId, summarizeRecord(nextRecord, chains)];
   }));
 
-  const currentChain = state.currentChain
-    ? { ...state.currentChain, steps: state.currentChain.steps.map(replaceStep) }
-    : state.currentChain;
+  const currentDefeater = state.currentChain ? replaceDefeater(state.currentChain).chain : state.currentChain;
+  const currentChain = currentDefeater
+    ? { ...currentDefeater, steps: currentDefeater.steps.map(replaceStep) }
+    : currentDefeater;
 
   const compatible = applyCompatibility(records, currentChain);
   return {
@@ -370,6 +446,7 @@ const applyBridgeAnswer = (state, response) => {
     factSensitivity: state.pendingFactSensitivity,
     bridgeClaimId: argument.bridgeClaimId,
     bridgeResponse: response,
+    formalCheck: formalCheckFor(argument, state.pendingFactResponses, response),
     assessmentMode: state.assessmentMode,
     createdAt: now(),
   };
@@ -394,6 +471,30 @@ const applyBridgeAnswer = (state, response) => {
     updatedAt: now(),
   };
 };
+
+const applyDefeaterFactAnswer = (state, response) => {
+  const argument = argumentsById[state.pendingDefeaterArgumentId];
+  const factId = argument?.factIds?.[state.pendingDefeaterFactIndex];
+  if (!argument || !factId) return state;
+  const nextIndex = state.pendingDefeaterFactIndex + 1;
+  return {
+    ...state,
+    pendingDefeaterFactIndex: nextIndex,
+    pendingDefeaterFactResponses: {
+      ...state.pendingDefeaterFactResponses,
+      [factId]: response,
+    },
+    phase: nextIndex >= argument.factIds.length ? PHASES.DEFEATER_BRIDGE : PHASES.DEFEATER_FACT,
+    updatedAt: now(),
+  };
+};
+
+const applyDefeaterBridgeAnswer = (state, response) => ({
+  ...state,
+  pendingDefeaterBridgeResponse: response,
+  phase: PHASES.DEFEATER_IMPACT,
+  updatedAt: now(),
+});
 
 const finalizeCurrentChain = (state, stress) => {
   const policy = policies[state.policyIndex];
@@ -692,7 +793,7 @@ export const reducer = (state, action) => {
     case 'OPEN_POLICY': {
       const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
       if (policyIndex < 0) return state;
-      return openPolicy(state, policyIndex);
+      return openPolicy({ ...state, migrationNotice: null }, policyIndex);
     }
 
     case 'EXIT_TO_LANDING': {
@@ -921,6 +1022,7 @@ export const reducer = (state, action) => {
           ...state,
           pendingConflict: {
             id: uid('conflict'),
+            context: 'main_fact',
             kind: 'fact',
             propositionId: factId,
             previousResponses,
@@ -981,6 +1083,7 @@ export const reducer = (state, action) => {
           ...state,
           pendingConflict: {
             id: uid('conflict'),
+            context: 'main_bridge',
             kind: 'bridge',
             propositionId: bridgeClaimId,
             previousResponses,
@@ -1020,15 +1123,20 @@ export const reducer = (state, action) => {
           propositionId: conflict.propositionId,
           createdAt: now(),
         };
-        next = {
-          ...next,
-          currentChain: next.currentChain
-            ? {
-                ...next.currentChain,
-                scopeConflicts: [...(next.currentChain.scopeConflicts || []), marker],
-              }
-            : next.currentChain,
-        };
+        if (next.currentChain) {
+          next = {
+            ...next,
+            currentChain: {
+              ...next.currentChain,
+              scopeConflicts: [...(next.currentChain.scopeConflicts || []), marker],
+            },
+          };
+        } else if (conflict.chainId) {
+          next = updateStoredChain(next, conflict.chainId, (chain) => ({
+            ...chain,
+            scopeConflicts: [...(chain.scopeConflicts || []), marker],
+          }));
+        }
       } else {
         return state;
       }
@@ -1045,9 +1153,9 @@ export const reducer = (state, action) => {
         updatedAt: now(),
       };
 
-      return conflict.kind === 'fact'
-        ? applyFactAnswer(next, answer)
-        : applyBridgeAnswer(next, answer);
+      if (conflict.context === 'defeater_fact') return applyDefeaterFactAnswer(next, answer);
+      if (conflict.context === 'defeater_bridge') return applyDefeaterBridgeAnswer(next, answer);
+      return conflict.kind === 'fact' ? applyFactAnswer(next, answer) : applyBridgeAnswer(next, answer);
     }
 
     case 'SET_DEPTH': {
@@ -1243,28 +1351,52 @@ export const reducer = (state, action) => {
       const argument = argumentsById[state.pendingDefeaterArgumentId];
       const factId = argument?.factIds?.[state.pendingDefeaterFactIndex];
       if (!argument || !factId) return state;
-      const nextIndex = state.pendingDefeaterFactIndex + 1;
-      return {
-        ...state,
-        pendingDefeaterFactIndex: nextIndex,
-        pendingDefeaterFactResponses: {
-          ...state.pendingDefeaterFactResponses,
-          [factId]: action.response,
-        },
-        phase: nextIndex >= argument.factIds.length ? PHASES.DEFEATER_BRIDGE : PHASES.DEFEATER_FACT,
-        updatedAt: now(),
-      };
+      const previousResponses = priorResponses(state, 'fact', factId);
+      if (isDecisiveConflict('fact', previousResponses, action.response)) {
+        return {
+          ...state,
+          pendingConflict: {
+            id: uid('conflict'),
+            context: 'defeater_fact',
+            kind: 'fact',
+            propositionId: factId,
+            previousResponses,
+            attemptedResponse: action.response,
+            policyId: policies[state.policyIndex]?.id || null,
+            chainId: state.selectedChainId,
+            createdAt: now(),
+          },
+          phase: PHASES.CONFLICT,
+          updatedAt: now(),
+        };
+      }
+      return applyDefeaterFactAnswer(state, action.response);
     }
 
     case 'ANSWER_DEFEATER_BRIDGE': {
       if (!['accept', 'reject', 'uncertain'].includes(action.response)) return state;
-      if (!argumentsById[state.pendingDefeaterArgumentId]) return state;
-      return {
-        ...state,
-        pendingDefeaterBridgeResponse: action.response,
-        phase: PHASES.DEFEATER_IMPACT,
-        updatedAt: now(),
-      };
+      const argument = argumentsById[state.pendingDefeaterArgumentId];
+      if (!argument) return state;
+      const previousResponses = priorResponses(state, 'bridge', argument.bridgeClaimId);
+      if (isDecisiveConflict('bridge', previousResponses, action.response)) {
+        return {
+          ...state,
+          pendingConflict: {
+            id: uid('conflict'),
+            context: 'defeater_bridge',
+            kind: 'bridge',
+            propositionId: argument.bridgeClaimId,
+            previousResponses,
+            attemptedResponse: action.response,
+            policyId: policies[state.policyIndex]?.id || null,
+            chainId: state.selectedChainId,
+            createdAt: now(),
+          },
+          phase: PHASES.CONFLICT,
+          updatedAt: now(),
+        };
+      }
+      return applyDefeaterBridgeAnswer(state, action.response);
     }
 
     case 'NO_DEFEATER_ACCEPTED': {
@@ -1304,6 +1436,7 @@ export const reducer = (state, action) => {
       const argument = argumentsById[state.pendingDefeaterArgumentId];
       if (!argument) return state;
       const premisesAccepted = argument.factIds.every((factId) => state.pendingDefeaterFactResponses[factId] === 'true');
+      if (effect === 'reject' && premisesAccepted && state.pendingDefeaterBridgeResponse === 'accept') return state;
       if (effect !== 'reject' && (!premisesAccepted || state.pendingDefeaterBridgeResponse !== 'accept')) return state;
       const selectedChain = Object.values(state.records).flatMap((record) => record.chains || [])
         .find((chain) => chain.id === state.selectedChainId);
@@ -1540,18 +1673,103 @@ export const reducer = (state, action) => {
 };
 
 export const migrateSavedState = (state) => {
-  if (![4, 5, 6].includes(state?.storageVersion)) return null;
-  if (!['0.7.0', '0.7.1', '0.8.0', MODEL_META.version].includes(state.modelVersion)) return null;
+  if (![4, 5, 6, 7].includes(state?.storageVersion)) return null;
+  if (!['0.7.0', '0.7.1', '0.8.0', '0.8.1', MODEL_META.version].includes(state.modelVersion)) return null;
   const legacyRealWorld = state.modelVersion === '0.7.0';
+  const upgrading = state.modelVersion !== MODEL_META.version;
+  const revisedIds = new Set([
+    'speech_no_equal_alternative',
+    'surveillance_no_equal_targeted_method',
+    'carbon_no_equal_alternative',
+    'punishment_desert_scenario_scope',
+    'speech_support',
+    'surveillance_support',
+    'income_support',
+    'carbon_support',
+    'workplace_cogovernance_support',
+    'education_opportunity_support',
+    'emergency_powers_support',
+    'equal_citizenship_ancestry_support',
+    'prevent_severe_harm',
+    'speech_correction_oppose',
+    'punishment_desert_support_internalize_enterprise_created_risk_2',
+    'expert_referendum_veto_support_preserve_error_correction_2',
+    'minimum_social_insurance_oppose_protect_local_land_autonomy_3',
+    'natural_monopoly_ownership_oppose_protect_local_land_autonomy_3',
+    'parental_education_exemption_support_protect_local_land_autonomy_3',
+  ]);
+  const invalidatedChainIds = new Set();
+  const invalidatedDefeaterChainIds = new Set();
+  const migrationArguments = { ...argumentsById, ...(state.sessionOverlay?.arguments || {}) };
+  const migrationClaims = { ...claims, ...(state.sessionOverlay?.claims || {}) };
+  let invalidatedProgress = false;
+  const referencesRevision = (value) => upgrading && revisedIds.has(value);
   const legacyDefeaterEffect = {
     unchanged: 'supplement',
     weakened: 'offset',
     reversed: 'outweigh',
     rejected: 'reject',
   };
+  const chainCompatible = (chain) => {
+    if ([chain?.targetClaimId, chain?.terminal?.claimId].some(referencesRevision)) return false;
+    if (chain?.targetClaimId && !migrationClaims[chain.targetClaimId]) return false;
+    if (chain?.terminal?.claimId && !migrationClaims[chain.terminal.claimId]) return false;
+    return (chain?.steps || []).every((step) => {
+      const argument = migrationArguments[step.argumentId];
+      const factIds = Object.keys(step.factResponses || {});
+      return argument
+        && ![step.argumentId, step.targetClaimId, step.bridgeClaimId, ...factIds].some(referencesRevision)
+        && step.targetClaimId === argument.targetClaimId
+        && step.bridgeClaimId === argument.bridgeClaimId
+        && factIds.length === argument.factIds.length
+        && argument.factIds.every((factId) => factIds.includes(factId));
+    });
+  };
+  const defeaterReviewCompatible = (review) => {
+    if (!review) return true;
+    const effect = legacyDefeaterEffect[review.effect || review.impact] || review.effect || review.impact;
+    if (!review.argumentId) return effect === 'none_accepted';
+    const argument = migrationArguments[review.argumentId];
+    const factIds = Object.keys(review.factResponses || {});
+    if (!argument
+      || [review.argumentId, review.bridgeClaimId, ...factIds].some(referencesRevision)
+      || review.bridgeClaimId !== argument.bridgeClaimId
+      || factIds.length !== argument.factIds.length
+      || !argument.factIds.every((factId) => factIds.includes(factId))) return false;
+    const established = argument.factIds.every((factId) => review.factResponses[factId] === 'true')
+      && review.bridgeResponse === 'accept';
+    if (effect === 'reject') return !established;
+    return established && ['supplement', 'weaken', 'offset', 'outweigh'].includes(effect);
+  };
+  const flowCompatible = (flow, migratedChain = flow?.currentChain) => {
+    if (!flow) return true;
+    if (flow.currentChain && !migratedChain) return false;
+    if (flow.selectedChainId && invalidatedChainIds.has(flow.selectedChainId)) return false;
+    const references = [
+      flow.currentTargetClaimId,
+      flow.currentArgumentId,
+      flow.pendingDefeaterArgumentId,
+      flow.pendingConflict?.propositionId,
+      ...Object.keys(flow.pendingFactResponses || {}),
+      ...Object.keys(flow.pendingDefeaterFactResponses || {}),
+    ];
+    if (references.some(referencesRevision)) return false;
+    if (flow.currentArgumentId && !migrationArguments[flow.currentArgumentId]) return false;
+    if (flow.pendingDefeaterArgumentId && !migrationArguments[flow.pendingDefeaterArgumentId]) return false;
+    return true;
+  };
   const migrateChain = (chain) => {
     if (!chain) return chain;
-    const review = chain.defeaterReview
+    if (!chainCompatible(chain)) {
+      if (chain.id) invalidatedChainIds.add(chain.id);
+      return null;
+    }
+    const keepReview = defeaterReviewCompatible(chain.defeaterReview);
+    if (chain.defeaterReview && !keepReview) {
+      invalidatedProgress = true;
+      if (chain.id) invalidatedDefeaterChainIds.add(chain.id);
+    }
+    const review = keepReview && chain.defeaterReview
       ? {
           ...chain.defeaterReview,
           effect: legacyDefeaterEffect[chain.defeaterReview.effect || chain.defeaterReview.impact]
@@ -1574,7 +1792,7 @@ export const migrateSavedState = (state) => {
     return revised.completedAt ? classifyStoredChain(revised) : revised;
   };
   const records = Object.fromEntries(Object.entries(state.records || {}).map(([policyId, record]) => {
-    const chains = (record.chains || []).map(migrateChain);
+    const chains = (record.chains || []).map(migrateChain).filter(Boolean);
     const policy = getPolicy(policyId);
     const legacyPositions = record.componentPositions || {};
     const migratedResponses = {
@@ -1593,16 +1811,22 @@ export const migrateSavedState = (state) => {
           : value;
     });
     const { componentPositions: _componentPositions, postDefeaterStance, ...recordWithoutLegacy } = record;
+    const migratedDraftChain = migrateChain(record.draft?.currentChain);
+    const keepDraft = record.draft && flowCompatible(record.draft, migratedDraftChain);
+    if (record.draft && !keepDraft) invalidatedProgress = true;
+    const reviewInvalidated = [...(record.chains || []), record.draft?.currentChain]
+      .some((chain) => invalidatedDefeaterChainIds.has(chain?.id));
+    const stanceBeforeDefeater = record.packageStanceBeforeDefeater || record.direction || record.stance || null;
     const migratedRecord = {
       ...ensurePolicyRecord({ records: {} }, policyId),
       ...recordWithoutLegacy,
       ...migratedResponses,
       elementNotes: record.elementNotes || {},
       chains,
-      draft: record.draft
+      draft: keepDraft
         ? {
             ...record.draft,
-            currentChain: migrateChain(record.draft.currentChain),
+            currentChain: migratedDraftChain,
             pendingFactSensitivity: record.draft.pendingFactSensitivity || {},
             pendingSensitivity: record.draft.pendingSensitivity || null,
             pendingCustomStressTest: record.draft.pendingCustomStressTest || null,
@@ -1615,7 +1839,10 @@ export const migrateSavedState = (state) => {
       componentTradeoffs: record.componentTradeoffs || {},
       packageConflict: Boolean(record.packageConflict),
       packageStanceBeforeDefeater: record.packageStanceBeforeDefeater || record.direction || record.stance || null,
-      packageStanceAfterDefeater: record.packageStanceAfterDefeater || postDefeaterStance || null,
+      packageStanceAfterDefeater: reviewInvalidated
+        ? stanceBeforeDefeater
+        : record.packageStanceAfterDefeater || postDefeaterStance || null,
+      stance: reviewInvalidated ? stanceBeforeDefeater : record.stance,
     };
     return [policyId, summarizeRecord(migratedRecord, chains)];
   }));
@@ -1628,37 +1855,60 @@ export const migrateSavedState = (state) => {
   };
 
   const migratedCurrent = migrateChain(state.currentChain);
+  const keepCurrentFlow = flowCompatible(state, migratedCurrent);
+  if (!keepCurrentFlow && (state.currentChain || state.currentArgumentId || state.pendingDefeaterArgumentId)) {
+    invalidatedProgress = true;
+  }
+  const invalidatedOldWork = invalidatedProgress || invalidatedChainIds.size > 0;
   const duplicateCompleted = migratedCurrent?.completedAt && Object.values(records)
     .some((record) => record.chains.some((chain) => chain.id === migratedCurrent.id));
   const compatible = applyCompatibility(records, duplicateCompleted ? null : migratedCurrent);
   return {
     ...createInitialState(),
     ...state,
-    storageVersion: 6,
+    storageVersion: 7,
     modelVersion: MODEL_META.version,
     assessmentMode: legacyRealWorld
       ? 'real_world_belief'
       : isAssessmentMode(state.assessmentMode) ? state.assessmentMode : assessmentModes.default || 'real_world_belief',
+    migrationNotice: invalidatedOldWork
+      ? '题库中的部分命题含义已更新；相关旧版理由链需要重新核对，其他回答已保留。'
+      : null,
     sessionOverlay,
     records: compatible.records,
-    currentChain: compatible.currentChain,
-    selectedChainId: duplicateCompleted ? migratedCurrent.id : state.selectedChainId || null,
-    fixedPointEvents: (state.fixedPointEvents || []).map((event) => ({
+    currentChain: keepCurrentFlow ? compatible.currentChain : null,
+    selectedChainId: keepCurrentFlow
+      ? duplicateCompleted ? migratedCurrent.id : state.selectedChainId || null
+      : null,
+    currentTargetClaimId: keepCurrentFlow ? state.currentTargetClaimId : null,
+    currentArgumentId: keepCurrentFlow ? state.currentArgumentId : null,
+    currentFactIndex: keepCurrentFlow ? state.currentFactIndex || 0 : 0,
+    pendingFactResponses: keepCurrentFlow ? state.pendingFactResponses || {} : {},
+    pendingConflict: keepCurrentFlow ? state.pendingConflict || null : null,
+    breakReason: keepCurrentFlow ? state.breakReason || null : null,
+    fixedPointEvents: (state.fixedPointEvents || []).filter((event) => (
+      !invalidatedChainIds.has(event.chainId)
+    )).map((event) => ({
       ...event,
       lifecycle: event.lifecycle || 'active',
       invalidatedByConflictId: event.invalidatedByConflictId || null,
     })),
-    pendingFactSensitivity: state.pendingFactSensitivity || {},
-    pendingSensitivity: state.pendingSensitivity || null,
-    pendingCustomStressTest: state.pendingCustomStressTest || null,
-    pendingDefeaterArgumentId: state.pendingDefeaterArgumentId || null,
-    pendingDefeaterFactIndex: state.storageVersion === 6 ? state.pendingDefeaterFactIndex || 0 : 0,
-    pendingDefeaterFactResponses: state.storageVersion === 6 ? state.pendingDefeaterFactResponses || {} : {},
-    pendingDefeaterBridgeResponse: state.storageVersion === 6 ? state.pendingDefeaterBridgeResponse || null : null,
-    phase: state.storageVersion < 6 && state.phase === PHASES.DEFEATER_IMPACT && state.pendingDefeaterArgumentId
-      ? PHASES.DEFEATER_FACT
-      : state.phase,
-    dilemmaSensitivity: state.dilemmaSensitivity || null,
+    pendingFactSensitivity: keepCurrentFlow ? state.pendingFactSensitivity || {} : {},
+    pendingSensitivity: keepCurrentFlow ? state.pendingSensitivity || null : null,
+    pendingCustomStressTest: keepCurrentFlow ? state.pendingCustomStressTest || null : null,
+    pendingDefeaterArgumentId: keepCurrentFlow ? state.pendingDefeaterArgumentId || null : null,
+    pendingDefeaterFactIndex: keepCurrentFlow && state.storageVersion >= 6 ? state.pendingDefeaterFactIndex || 0 : 0,
+    pendingDefeaterFactResponses: keepCurrentFlow && state.storageVersion >= 6 ? state.pendingDefeaterFactResponses || {} : {},
+    pendingDefeaterBridgeResponse: keepCurrentFlow && state.storageVersion >= 6 ? state.pendingDefeaterBridgeResponse || null : null,
+    phase: !keepCurrentFlow
+      ? state.startedAt ? PHASES.POLICY_OVERVIEW : PHASES.LANDING
+      : state.storageVersion < 6 && state.phase === PHASES.DEFEATER_IMPACT && state.pendingDefeaterArgumentId
+        ? PHASES.DEFEATER_FACT
+        : state.phase,
+    dilemmaQueue: invalidatedOldWork ? [] : state.dilemmaQueue || [],
+    dilemmaIndex: invalidatedOldWork ? 0 : state.dilemmaIndex || 0,
+    dilemmaResponses: invalidatedOldWork ? {} : state.dilemmaResponses || {},
+    dilemmaSensitivity: invalidatedOldWork ? null : state.dilemmaSensitivity || null,
   };
 };
 

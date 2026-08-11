@@ -23,6 +23,9 @@ export const validateBankManifest = (manifest) => {
   }
   const selected = manifest.models.find((item) => item.version === manifest.current);
   if (!selected?.path) throw new Error('题库清单没有当前版本文件。');
+  if (Boolean(selected.formalSchema) !== Boolean(selected.formalSchemes)) {
+    throw new Error('题库清单的形式语言 schema 与方案目录必须同时提供。');
+  }
   return selected;
 };
 
@@ -162,10 +165,13 @@ export const loadFormalBank = async () => {
   const modelUrl = new URL(selected.path, manifestUrl).toString();
   const extensionEntries = Array.isArray(manifest.extensions) ? manifest.extensions : [];
 
-  const [model, benchmarks, extensionFiles] = await Promise.all([
+  const [model, benchmarks, arglogicCatalog, extensionFiles] = await Promise.all([
     fetchJson(modelUrl),
     selected.benchmarks
       ? fetchJson(new URL(selected.benchmarks, manifestUrl).toString())
+      : Promise.resolve(null),
+    selected.formalSchemes
+      ? fetchJson(new URL(selected.formalSchemes, manifestUrl).toString())
       : Promise.resolve(null),
     Promise.all(extensionEntries.map(async (entry) => {
       const extensionUrl = new URL(entry.path, manifestUrl).toString();
@@ -176,6 +182,7 @@ export const loadFormalBank = async () => {
   const extension = extensionFiles.reduce(mergeExtension, emptyExtension());
   const mergedModel = {
     ...model,
+    arglogicCatalog,
     ideologyBenchmarks: benchmarks || { profiles: [] },
     facts: { ...model.facts, ...extension.facts },
     claims: { ...model.claims, ...extension.claims },

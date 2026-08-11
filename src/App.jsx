@@ -267,6 +267,8 @@ function ReadyApp({ bankManifest }) {
         </div>
       ) : null}
 
+      {state.migrationNotice ? <p className="migration-notice" role="status">{state.migrationNotice}</p> : null}
+
       {state.phase === PHASES.LANDING ? (
         <Landing
           aiLoading={aiStatus.loading}

@@ -1,3 +1,5 @@
+import { validateArgument } from '../lib/formalValidator.js';
+
 const EMPTY_MODEL_META = Object.freeze({
   id: 'argument-chain-bank',
   version: 'unloaded',
@@ -27,6 +29,9 @@ export let sources = [];
 export let assessmentModes = { default: 'real_world_belief' };
 export let ideologyBenchmarks = { profiles: [] };
 export let adaptiveAssessment = {};
+export let arglogicCatalog = null;
+export let formalEntities = {};
+export let formalCertificates = {};
 
 export const POLICY_ELEMENT_GROUPS = Object.freeze({
   scenario_condition: 'scenarioConditions',
@@ -56,6 +61,10 @@ export const validateFormalModel = (model) => {
   assertRecord(model.facts, 'facts');
   assertRecord(model.claims, 'claims');
   assertRecord(model.arguments, 'arguments');
+  if (Object.values(model.arguments).some((argument) => argument.formalization)) {
+    assertRecord(model.formalEntities, 'formalEntities');
+    assertRecord(model.arglogicCatalog, 'arglogicCatalog');
+  }
   assertArray(model.policies, 'policies');
   model.policies.forEach((policy) => {
     if (policy.origin === 'community' || policy.origin === 'session_overlay') return;
@@ -122,6 +131,16 @@ const applyModel = () => {
   assessmentModes = formalModel.assessmentModes || { default: 'real_world_belief' };
   ideologyBenchmarks = formalModel.ideologyBenchmarks || { profiles: [] };
   adaptiveAssessment = formalModel.adaptiveAssessment || {};
+  arglogicCatalog = formalModel.arglogicCatalog || null;
+  formalEntities = formalModel.formalEntities || {};
+  formalCertificates = arglogicCatalog
+    ? Object.fromEntries(Object.values(formalModel.arguments)
+      .filter((argument) => argument.formalization)
+      .map((argument) => [
+        argument.id,
+        validateArgument(argument.formalization, { entities: formalEntities }, arglogicCatalog),
+      ]))
+    : {};
 };
 
 export const configureFormalModel = (model, overlay = EMPTY_OVERLAY) => {
@@ -154,6 +173,9 @@ export const getModelSnapshot = () => ({
   assessmentModes,
   ideologyBenchmarks,
   adaptiveAssessment,
+  arglogicCatalog,
+  formalEntities,
+  formalCertificates,
 });
 
 export const getArgumentsForClaim = (claimId) =>

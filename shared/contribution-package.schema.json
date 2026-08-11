@@ -7,7 +7,7 @@
   "required": ["schema", "version", "bankVersion", "consentVersion", "status", "checks", "argument"],
   "properties": {
     "schema": { "const": "argument-chain-contribution" },
-    "version": { "const": 2 },
+    "version": { "const": 3 },
     "bankVersion": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
     "consentVersion": { "const": 1 },
     "status": { "const": "complete" },
@@ -66,10 +66,13 @@
     "checks": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["noUnresolvedConflicts", "noModelGaps"],
+      "required": ["noUnresolvedConflicts", "noModelGaps", "formalValidationVersion", "noFormalErrors", "formalizationCoverage"],
       "properties": {
         "noUnresolvedConflicts": { "const": true },
-        "noModelGaps": { "const": true }
+        "noModelGaps": { "const": true },
+        "formalValidationVersion": { "const": "arglogic-0.1" },
+        "noFormalErrors": { "const": true },
+        "formalizationCoverage": { "enum": ["complete", "partial", "none"] }
       }
     },
     "argument": {

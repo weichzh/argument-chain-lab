@@ -244,7 +244,9 @@ const usedAsBridge = new Set(Object.values(argumentsById).map((argument) => argu
 const targeted = new Set(Object.values(argumentsById).map((argument) => argument.targetClaimId));
 for (const claim of Object.values(claims)) {
   if (claim.kind !== 'policy' && !usedAsBridge.has(claim.id)) warnings.push(`Normative claim ${claim.id} is never used as a bridge.`);
-  if (claim.kind === 'bridge' && !targeted.has(claim.id)) warnings.push(`Bridge ${claim.id} has no deeper justification path.`);
+  if (claim.kind === 'bridge' && !targeted.has(claim.id) && !claim.stressTest) {
+    warnings.push(`Bridge ${claim.id} has no deeper justification path or stress test.`);
+  }
 }
 
 if (failures.length) {

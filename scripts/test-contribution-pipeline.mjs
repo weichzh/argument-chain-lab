@@ -16,6 +16,14 @@ import { handleRequest } from '../worker/src/index.js';
 const root = path.resolve(import.meta.dirname, '..');
 const fixture = JSON.parse(await readFile(path.join(root, 'shared/fixtures/minimal-complete-contribution.json'), 'utf8'));
 const clone = (value) => structuredClone(value);
+const asLegacyContribution = (value) => {
+  const legacy = clone(value);
+  legacy.version = 2;
+  delete legacy.checks.formalValidationVersion;
+  delete legacy.checks.noFormalErrors;
+  delete legacy.checks.formalizationCoverage;
+  return legacy;
+};
 
 function expectIssue(value, code) {
   const result = validateContributionPackage(value);
@@ -53,6 +61,15 @@ async function testContract() {
   const conflict = clone(fixture);
   conflict.checks.noUnresolvedConflicts = false;
   expectIssue(conflict, 'invalid_value');
+
+  const invalidCoverage = clone(fixture);
+  invalidCoverage.checks.formalizationCoverage = 'claimed_complete';
+  expectIssue(invalidCoverage, 'invalid_value');
+
+  const legacy = asLegacyContribution(fixture);
+  assert.equal(validateContributionPackage(legacy).ok, false, 'The live endpoint must not accept new legacy packages.');
+  assert.deepEqual(validateContributionPackage(legacy, { allowLegacy: true }), { ok: true, issues: [] });
+  assert.equal((await hashContributionPackage(legacy, { allowLegacy: true })).ok, true);
 
   const hiddenControl = clone(fixture);
   hiddenControl.argument.target.text += '\u202E';
@@ -178,8 +195,8 @@ async function testWorker() {
   assert.deepEqual(await jsonBody(unavailable), { error: { code: 'storage_unavailable' } });
 }
 
-async function makeRecord(contribution) {
-  const hash = await hashContributionPackage(contribution);
+async function makeRecord(contribution, options) {
+  const hash = await hashContributionPackage(contribution, options);
   assert.equal(hash.ok, true);
   return {
     schema: CANDIDATE_RECORD_SCHEMA,
@@ -208,6 +225,11 @@ async function testReviewBatch() {
     await mkdir(validDirectory, { recursive: true });
     await writeFile(path.join(validDirectory, `${valid.contentHash.slice(7)}.json`), JSON.stringify(valid));
 
+    const legacy = await makeRecord(asLegacyContribution(fixture), { allowLegacy: true });
+    const legacyDirectory = path.join(input, legacy.contentHash.slice(7, 9));
+    await mkdir(legacyDirectory, { recursive: true });
+    await writeFile(path.join(legacyDirectory, `${legacy.contentHash.slice(7)}.json`), JSON.stringify(legacy));
+
     const sensitiveContribution = clone(fixture);
     sensitiveContribution.argument.target.text = '请联系 reviewer@example.com';
     sensitiveContribution.argument.steps[0].target.text = sensitiveContribution.argument.target.text;
@@ -233,15 +255,17 @@ async function testReviewBatch() {
 
     const bankValue = JSON.parse(await readFile(bank, 'utf8'));
     assert.equal(validateCommunityBank(bankValue).ok, true);
-    assert.equal(bankValue.entries.length, 1);
-    assert.equal(bankValue.entries[0].contentHash, valid.contentHash);
+    assert.equal(bankValue.entries.length, 2);
+    assert(bankValue.entries.some((entry) => entry.contentHash === valid.contentHash));
+    assert(bankValue.entries.some((entry) => entry.contentHash === legacy.contentHash));
 
     const reportValue = JSON.parse(await readFile(report, 'utf8'));
-    assert.equal(reportValue.proposedCount, 1);
+    assert.equal(reportValue.proposedCount, 2);
     assert.equal(reportValue.rejectedCount, 2);
     assert.equal(JSON.stringify(reportValue).includes('reviewer@example.com'), false);
-    assert.match(await readFile(githubOutput, 'utf8'), /candidate_count=1/);
+    assert.match(await readFile(githubOutput, 'utf8'), /candidate_count=2/);
     assert.match(await readFile(processed, 'utf8'), new RegExp(`candidates/v1/${valid.contentHash.slice(7, 9)}/`));
+    assert.match(await readFile(processed, 'utf8'), new RegExp(`candidates/v1/${legacy.contentHash.slice(7, 9)}/`));
     assert.equal((await readFile(rejected, 'utf8')).trim().split('\n').length, 2);
 
     const secondOutput = path.join(temporaryRoot, 'github-output-second.txt');
@@ -257,7 +281,7 @@ async function testReviewBatch() {
     assert.equal(duplicateRun.status, 0, `${duplicateRun.stdout}\n${duplicateRun.stderr}`);
     const duplicateReport = JSON.parse(await readFile(report, 'utf8'));
     assert.equal(duplicateReport.proposedCount, 0);
-    assert.equal(duplicateReport.duplicateCount, 1);
+    assert.equal(duplicateReport.duplicateCount, 2);
     assert.match(await readFile(secondOutput, 'utf8'), /candidate_count=0/);
 
     const editedBank = JSON.parse(await readFile(bank, 'utf8'));
@@ -271,7 +295,8 @@ async function testReviewBatch() {
     ], { cwd: root, encoding: 'utf8' });
     assert.equal(normalizeRun.status, 0, `${normalizeRun.stdout}\n${normalizeRun.stderr}`);
     const normalizedBank = JSON.parse(await readFile(bank, 'utf8'));
-    const editedHash = await hashContributionPackage(normalizedBank.entries[0].contribution);
+    assert(normalizedBank.entries.some((entry) => entry.contribution.version === 2));
+    const editedHash = await hashContributionPackage(normalizedBank.entries[0].contribution, { allowLegacy: true });
     assert.equal(editedHash.ok, true);
     assert.equal(normalizedBank.entries[0].contentHash, editedHash.value);
     assert.notEqual(normalizedBank.entries[0].contentHash, valid.contentHash);
@@ -286,7 +311,7 @@ async function testCommittedCommunityBank() {
   const validation = validateCommunityBank(bank);
   assert.equal(validation.ok, true, JSON.stringify(validation.issues));
   for (const entry of bank.entries) {
-    const hash = await hashContributionPackage(entry.contribution);
+    const hash = await hashContributionPackage(entry.contribution, { allowLegacy: true });
     assert.equal(hash.ok, true);
     assert.equal(hash.value, entry.contentHash);
     assert.deepEqual(findSensitiveContent(entry.contribution), []);

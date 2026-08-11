@@ -1,13 +1,13 @@
 {
   "name": "argument-atlas-dialogue",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.8.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/validate-model.mjs && node scripts/validate-formal-model.mjs && vite build",
     "preview": "vite preview",
-    "test": "node scripts/test-engine.mjs && node scripts/validate-model.mjs && node scripts/test-ideology.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs",
+    "test": "node scripts/test-engine.mjs && node scripts/test-formal-validator.mjs && node scripts/validate-model.mjs && node scripts/validate-formal-model.mjs && node scripts/test-ideology.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs",
     "test:e2e": "playwright test",
     "export:model": "node scripts/export-model.mjs",
     "dev:worker": "wrangler -c worker/wrangler.jsonc dev",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.0.3",
+    "ajv": "8.20.0",
     "playwright": "1.61.1",
     "vite": "8.1.4",
     "wrangler": "4.110.0"

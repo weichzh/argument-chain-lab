@@ -75,7 +75,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
   assert.equal(state.phase, PHASES.FACT);
   state = answerFact(state, firstFact);
-  state = answerFact(state, 'true');
+  for (const _factId of argumentsById.speech_harm_support.factIds.slice(1)) state = answerFact(state, 'true');
   assert.equal(state.phase, PHASES.BRIDGE);
   state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
   assert.equal(state.phase, PHASES.DEPTH);
@@ -213,6 +213,8 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert.equal(getSelectedChain(state).defeaterReview.effect, 'none_accepted');
   assert.equal(getSelectedChain(state).matchingStatus, 'active');
   assert.equal(getSelectedChain(state).argumentClosure, 'closed');
+  assert(getSelectedChain(state).steps.every((step) => step.formalCheck?.locallyLicensed));
+  assert(getSelectedChain(state).steps.every((step) => step.formalCheck?.evidenceStatus === 'established'));
   assert.equal(state.currentChain, null, 'Completed chains must only live in records.');
 }
 
@@ -300,9 +302,102 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert.equal(migrated.modelVersion, model.meta.version);
   assert.equal(migrated.assessmentMode, 'real_world_belief');
   assert.equal(migrated.currentChain, null);
-  assert.equal(getSelectedChain(migrated).status, 'tension');
-  assert.equal(migrated.records.speech_restriction.hasTension, true);
+  assert.equal(getSelectedChain(migrated), null);
+  assert.equal(migrated.records.speech_restriction.chains.length, 0, 'Changed proposition meanings must invalidate old chains.');
+  assert.equal(migrated.phase, PHASES.POLICY_OVERVIEW);
+  assert.match(migrated.migrationNotice, /重新核对/);
   assert.equal(migrated.sessionOverlay.claims.local_claim_legacy.nominatable, true);
+}
+
+{
+  const migrated = migrateSavedState({
+    ...createInitialState(),
+    modelVersion: '0.8.1',
+    storageVersion: 6,
+    phase: PHASES.ARGUMENT,
+    startedAt: new Date().toISOString(),
+    currentTargetClaimId: 'speech_support',
+    currentChain: {
+      id: 'legacy_empty_chain',
+      policyId: 'speech_restriction',
+      direction: 'support',
+      targetClaimId: 'speech_support',
+      steps: [],
+    },
+  });
+  assert.equal(migrated.currentChain, null, 'A zero-step chain cannot preserve a revised target meaning.');
+  assert.match(migrated.migrationNotice, /重新核对/);
+}
+
+{
+  const argument = argumentsById.majority_morality_law_support_preserve_sacred_moral_continuity_1;
+  const baseChain = {
+    id: 'legacy_defeater_chain',
+    policyId: 'majority_morality_law',
+    direction: 'support',
+    targetClaimId: argument.targetClaimId,
+    steps: [{
+      id: 'legacy_defeater_step',
+      targetClaimId: argument.targetClaimId,
+      argumentId: argument.id,
+      factResponses: Object.fromEntries(argument.factIds.map((factId) => [factId, 'true'])),
+      factSensitivity: {},
+      bridgeClaimId: argument.bridgeClaimId,
+      bridgeResponse: 'accept',
+      assessmentMode: 'real_world_belief',
+    }],
+    terminal: { claimId: argument.bridgeClaimId, status: 'provisional_fixed_point' },
+    stress: { response: 'apply' },
+    scopeConflicts: [],
+    compatibilityIssues: [],
+    status: 'complete',
+    matchingStatus: 'active',
+    completedAt: new Date().toISOString(),
+  };
+  const migrateWithReview = (defeaterReview) => migrateSavedState({
+    ...createInitialState(),
+    modelVersion: '0.8.1',
+    storageVersion: 6,
+    phase: PHASES.RESULTS,
+    startedAt: new Date().toISOString(),
+    selectedChainId: baseChain.id,
+    records: {
+      majority_morality_law: {
+        policyId: 'majority_morality_law',
+        direction: 'support',
+        stance: 'oppose',
+        packageStanceBeforeDefeater: 'support',
+        packageStanceAfterDefeater: 'oppose',
+        chains: [{ ...baseChain, defeaterReview }],
+      },
+    },
+  });
+  const missingArgument = migrateWithReview({
+    argumentId: 'expert_referendum_veto_support_preserve_error_correction_2',
+    factResponses: {},
+    bridgeClaimId: 'preserve_error_correction',
+    bridgeResponse: 'accept',
+    effect: 'outweigh',
+    stanceBefore: 'support',
+    stanceAfter: 'oppose',
+  });
+  assert.equal(getSelectedChain(missingArgument).defeaterReview, null);
+  assert.equal(getSelectedChain(missingArgument).matchingStatus, 'inactive');
+  assert.equal(missingArgument.records.majority_morality_law.stance, 'support');
+  assert.match(missingArgument.migrationNotice, /重新核对/);
+
+  const defeater = argumentsById.majority_morality_law_oppose_protect_adult_moral_autonomy_1;
+  const establishedRejected = migrateWithReview({
+    argumentId: defeater.id,
+    factResponses: Object.fromEntries(defeater.factIds.map((factId) => [factId, 'true'])),
+    bridgeClaimId: defeater.bridgeClaimId,
+    bridgeResponse: 'accept',
+    effect: 'reject',
+    stanceBefore: 'support',
+    stanceAfter: 'support',
+  });
+  assert.equal(getSelectedChain(establishedRejected).defeaterReview, null);
+  assert.equal(getSelectedChain(establishedRejected).matchingStatus, 'inactive');
 }
 
 {
@@ -373,6 +468,122 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert.equal(state.fixedPointEvents.find((event) => event.status === 'confirmed').lifecycle, 'orphaned');
   assert.equal(state.fixedPointEvents.find((event) => event.status === 'confirmed').invalidatedByConflictId, state.conflicts[0].id);
   assert.equal(state.conflicts.length, 1);
+}
+
+{
+  let state = completeSpeechChain();
+  const record = state.records.speech_restriction;
+  state = {
+    ...state,
+    phase: PHASES.DEFEATER,
+    records: {
+      ...state.records,
+      speech_restriction: {
+        ...record,
+        chains: [
+          ...record.chains,
+          {
+            id: 'prior_opposition_chain',
+            steps: [{
+              factResponses: { speech_scope_noncoercive: 'true' },
+              bridgeClaimId: 'protect_nonharmful_choice',
+              bridgeResponse: 'reject',
+            }],
+          },
+        ],
+      },
+    },
+  };
+  state = act(state, { type: 'SELECT_DEFEATER', argumentId: 'speech_choice_oppose' });
+  state = act(state, { type: 'ANSWER_DEFEATER_FACT', response: 'false' });
+  assert.equal(state.phase, PHASES.CONFLICT, 'A defeater fact must use the same conflict index as the main chain.');
+  assert.equal(state.pendingConflict.context, 'defeater_fact');
+  state = act(state, { type: 'RESOLVE_CONFLICT', resolution: 'keep_prior' });
+  assert.equal(state.pendingDefeaterFactResponses.speech_scope_noncoercive, 'true');
+  assert.equal(state.phase, PHASES.DEFEATER_BRIDGE);
+  state = act(state, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  assert.equal(state.phase, PHASES.CONFLICT, 'A defeater bridge must use the same conflict index as the main chain.');
+  assert.equal(state.pendingConflict.context, 'defeater_bridge');
+}
+
+{
+  let state = completeSpeechChain({ defeaterEffect: 'supplement' });
+  state = {
+    ...state,
+    currentChain: {
+      id: 'retry_after_defeater',
+      policyId: 'speech_restriction',
+      direction: 'oppose',
+      targetClaimId: 'speech_oppose',
+      steps: [],
+      scopeConflicts: [],
+      compatibilityIssues: [],
+    },
+    currentTargetClaimId: 'speech_oppose',
+    currentArgumentId: 'speech_choice_oppose',
+    currentFactIndex: 0,
+    pendingFactResponses: {},
+    phase: PHASES.FACT,
+  };
+  state = act(state, { type: 'ANSWER_FACT', response: 'false' });
+  assert.equal(state.phase, PHASES.CONFLICT, 'A stored defeater answer must constrain later main-chain answers.');
+  assert.equal(state.pendingConflict.context, 'main_fact');
+}
+
+{
+  let state = completeSpeechChain();
+  state = { ...state, phase: PHASES.DEFEATER };
+  state = act(state, { type: 'SELECT_DEFEATER', argumentId: 'speech_choice_oppose' });
+  state = act(state, { type: 'ANSWER_DEFEATER_FACT', response: 'true' });
+  state = act(state, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  assert.equal(state.phase, PHASES.DEFEATER_IMPACT);
+  const rejected = act(state, { type: 'ANSWER_DEFEATER', effect: 'reject' });
+  assert.equal(rejected.phase, PHASES.DEFEATER_IMPACT, 'An established counterargument cannot be relabelled as not accepted.');
+}
+
+{
+  let state = completeSpeechChain();
+  const record = state.records.speech_restriction;
+  state = {
+    ...state,
+    records: {
+      ...state.records,
+      speech_restriction: {
+        ...record,
+        chains: record.chains.map((chain) => chain.id === state.selectedChainId ? {
+          ...chain,
+          defeaterReview: {
+            argumentId: 'speech_choice_oppose',
+            factResponses: { speech_scope_noncoercive: 'false' },
+            bridgeClaimId: 'protect_nonharmful_choice',
+            bridgeResponse: 'accept',
+            accepted: false,
+            effect: 'reject',
+            stanceBefore: 'support',
+            stanceAfter: 'support',
+          },
+        } : chain),
+      },
+    },
+    currentChain: {
+      id: 'revision_establishes_defeater',
+      policyId: 'speech_restriction',
+      direction: 'oppose',
+      targetClaimId: 'speech_oppose',
+      steps: [],
+      scopeConflicts: [],
+      compatibilityIssues: [],
+    },
+    currentTargetClaimId: 'speech_oppose',
+    currentArgumentId: 'speech_choice_oppose',
+    currentFactIndex: 0,
+    pendingFactResponses: {},
+    phase: PHASES.FACT,
+  };
+  state = act(state, { type: 'ANSWER_FACT', response: 'true' });
+  state = act(state, { type: 'RESOLVE_CONFLICT', resolution: 'revise_prior' });
+  assert.equal(getSelectedChain(state).defeaterReview, null, 'A revision that establishes a rejected defeater must require a new impact review.');
+  assert.equal(getSelectedChain(state).matchingStatus, 'inactive');
 }
 
 {

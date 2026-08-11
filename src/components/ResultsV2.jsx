@@ -72,6 +72,13 @@ const originCopy = (argument, modelVersion) => {
   return `正式题库 ${modelVersion}`;
 };
 
+const formalStatusCopy = (check) => {
+  if (!check || check.inferenceStatus === 'not_formalized') return '尚未形式化';
+  if (check.errors?.length) return '推理结构需修正';
+  if (check.openCriticalQuestions?.length) return '结构合格，仍有待核问题';
+  return '推理结构合格';
+};
+
 const downloadJson = (filename, value) => {
   const url = URL.createObjectURL(new Blob(
     [`${JSON.stringify(value, null, 2)}\n`],
@@ -426,6 +433,15 @@ function MechanicalReport({ state, chains }) {
                     <b>V</b>
                     <div><p>{claims[step.targetClaimId]?.text}</p><small>链条方向：{chain.direction === 'support' ? '支持' : chain.direction === 'oppose' ? '反对' : '未决定'}</small></div>
                   </div>
+                  <details className="formal-check-details">
+                    <summary>形式检查：{formalStatusCopy(step.formalCheck)}</summary>
+                    <dl>
+                      <dt>前提状态</dt><dd>{({ established: '当前回答已建立', rejected: '当前回答未建立', undetermined: '仍有未定回答', not_evaluated: '尚未检查' })[step.formalCheck?.evidenceStatus] || '尚未检查'}</dd>
+                      <dt>辩证状态</dt><dd>{step.formalCheck?.dialecticalStatus === 'undecided' ? '竞争理由尚未裁定' : '尚未评估竞争理由'}</dd>
+                    </dl>
+                    {step.formalCheck?.errors?.length ? <ul>{step.formalCheck.errors.map((issue) => <li key={`${issue.code}-${issue.path}`}>{issue.message}</li>)}</ul> : null}
+                    {step.formalCheck?.warnings?.length ? <ul>{step.formalCheck.warnings.map((issue) => <li key={`${issue.code}-${issue.path}`}>{issue.message}</li>)}</ul> : null}
+                  </details>
                 </div>
               );
             })}

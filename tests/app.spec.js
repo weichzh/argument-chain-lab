@@ -40,6 +40,7 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await page.getByRole('button', { name: '成立', exact: true }).click();
   await acceptBothSensitivityScenarios(page);
   await page.getByRole('button', { name: '成立', exact: true }).click();
+  await page.getByRole('button', { name: '成立', exact: true }).click();
   await page.getByRole('button', { name: '接受这条原则', exact: true }).click();
   await page.getByRole('button', { name: /继续追问为什么/ }).click();
   await expect(page.getByText('没有合适选项')).toBeVisible();
@@ -56,7 +57,9 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await expect(page.getByRole('heading', { name: '本轮机械报告' })).toBeVisible();
   await page.locator('.report-chain > summary').first().click();
   await expect(page.locator('.report-step')).toHaveCount(2);
-  await expect(page.getByText('正式题库 0.8.1').first()).toBeVisible();
+  await expect(page.getByText('正式题库 0.8.2').first()).toBeVisible();
+  await expect(page.locator('.formal-check-details')).toHaveCount(2);
+  await expect(page.locator('.formal-check-details > summary').first()).not.toContainText('尚未形式化');
   await expect(page.locator('.report-list').filter({ hasText: '已确认' })).toContainText('避免人的死亡、重伤和严重身体损害');
   expect(requests).toHaveLength(0);
 
@@ -72,7 +75,12 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await page.getByRole('button', { name: '贡献到公开题库', exact: true }).click();
   await expect(page.getByText('已进入公开审核候选区。')).toBeVisible();
   expect(requests).toHaveLength(1);
-  expect(requests[0].version).toBe(2);
+  expect(requests[0].version).toBe(3);
+  expect(requests[0].checks).toMatchObject({
+    formalValidationVersion: 'arglogic-0.1',
+    noFormalErrors: true,
+    formalizationCoverage: 'complete',
+  });
   expect(requests[0].argument.defeaterReview.effect).toBe('none_accepted');
 
   await page.reload();
@@ -155,7 +163,7 @@ test('短桌面视口可点击底部立场，并可在无 AI 时记录题库缺�
   await expect(page.getByText('现有理由没有覆盖我的实际理由。')).toHaveCount(0);
 });
 
-test('可自由切换题目、退出，并从精确步骤继续', async ({ page }) => {
+test('可自由切换和精确续答，旧语义草稿升级时安全失效', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: '从题库开始', exact: true }).click();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^开始/ }).click();
@@ -164,7 +172,7 @@ test('可自由切换题目、退出，并从精确步骤继续', async ({ page 
   await page.getByRole('button', { name: /因为禁令确实能减少针对群体的重伤/ }).click();
   await page.getByRole('button', { name: '作为题设条件采用', exact: true }).click();
   await acceptBothSensitivityScenarios(page);
-  await expect(page.getByText('事实 2 / 2', { exact: true })).toBeVisible();
+  await expect(page.getByText('事实 2 / 3', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
   await expect(page.locator('[data-policy-id="speech_restriction"]')).toContainText('进行中');
@@ -173,7 +181,7 @@ test('可自由切换题目、退出，并从精确步骤继续', async ({ page 
   await expect(page.getByRole('heading', { name: /你目前倾向支持还是反对/ })).toBeVisible();
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^继续/ }).click();
-  await expect(page.getByText('事实 2 / 2', { exact: true })).toBeVisible();
+  await expect(page.getByText('事实 2 / 3', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await expect(page.getByRole('button', { name: '继续上次进度', exact: true })).toBeVisible();
@@ -196,12 +204,11 @@ test('可自由切换题目、退出，并从精确步骤继续', async ({ page 
     window.localStorage.removeItem(currentKey);
   });
   await page.reload();
-  await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^继续/ }).click();
-  await expect(page.getByText('事实 2 / 2', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '成立', exact: true })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('相关旧版理由链需要重新核对');
+  await expect(page.locator('[data-policy-id="speech_restriction"]')).not.toContainText('继续');
   await expect.poll(() => page.evaluate(() => (
     JSON.parse(window.localStorage.getItem('argument-chain-lab:progress:v6')).modelVersion
-  ))).toBe('0.8.1');
+  ))).toBe('0.8.2');
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('argument-chain-lab:progress:v5'))).toBe(null);
 });
 
@@ -261,8 +268,8 @@ test('移动端同答异因使用纵向卡片并显示基准依据', async ({ pa
   await page.goto('/');
   await page.evaluate(async () => {
     const [model, benchmarks] = await Promise.all([
-      fetch('/bank/model-0.8.1.json').then((response) => response.json()),
-      fetch('/bank/ideology-benchmarks-0.8.1.json').then((response) => response.json()),
+      fetch('/bank/model-0.8.2.json').then((response) => response.json()),
+      fetch('/bank/ideology-benchmarks-0.8.2.json').then((response) => response.json()),
     ]);
     const variant = benchmarks.profiles[0].variants[0];
     const state = JSON.parse(localStorage.getItem('argument-chain-lab:progress:v6'));
@@ -311,8 +318,8 @@ test('移动端同答异因使用纵向卡片并显示基准依据', async ({ pa
     });
     localStorage.setItem('argument-chain-lab:progress:v6', JSON.stringify({
       ...state,
-      modelVersion: '0.8.1',
-      storageVersion: 6,
+      modelVersion: '0.8.2',
+      storageVersion: 7,
       assessmentMode: 'real_world_belief',
       phase: 'results',
       records,

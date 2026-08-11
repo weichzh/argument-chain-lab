@@ -1,5 +1,5 @@
 export const CONTRIBUTION_SCHEMA = 'argument-chain-contribution';
-export const CONTRIBUTION_VERSION = 2;
+export const CONTRIBUTION_VERSION = 3;
 export const CONSENT_VERSION = 1;
 export const CANDIDATE_RECORD_SCHEMA = 'argument-chain-candidate-record';
 export const COMMUNITY_BANK_SCHEMA = 'argument-chain-community-bank';
@@ -156,11 +156,19 @@ function validateDefeaterReview(value, path, issues) {
   if (!['support', 'oppose', 'undecided'].includes(value.stanceAfter)) issue(issues, `${path}.stanceAfter`, 'invalid_value');
 }
 
-function validateChecks(value, path, issues) {
-  const keys = ['noUnresolvedConflicts', 'noModelGaps'];
+function validateChecks(value, path, issues, legacy) {
+  const keys = legacy
+    ? ['noUnresolvedConflicts', 'noModelGaps']
+    : ['noUnresolvedConflicts', 'noModelGaps', 'formalValidationVersion', 'noFormalErrors', 'formalizationCoverage'];
   if (!checkObject(value, path, keys, keys, issues)) return;
   checkExact(value.noUnresolvedConflicts, true, `${path}.noUnresolvedConflicts`, issues);
   checkExact(value.noModelGaps, true, `${path}.noModelGaps`, issues);
+  if (legacy) return;
+  checkExact(value.formalValidationVersion, 'arglogic-0.1', `${path}.formalValidationVersion`, issues);
+  checkExact(value.noFormalErrors, true, `${path}.noFormalErrors`, issues);
+  if (!['complete', 'partial', 'none'].includes(value.formalizationCoverage)) {
+    issue(issues, `${path}.formalizationCoverage`, 'invalid_value');
+  }
 }
 
 function validateArgument(value, path, issues) {
@@ -214,7 +222,7 @@ function validateArgument(value, path, issues) {
   }
 }
 
-export function validateContributionPackage(value) {
+export function validateContributionPackage(value, { allowLegacy = false } = {}) {
   const issues = [];
   const keys = [
     'schema',
@@ -227,11 +235,12 @@ export function validateContributionPackage(value) {
   ];
   if (!checkObject(value, '$', keys, keys, issues)) return { ok: false, issues };
   checkExact(value.schema, CONTRIBUTION_SCHEMA, '$.schema', issues);
-  checkExact(value.version, CONTRIBUTION_VERSION, '$.version', issues);
+  const legacy = allowLegacy && value.version === 2;
+  if (!legacy) checkExact(value.version, CONTRIBUTION_VERSION, '$.version', issues);
   checkString(value.bankVersion, '$.bankVersion', issues, { max: 64, pattern: VERSION_PATTERN });
   checkExact(value.consentVersion, CONSENT_VERSION, '$.consentVersion', issues);
   checkExact(value.status, 'complete', '$.status', issues);
-  validateChecks(value.checks, '$.checks', issues);
+  validateChecks(value.checks, '$.checks', issues, legacy);
   validateArgument(value.argument, '$.argument', issues);
   return { ok: issues.length === 0, issues };
 }
@@ -251,11 +260,11 @@ function normalizeValue(value) {
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, normalizeValue(child)]));
 }
 
-export function normalizeContributionPackage(value) {
-  const before = validateContributionPackage(value);
+export function normalizeContributionPackage(value, options) {
+  const before = validateContributionPackage(value, options);
   if (!before.ok) return before;
   const normalized = normalizeValue(value);
-  const after = validateContributionPackage(normalized);
+  const after = validateContributionPackage(normalized, options);
   return after.ok ? { ok: true, value: normalized } : after;
 }
 
@@ -265,14 +274,14 @@ function stableValue(value) {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
 }
 
-export function canonicalizeContributionPackage(value) {
-  const normalized = normalizeContributionPackage(value);
+export function canonicalizeContributionPackage(value, options) {
+  const normalized = normalizeContributionPackage(value, options);
   if (!normalized.ok) return normalized;
   return { ok: true, value: JSON.stringify(stableValue(normalized.value)) };
 }
 
-export async function hashContributionPackage(value) {
-  const canonical = canonicalizeContributionPackage(value);
+export async function hashContributionPackage(value, options) {
+  const canonical = canonicalizeContributionPackage(value, options);
   if (!canonical.ok) return canonical;
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical.value));
   const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -322,7 +331,7 @@ export function validateCandidateRecord(value) {
   checkExact(value.schema, CANDIDATE_RECORD_SCHEMA, '$.schema', issues);
   checkExact(value.version, 1, '$.version', issues);
   checkString(value.contentHash, '$.contentHash', issues, { min: 71, max: 71, pattern: HASH_PATTERN });
-  const contribution = validateContributionPackage(value.contribution);
+  const contribution = validateContributionPackage(value.contribution, { allowLegacy: true });
   issues.push(...contribution.issues.map((entry) => ({ ...entry, path: `$.contribution${entry.path.slice(1)}` })));
   return { ok: issues.length === 0, issues };
 }
@@ -343,7 +352,7 @@ export function validateCommunityBank(value) {
       checkString(entry.contentHash, `${path}.contentHash`, issues, { min: 71, max: 71, pattern: HASH_PATTERN });
       if (hashes.has(entry.contentHash)) issue(issues, `${path}.contentHash`, 'duplicate_hash');
       hashes.add(entry.contentHash);
-      const contribution = validateContributionPackage(entry.contribution);
+      const contribution = validateContributionPackage(entry.contribution, { allowLegacy: true });
       issues.push(...contribution.issues.map((item) => ({ ...item, path: `${path}.contribution${item.path.slice(1)}` })));
     });
   }

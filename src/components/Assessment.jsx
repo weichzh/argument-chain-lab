@@ -704,7 +704,6 @@ function DefeaterImpactQuestion({ state, dispatch }) {
         { id: 'weaken', label: '它削弱了原理由，但我仍维持原立场', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'weaken' }) },
         { id: 'offset', label: '正反理由暂时抵消，整包立场变为未定', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'offset' }) },
         { id: 'outweigh', label: '它压过原理由，我改为相反立场', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'outweigh' }) },
-        { id: 'reject', label: '复核后仍不采用这条反方理由', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'reject' }) },
       ] : [
         { id: 'reject', label: '记录为未接受，不改变整包立场', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'reject' }) },
       ]} />
