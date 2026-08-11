@@ -11,7 +11,7 @@ const PREFIX_SORTS = {
   'rule:': 'Rule',
 };
 
-export const ARGLOGIC_VERSION = 'arglogic-0.1';
+export const ARGLOGIC_VERSION = 'arglogic-0.2';
 
 const stable = (value) => {
   if (Array.isArray(value)) return value.map(stable);
@@ -150,11 +150,143 @@ const isDirectNegation = (left, right) => (
   || canonicalFormula(right?.not) === canonicalFormula(left)
 );
 
-const openCriticalQuestions = (scheme, answers = {}) => (
-  (scheme.criticalQuestions || []).filter((question) => (
-    !['satisfied', 'not_applicable'].includes(answers[question.id])
-  ))
+const criticalQuestionState = (scheme, answers = {}) => {
+  const open = [];
+  const defeated = [];
+  for (const question of scheme.criticalQuestions || []) {
+    const answer = answers[question.id] || 'open';
+    if (answer === 'defeated') defeated.push(question);
+    else if (!['satisfied', 'not_applicable'].includes(answer)) open.push(question);
+  }
+  return { open, defeated };
+};
+
+const comparison = {
+  Eq: (left, right) => left === right,
+  Ne: (left, right) => left !== right,
+  Lt: (left, right) => left < right,
+  Lte: (left, right) => left <= right,
+  Gt: (left, right) => left > right,
+  Gte: (left, right) => left >= right,
+};
+
+const resolveConstraintTerm = (term, bindings) => (
+  typeof term === 'string' && term.startsWith('?') ? bindings[term] : term
 );
+
+// ponytail: bank constraints are tiny finite ASTs; move this evaluator to a Worker if they grow large.
+export const evaluateConstraint = (formula, bindings = {}, assignments = {}) => {
+  if (isAtom(formula)) {
+    const values = formula.args.map((term) => resolveConstraintTerm(term, bindings));
+    if (comparison[formula.pred]) {
+      if (values.some((value) => value === undefined)) return null;
+      return comparison[formula.pred](...values);
+    }
+    const assigned = assignments[canonicalFormula(formula)] ?? assignments[formula.pred];
+    return typeof assigned === 'boolean' ? assigned : null;
+  }
+  if (formula?.not) {
+    const value = evaluateConstraint(formula.not, bindings, assignments);
+    return value === null ? null : !value;
+  }
+  if (Array.isArray(formula?.and)) {
+    const values = formula.and.map((child) => evaluateConstraint(child, bindings, assignments));
+    return values.includes(false) ? false : values.includes(null) ? null : true;
+  }
+  if (Array.isArray(formula?.or)) {
+    const values = formula.or.map((child) => evaluateConstraint(child, bindings, assignments));
+    return values.includes(true) ? true : values.includes(null) ? null : false;
+  }
+  return null;
+};
+
+export const deriveAttackGraph = (formalizations = []) => {
+  const attacks = [];
+  const add = (sourceArgumentId, targetArgumentId, kind, basis) => {
+    if (sourceArgumentId !== targetArgumentId) attacks.push({ sourceArgumentId, targetArgumentId, kind, basis });
+  };
+  for (const source of formalizations) {
+    for (const explicit of source.explicitAttacks || []) {
+      add(source.argumentId, explicit.targetArgumentId, explicit.kind, 'explicit');
+    }
+    for (const target of formalizations) {
+      if (source.argumentId === target.argumentId) continue;
+      const left = source.conclusion?.formula;
+      const right = target.conclusion?.formula;
+      const oppositeReasons = ['ReasonFor', 'ReasonAgainst'].includes(left?.pred)
+        && ['ReasonFor', 'ReasonAgainst'].includes(right?.pred)
+        && left.pred !== right.pred
+        && canonicalFormula(left.args) === canonicalFormula(right.args);
+      if (isDirectNegation(left, right) || oppositeReasons) {
+        add(source.argumentId, target.argumentId, 'rebut', 'conclusion_conflict');
+      }
+      if ((target.premises || []).some((premise) => isDirectNegation(left, premise.formula))) {
+        add(source.argumentId, target.argumentId, 'undermine', 'premise_conflict');
+      }
+      const targetRule = target.bindings?.['?rule'];
+      if (targetRule && (source.premises || []).some((premise) => (
+        premise.formula?.pred === 'UndercutsRule' && premise.formula.args?.[0] === targetRule
+      ))) add(source.argumentId, target.argumentId, 'undercut', 'rule_exception');
+    }
+  }
+  return [...new Map(attacks.map((attack) => [
+    `${attack.sourceArgumentId}|${attack.targetArgumentId}|${attack.kind}`,
+    attack,
+  ])).values()];
+};
+
+export const groundedLabelling = (argumentIds, attacks = []) => {
+  const ids = [...new Set(argumentIds)];
+  const active = new Set(ids);
+  const incoming = new Map(ids.map((id) => [id, new Set()]));
+  attacks.forEach((attack) => {
+    if (active.has(attack.sourceArgumentId) && active.has(attack.targetArgumentId)) {
+      incoming.get(attack.targetArgumentId).add(attack.sourceArgumentId);
+    }
+  });
+  const accepted = new Set();
+  const rejected = new Set();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const id of ids) {
+      if (accepted.has(id) || rejected.has(id)) continue;
+      if ([...incoming.get(id)].every((attacker) => rejected.has(attacker))) {
+        accepted.add(id);
+        changed = true;
+      }
+    }
+    for (const id of ids) {
+      if (accepted.has(id) || rejected.has(id)) continue;
+      if ([...incoming.get(id)].some((attacker) => accepted.has(attacker))) {
+        rejected.add(id);
+        changed = true;
+      }
+    }
+  }
+  return Object.fromEntries(ids.map((id) => [
+    id,
+    accepted.has(id) ? 'accepted' : rejected.has(id) ? 'rejected' : 'undecided',
+  ]));
+};
+
+export const labelDialecticalPair = (mainArgumentId, defeaterArgumentId, effect) => {
+  if (!defeaterArgumentId || ['reject', 'none_accepted'].includes(effect)) {
+    return { [mainArgumentId]: 'accepted', ...(defeaterArgumentId ? { [defeaterArgumentId]: 'rejected' } : {}) };
+  }
+  if (effect === 'supplement') {
+    return { [mainArgumentId]: 'accepted', [defeaterArgumentId]: 'accepted' };
+  }
+  const attacks = effect === 'outweigh'
+    ? [{ sourceArgumentId: defeaterArgumentId, targetArgumentId: mainArgumentId, kind: 'rebut' }]
+    : effect === 'weaken'
+      ? [{ sourceArgumentId: mainArgumentId, targetArgumentId: defeaterArgumentId, kind: 'rebut' }]
+      : [
+          { sourceArgumentId: mainArgumentId, targetArgumentId: defeaterArgumentId, kind: 'rebut' },
+          { sourceArgumentId: defeaterArgumentId, targetArgumentId: mainArgumentId, kind: 'rebut' },
+        ];
+  return groundedLabelling([mainArgumentId, defeaterArgumentId], attacks);
+};
 
 export const validateArgument = (argument, bundle, catalog) => {
   const errors = [];
@@ -213,6 +345,16 @@ export const validateArgument = (argument, bundle, catalog) => {
   if (argument.conclusion?.formula) {
     validateFormula(argument.conclusion.formula, context, '$.conclusion.formula', errors);
   }
+  (argument.constraints || []).forEach((constraint, index) => {
+    const pathName = `$.constraints[${index}]`;
+    validateFormula(constraint, context, pathName, errors);
+    const result = evaluateConstraint(constraint, argument.bindings || {});
+    if (result === false) {
+      errors.push(issue('error', 'CONSTRAINT_UNSATISFIED', '数值或命题约束不成立。', pathName));
+    } else if (result === null) {
+      warnings.push(issue('warning', 'CONSTRAINT_UNDETERMINED', '数值或命题约束仍缺少可判定值。', pathName));
+    }
+  });
 
   const available = (argument.premises || []).flatMap((premise) => (
     flattenConjunction(premise.formula).map((formula) => ({
@@ -319,20 +461,21 @@ export const validateArgument = (argument, bundle, catalog) => {
     ));
   }
 
-  const openQuestions = openCriticalQuestions(scheme, argument.criticalQuestionAnswers);
-  openQuestions.forEach((question) => {
-    const answer = argument.criticalQuestionAnswers?.[question.id];
-    const code = answer === 'defeated' ? 'CRITICAL_QUESTION_DEFEATS' : 'OPEN_CRITICAL_QUESTION';
-    const severity = answer === 'defeated' ? 'error' : 'warning';
-    const target = severity === 'error' ? errors : warnings;
-    target.push(issue(
-      severity,
-      code,
-      `${question.label}${answer === 'defeated' ? ' 当前回答会击败这条推理。' : ' 尚未解决。'}`,
-      `$.criticalQuestionAnswers.${question.id}`,
-      { criticalQuestionId: question.id },
-    ));
-  });
+  const questionState = criticalQuestionState(scheme, argument.criticalQuestionAnswers);
+  questionState.open.forEach((question) => warnings.push(issue(
+    'warning',
+    'OPEN_CRITICAL_QUESTION',
+    `${question.label} 尚未解决。`,
+    `$.criticalQuestionAnswers.${question.id}`,
+    { criticalQuestionId: question.id },
+  )));
+  questionState.defeated.forEach((question) => errors.push(issue(
+    'error',
+    'CRITICAL_QUESTION_DEFEATS',
+    `${question.label} 当前回答会击败这条推理。`,
+    `$.criticalQuestionAnswers.${question.id}`,
+    { criticalQuestionId: question.id },
+  )));
 
   const structuralErrors = new Set([
     'INVALID_ARGUMENT',
@@ -360,6 +503,7 @@ export const validateArgument = (argument, bundle, catalog) => {
     'CONCLUSION_PATTERN_MISMATCH',
     'CONCLUSION_OVERREACH',
     'CRITICAL_QUESTION_DEFEATS',
+    'CONSTRAINT_UNSATISFIED',
   ].includes(item.code));
 
   const inferenceStatus = !wellFormed
@@ -368,7 +512,7 @@ export const validateArgument = (argument, bundle, catalog) => {
       ? 'unlicensed'
       : scheme.inferenceKind === 'strict'
         ? 'strict_rule_licensed'
-        : openQuestions.length
+        : questionState.open.length
           ? 'open_critical_questions'
           : 'defeasibly_licensed';
 
@@ -376,27 +520,62 @@ export const validateArgument = (argument, bundle, catalog) => {
     argumentId: argument.argumentId,
     schemeId: scheme.id,
     schemeLabel: scheme.label,
+    inferenceKind: scheme.inferenceKind,
     ok: errors.length === 0,
     wellFormed,
     locallyLicensed,
     inferenceStatus,
+    formalStatus: wellFormed && locallyLicensed ? 'qualified' : 'error',
+    scopeStatus: unsupportedTargetElements.length ? 'overreach' : 'within_scope',
+    dialecticalStatus: questionState.defeated.length
+      ? 'rejected'
+      : questionState.open.length ? 'undecided' : 'accepted',
+    certificateHash: bundle.formalIndex?.nodes?.[argument.argumentId]?.certificateHash || null,
     missingPremises,
     supportedElements,
     unsupportedTargetElements,
-    openCriticalQuestions: openQuestions.map((item) => item.id),
+    criticalQuestions: (scheme.criticalQuestions || []).map((item) => ({ ...item })),
+    openCriticalQuestions: questionState.open.map((item) => item.id),
     errors,
     warnings,
   };
 };
 
-export const evaluateFormalCheck = (certificate, argument, factResponses = {}, bridgeResponse = null) => {
+const runtimeCache = new Map();
+
+const runtimeQuestionState = (certificate, argument, responses) => {
+  const answers = { ...(argument.criticalQuestionAnswers || {}), ...(responses || {}) };
+  return criticalQuestionState({ criticalQuestions: certificate.criticalQuestions || [] }, answers);
+};
+
+export const nextCriticalQuestion = (certificate, argument, responses = {}) => {
+  if (!certificate?.wellFormed || !certificate?.locallyLicensed || !argument) return null;
+  return [...(certificate.criticalQuestions || [])]
+    .sort((left, right) => (left.priority || 100) - (right.priority || 100))
+    .find((question) => {
+      if (Object.hasOwn(responses, question.id)) return false;
+      const answer = argument.criticalQuestionAnswers?.[question.id] || 'open';
+      return !['satisfied', 'not_applicable', 'defeated'].includes(answer);
+    }) || null;
+};
+
+export const evaluateFormalCheck = (
+  certificate,
+  argument,
+  factResponses = {},
+  bridgeResponse = null,
+  options = {},
+) => {
   if (!certificate || !argument) {
     return {
       version: ARGLOGIC_VERSION,
+      certificateHash: null,
       wellFormed: null,
       locallyLicensed: null,
+      formalStatus: 'not_formalized',
       inferenceStatus: 'not_formalized',
       evidenceStatus: 'not_evaluated',
+      scopeStatus: 'not_evaluated',
       dialecticalStatus: 'not_evaluated',
       missingPremises: [],
       unsupportedTargetElements: [],
@@ -405,6 +584,16 @@ export const evaluateFormalCheck = (certificate, argument, factResponses = {}, b
       warnings: [issue('warning', 'FORMALIZATION_MISSING', '这条理由尚未完成形式化。')],
     };
   }
+
+  const cacheKey = canonicalFormula({
+    modelVersion: options.modelVersion || 'unknown',
+    argumentId: argument.argumentId,
+    factResponses,
+    bridgeResponse,
+    criticalQuestionResponses: options.criticalQuestionResponses || {},
+    dialecticalStatus: options.dialecticalStatus || null,
+  });
+  if (runtimeCache.has(cacheKey)) return runtimeCache.get(cacheKey);
 
   const source = argument.source || {};
   const factValues = (source.factIds || []).map((factId) => factResponses[factId]);
@@ -426,18 +615,70 @@ export const evaluateFormalCheck = (certificate, argument, factResponses = {}, b
       ? 'undetermined'
       : 'established';
 
-  return {
+  const questionState = runtimeQuestionState(
+    certificate,
+    argument,
+    options.criticalQuestionResponses,
+  );
+  const baseErrors = (certificate.errors || []).filter((item) => item.code !== 'CRITICAL_QUESTION_DEFEATS');
+  const baseWarnings = (certificate.warnings || []).filter((item) => item.code !== 'OPEN_CRITICAL_QUESTION');
+  const errors = [
+    ...baseErrors,
+    ...questionState.defeated.map((question) => issue(
+      'error',
+      'CRITICAL_QUESTION_DEFEATS',
+      `${question.label} 当前回答会击败这条推理。`,
+      `$.criticalQuestionAnswers.${question.id}`,
+      { criticalQuestionId: question.id },
+    )),
+  ];
+  const warnings = [
+    ...baseWarnings,
+    ...questionState.open.map((question) => issue(
+      'warning',
+      'OPEN_CRITICAL_QUESTION',
+      `${question.label} 尚未解决。`,
+      `$.criticalQuestionAnswers.${question.id}`,
+      { criticalQuestionId: question.id },
+    )),
+  ];
+  const locallyLicensed = certificate.locallyLicensed && questionState.defeated.length === 0;
+  const inferenceStatus = !certificate.wellFormed
+    ? 'ill_formed'
+    : !locallyLicensed
+      ? 'unlicensed'
+      : questionState.open.length
+        ? 'open_critical_questions'
+        : certificate.inferenceKind === 'strict' ? 'strict_rule_licensed' : 'defeasibly_licensed';
+  const dialecticalStatus = evidenceStatus === 'rejected'
+    || questionState.defeated.length
+    || options.dialecticalStatus === 'rejected'
+    ? 'rejected'
+    : evidenceStatus !== 'established'
+      || questionState.open.length
+      || options.dialecticalStatus === 'undecided'
+      ? 'undecided'
+      : options.dialecticalStatus || 'accepted';
+
+  const result = {
     version: argument.languageVersion,
+    certificateHash: certificate.certificateHash || null,
+    schemeId: certificate.schemeId,
+    schemeLabel: certificate.schemeLabel,
     wellFormed: certificate.wellFormed,
-    locallyLicensed: certificate.locallyLicensed,
-    inferenceStatus: certificate.inferenceStatus,
+    locallyLicensed,
+    formalStatus: certificate.wellFormed && locallyLicensed ? 'qualified' : 'error',
+    inferenceStatus,
     evidenceStatus,
-    dialecticalStatus: certificate.dialecticalStatus
-      || (certificate.openCriticalQuestions?.length ? 'undecided' : 'not_evaluated'),
+    scopeStatus: certificate.scopeStatus || 'not_evaluated',
+    dialecticalStatus,
     missingPremises: certificate.missingPremises || [],
     unsupportedTargetElements: certificate.unsupportedTargetElements || [],
-    openCriticalQuestions: certificate.openCriticalQuestions || [],
-    errors: certificate.errors || [],
-    warnings: certificate.warnings || [],
+    openCriticalQuestions: questionState.open.map((item) => item.id),
+    errors,
+    warnings,
   };
+  if (runtimeCache.size >= 500) runtimeCache.clear();
+  runtimeCache.set(cacheKey, result);
+  return result;
 };

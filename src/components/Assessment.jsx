@@ -40,7 +40,7 @@ import ProofView from './ProofView.jsx';
 const STAGES = [
   ['判断', [PHASES.COMPONENTS, PHASES.STANCE, PHASES.PACKAGE_TRADEOFF, PHASES.DIRECTION, PHASES.ARGUMENT]],
   ['事实', [PHASES.FACT, PHASES.FACT_SENSITIVITY]],
-  ['原则', [PHASES.BRIDGE, PHASES.DEPTH]],
+  ['原则', [PHASES.BRIDGE, PHASES.FORMAL_QUESTION, PHASES.DEPTH]],
   ['价值', [PHASES.TERMINAL_CONFIRM]],
   ['检验', [
     PHASES.STRESS_REQUIRED,
@@ -547,6 +547,25 @@ function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
   );
 }
 
+function FormalQuestion({ state, dispatch }) {
+  const pending = state.pendingFormalQuestion;
+  if (!pending) return null;
+  return (
+    <>
+      <QuestionHeader state={state} label="反例检查" title="再核对一个可能改变推理的问题" statement={pending.prompt} />
+      <ChoiceList options={[
+        { id: 'satisfied', label: '这项条件已满足，继续', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'satisfied' }) },
+        { id: 'defeated', label: '存在反例或例外，当前理由不能成立', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'defeated' }) },
+        { id: 'unknown', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'unknown' }) },
+      ]} />
+      <details className="evidence-details">
+        <summary>形式检查详情</summary>
+        <div><p>检查类型：{({ undermine: '前提削弱', rebut: '结论反驳', undercut: '规则例外' })[pending.attackKind] || '可撤销条件'}</p></div>
+      </details>
+    </>
+  );
+}
+
 function DepthQuestion({ state, dispatch }) {
   const bridge = claims[state.currentChain?.steps.at(-1)?.bridgeClaimId];
   const canNominate = canNominateClaim(bridge);
@@ -691,6 +710,7 @@ function DefeaterImpactQuestion({ state, dispatch }) {
   const bridge = claims[argument?.bridgeClaimId];
   if (!argument) return null;
   const acceptedPremises = argument.factIds.every((factId) => state.pendingDefeaterFactResponses[factId] === 'true');
+  const formalReady = !argument.formalization || state.pendingDefeaterFormalStatus === 'qualified';
   return (
     <>
       <QuestionHeader state={state} label="反方影响" title="核对这些前提后，它怎样改变你的整包判断？" statement={argument.title} />
@@ -699,7 +719,8 @@ function DefeaterImpactQuestion({ state, dispatch }) {
         <ul>{(argument.plainSteps?.facts || []).map((statement) => <li key={statement}>{statement}</li>)}</ul>
         <p><b>B</b>{bridge?.text}</p>
       </section>
-      <ChoiceList options={state.pendingDefeaterBridgeResponse === 'accept' && acceptedPremises ? [
+      {!formalReady && argument.formalization ? <p className="evidence-warning" role="note"><AlertTriangle size={17} />这条反方理由仍有未解决的反例检查，只能记录为尚未建立。</p> : null}
+      <ChoiceList options={state.pendingDefeaterBridgeResponse === 'accept' && acceptedPremises && formalReady ? [
         { id: 'supplement', label: '它补充了限制条件，但没有削弱原理由', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'supplement' }) },
         { id: 'weaken', label: '它削弱了原理由，但我仍维持原立场', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'weaken' }) },
         { id: 'offset', label: '正反理由暂时抵消，整包立场变为未定', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'offset' }) },
@@ -977,6 +998,7 @@ function PhaseQuestion({ state, dispatch, onAskAi, aiLoading }) {
     case PHASES.FACT: return <FactQuestion {...props} />;
     case PHASES.FACT_SENSITIVITY: return <FactSensitivityQuestion state={state} dispatch={dispatch} />;
     case PHASES.BRIDGE: return <BridgeQuestion {...props} />;
+    case PHASES.FORMAL_QUESTION: return <FormalQuestion state={state} dispatch={dispatch} />;
     case PHASES.DEPTH: return <DepthQuestion {...props} />;
     case PHASES.TERMINAL_CONFIRM: return <TerminalQuestion {...props} />;
     case PHASES.STRESS_REQUIRED: return <StressRequiredQuestion state={state} dispatch={dispatch} />;

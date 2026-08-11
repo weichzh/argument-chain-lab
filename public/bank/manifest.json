@@ -1,7 +1,7 @@
 {
   "schema": "argument-chain-bank-manifest",
   "version": 1,
-  "current": "0.8.2",
+  "current": "0.9.0",
   "models": [
     {
       "version": "0.5.0",
@@ -35,6 +35,15 @@
       "benchmarks": "ideology-benchmarks-0.8.2.json",
       "formalSchema": "arglogic-0.1.schema.json",
       "formalSchemes": "arglogic-schemes-0.1.json"
+    },
+    {
+      "version": "0.9.0",
+      "path": "model-0.9.0.json",
+      "benchmarks": "ideology-benchmarks-0.9.0.json",
+      "formalSchema": "arglogic-0.2.schema.json",
+      "formalSchemes": "arglogic-schemes-0.2.json",
+      "formalIndex": "formal-index-0.9.0.json",
+      "formalReviews": "formal-review-benchmark-0.9.0.json"
     }
   ],
   "extensions": [

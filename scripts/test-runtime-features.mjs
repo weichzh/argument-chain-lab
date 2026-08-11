@@ -77,6 +77,7 @@ const rawDraft = 'RAW_DRAFT_MUST_NOT_BE_PERSISTED_OR_CONTRIBUTED';
 const candidate = {
   scope: 'new_root',
   direction: 'support',
+  schemeId: 'harm_prevention',
   target: {
     shortLabel: '优先修复危险路口',
     text: '城市应当优先修复事故风险明确偏高的路口。',
@@ -115,6 +116,7 @@ const candidate = {
 };
 
 assert.equal(validateArgumentCandidate(candidate, 'new_root').ok, true);
+assert.equal(validateArgumentCandidate({ ...candidate, schemeId: 'invented_scheme' }, 'new_root').ok, false);
 assert.equal(validateArgumentCandidate({ ...candidate, direction: 'oppose' }, 'new_root', 'support').ok, false);
 const installed = mergeCandidateIntoOverlay(normalizeSessionOverlay(), candidate);
 assert(installed.policyId.startsWith('local_policy_'));
@@ -135,6 +137,7 @@ assert.equal(policies.find((policy) => policy.id === installed.policyId)?.origin
 assert.equal(claims[installed.targetClaimId].text, candidate.target.text);
 assert.equal(claims[installed.overlay.arguments[installed.argumentId].bridgeClaimId].nominatable, true);
 assert.equal(argumentsById[installed.argumentId].factIds.length, candidate.facts.length);
+assert.equal(argumentsById[installed.argumentId].proposedSchemeId, candidate.schemeId);
 applySessionOverlay({
   ...installed.overlay,
   arguments: {

@@ -31,6 +31,7 @@ export let ideologyBenchmarks = { profiles: [] };
 export let adaptiveAssessment = {};
 export let arglogicCatalog = null;
 export let formalEntities = {};
+export let formalIndex = null;
 export let formalCertificates = {};
 
 export const POLICY_ELEMENT_GROUPS = Object.freeze({
@@ -64,6 +65,9 @@ export const validateFormalModel = (model) => {
   if (Object.values(model.arguments).some((argument) => argument.formalization)) {
     assertRecord(model.formalEntities, 'formalEntities');
     assertRecord(model.arglogicCatalog, 'arglogicCatalog');
+    if (model.arglogicCatalog?.languageVersion === 'arglogic-0.2') {
+      assertRecord(model.formalIndex, 'formalIndex');
+    }
   }
   assertArray(model.policies, 'policies');
   model.policies.forEach((policy) => {
@@ -133,12 +137,13 @@ const applyModel = () => {
   adaptiveAssessment = formalModel.adaptiveAssessment || {};
   arglogicCatalog = formalModel.arglogicCatalog || null;
   formalEntities = formalModel.formalEntities || {};
+  formalIndex = formalModel.formalIndex || null;
   formalCertificates = arglogicCatalog
     ? Object.fromEntries(Object.values(formalModel.arguments)
       .filter((argument) => argument.formalization)
       .map((argument) => [
         argument.id,
-        validateArgument(argument.formalization, { entities: formalEntities }, arglogicCatalog),
+        validateArgument(argument.formalization, { entities: formalEntities, formalIndex }, arglogicCatalog),
       ]))
     : {};
 };
@@ -175,6 +180,7 @@ export const getModelSnapshot = () => ({
   adaptiveAssessment,
   arglogicCatalog,
   formalEntities,
+  formalIndex,
   formalCertificates,
 });
 

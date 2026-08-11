@@ -79,6 +79,22 @@ const formalStatusCopy = (check) => {
   return '推理结构合格';
 };
 
+const formatFormula = (formula) => {
+  if (formula?.pred) return `${formula.pred}(${formula.args.join(', ')})`;
+  if (formula?.not) return `not ${formatFormula(formula.not)}`;
+  if (formula?.and) return `and(${formula.and.map(formatFormula).join(', ')})`;
+  if (formula?.or) return `or(${formula.or.map(formatFormula).join(', ')})`;
+  if (formula?.exists) return `exists ${formula.exists.vars.join(', ')}: ${formatFormula(formula.exists.where)}`;
+  return '无法显示';
+};
+
+const dialecticalCopy = {
+  accepted: '当前可接受',
+  rejected: '已被竞争理由击败',
+  undecided: '竞争理由尚未裁定',
+  not_evaluated: '尚未评估竞争理由',
+};
+
 const downloadJson = (filename, value) => {
   const url = URL.createObjectURL(new Blob(
     [`${JSON.stringify(value, null, 2)}\n`],
@@ -437,8 +453,21 @@ function MechanicalReport({ state, chains }) {
                     <summary>形式检查：{formalStatusCopy(step.formalCheck)}</summary>
                     <dl>
                       <dt>前提状态</dt><dd>{({ established: '当前回答已建立', rejected: '当前回答未建立', undetermined: '仍有未定回答', not_evaluated: '尚未检查' })[step.formalCheck?.evidenceStatus] || '尚未检查'}</dd>
-                      <dt>辩证状态</dt><dd>{step.formalCheck?.dialecticalStatus === 'undecided' ? '竞争理由尚未裁定' : '尚未评估竞争理由'}</dd>
+                      <dt>辩证状态</dt><dd>{dialecticalCopy[step.formalCheck?.dialecticalStatus] || '尚未检查'}</dd>
+                      <dt>方案</dt><dd>{step.formalCheck?.schemeLabel || argument?.formalization?.schemeId || '尚未形式化'}</dd>
+                      <dt>证书</dt><dd>{step.formalCheck?.certificateHash || '无'}</dd>
                     </dl>
+                    {argument?.formalization ? (
+                      <div className="formal-ast-map">
+                        <strong>中文—形式 AST 对照</strong>
+                        <ul>
+                          {argument.formalization.premises.map((premise) => (
+                            <li key={premise.id}><span>{facts[premise.claimRef]?.statement || claims[premise.claimRef]?.text || premise.id}</span><code>{formatFormula(premise.formula)}</code></li>
+                          ))}
+                          <li><span>{claims[argument.formalization.conclusion.claimRef]?.text || '结论'}</span><code>{formatFormula(argument.formalization.conclusion.formula)}</code></li>
+                        </ul>
+                      </div>
+                    ) : null}
                     {step.formalCheck?.errors?.length ? <ul>{step.formalCheck.errors.map((issue) => <li key={`${issue.code}-${issue.path}`}>{issue.message}</li>)}</ul> : null}
                     {step.formalCheck?.warnings?.length ? <ul>{step.formalCheck.warnings.map((issue) => <li key={`${issue.code}-${issue.path}`}>{issue.message}</li>)}</ul> : null}
                   </details>

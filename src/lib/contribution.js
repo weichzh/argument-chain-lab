@@ -9,6 +9,7 @@ import {
   claims,
   facts,
   formalCertificates,
+  MODEL_META,
 } from '../data/model.js';
 import { ARGLOGIC_VERSION, evaluateFormalCheck } from './formalValidator.js';
 
@@ -19,6 +20,11 @@ const formalCheckFrom = (step) => {
     argument?.formalization,
     step.factResponses,
     step.bridgeResponse,
+    {
+      modelVersion: MODEL_META.version,
+      criticalQuestionResponses: step.formalQuestionResponses,
+      dialecticalStatus: step.dialecticalStatus,
+    },
   );
 };
 
@@ -93,7 +99,6 @@ const defeaterReviewFrom = (chain) => {
 export const contributionEligibility = (state, chain) => {
   const reasons = [];
   if (!chain || chain.status !== 'complete') reasons.push('这条理由链尚未闭合。');
-  if (chain?.matchingStatus !== 'active') reasons.push('这条理由链当前不是可用于报告或匹配的有效路径。');
   if (!chain?.steps?.length) reasons.push('论证没有已确认步骤。');
   if (chain?.steps?.some((step) => (
     Object.values(step.factResponses || {}).some((response) => response !== 'true')
@@ -117,8 +122,20 @@ export const contributionEligibility = (state, chain) => {
       reasons.push('形式检查证书版本与当前题库不一致。');
       break;
     }
+    if (argument?.formalization && !formalCheck.certificateHash) {
+      reasons.push('当前形式检查证书缺少可核对的哈希。');
+      break;
+    }
     if (formalCheck.errors?.length) {
       reasons.push(`形式检查仍有错误：${formalCheck.errors.map((item) => item.code).join('、')}。`);
+      break;
+    }
+    if (argument?.formalization && formalCheck.openCriticalQuestions?.length) {
+      reasons.push('形式检查仍有可能改变推理结果的未解决问题。');
+      break;
+    }
+    if (argument?.formalization && formalCheck.dialecticalStatus !== 'accepted') {
+      reasons.push('形式检查尚未把这条理由标记为当前可接受。');
       break;
     }
   }
@@ -152,6 +169,10 @@ export const contributionEligibility = (state, chain) => {
         || (!established && ['supplement', 'weaken', 'offset', 'outweigh'].includes(effect))) {
         reasons.push('最强反方理由是否成立与复核结果不一致。');
       }
+      if (established && defeater.formalization && (
+        chain.defeaterReview.formalCheck?.errors?.length
+        || chain.defeaterReview.formalCheck?.openCriticalQuestions?.length
+      )) reasons.push('最强反方理由仍有未处理的形式问题。');
     }
   }
   if (['weaken', 'offset', 'outweigh'].includes(chain?.defeaterReview?.effect || chain?.defeaterReview?.impact)) {

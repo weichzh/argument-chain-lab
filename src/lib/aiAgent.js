@@ -1,4 +1,5 @@
 import { validateArgumentCandidate } from './sessionOverlay.js';
+import { arglogicCatalog } from '../data/model.js';
 
 let modelsCollectionPromise;
 
@@ -36,9 +37,10 @@ const systemPrompt = `你是“论证链实验室”的结构化论证采访代�
 只调用 propose_argument_candidate 一次；不要输出聊天式答案。
 事实必须可判断真假并给出支持条件和否定条件。
 桥接原则必须明确说明为什么这些事实能为结论增加一项可反驳的理由。
+必须从提供的方案目录选择 schemeId，不得创造新方案。
 如果原则被标为 terminal，它仍必须在后续由用户独立确认并接受相似案例检验。`;
 
-const buildPrompt = ({ userText, scope, context }) => `请根据以下最小上下文生成结构化候选。
+const buildPrompt = ({ userText, scope, context, schemes }) => `请根据以下最小上下文生成结构化候选。
 
 候选范围：${scope}
 当前已确认上下文：
@@ -46,6 +48,9 @@ ${JSON.stringify(context, null, 2)}
 
 用户刚刚输入的想法：
 ${userText}
+
+允许使用的论证方案：
+${schemes.map((scheme) => `${scheme.id}：${scheme.label}`).join('\n')}
 
 约束：
 1. scope 必须精确等于 "${scope}"。
@@ -72,6 +77,8 @@ export const proposeWithPiAgent = async ({
   signal?.throwIfAborted();
   const catalogModel = models.getModel(config.provider, config.model);
   if (!catalogModel) throw new Error('在 pi-ai 目录中找不到所选模型，请重新选择。');
+  const schemes = arglogicCatalog?.schemes || [];
+  if (!schemes.length) throw new Error('形式论证方案目录尚未加载。');
   const model = config.baseUrl
     ? { ...catalogModel, baseUrl: config.baseUrl }
     : catalogModel;
@@ -84,6 +91,7 @@ export const proposeWithPiAgent = async ({
     parameters: Type.Object({
       scope: Type.Union([Type.Literal('new_root'), Type.Literal('current_target')]),
       direction: Type.Union([Type.Literal('support'), Type.Literal('oppose')]),
+      schemeId: Type.Union(schemes.map((scheme) => Type.Literal(scheme.id))),
       target: Type.Object({
         shortLabel: Type.String({ minLength: 1, maxLength: 160 }),
         text: Type.String({ minLength: 1, maxLength: 1200 }),
@@ -145,7 +153,7 @@ export const proposeWithPiAgent = async ({
     ),
   });
   if (signal) signal.addEventListener('abort', () => agent.abort(), { once: true });
-  await agent.prompt(buildPrompt({ userText, scope, context }));
+  await agent.prompt(buildPrompt({ userText, scope, context, schemes }));
   if (!capturedCandidate) throw new Error('模型没有返回可确认的结构化候选。');
   return capturedCandidate;
 };

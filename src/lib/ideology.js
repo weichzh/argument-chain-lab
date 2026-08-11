@@ -32,9 +32,18 @@ const relationFamily = (response) => {
   return response || null;
 };
 
+export const isFormallyQualifiedChain = (chain) => Boolean(chain?.steps?.length)
+  && chain.steps.every((step) => (
+    step.formalCheck?.wellFormed === true
+    && step.formalCheck?.locallyLicensed === true
+    && !step.formalCheck?.errors?.length
+    && step.formalCheck?.dialecticalStatus === 'accepted'
+  ));
+
 const activeChains = (record) => (record?.chains || []).filter((chain) => (
-  chain.matchingStatus === 'active'
-  || (!chain.matchingStatus && ['complete', 'conditional'].includes(chain.status) && chain.defeaterReview)
+  (chain.matchingStatus === 'active'
+    || (!chain.matchingStatus && ['complete', 'conditional'].includes(chain.status) && chain.defeaterReview))
+  && isFormallyQualifiedChain(chain)
 ));
 
 const normalizeElementResponse = (response) => ({

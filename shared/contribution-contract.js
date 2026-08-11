@@ -164,7 +164,9 @@ function validateChecks(value, path, issues, legacy) {
   checkExact(value.noUnresolvedConflicts, true, `${path}.noUnresolvedConflicts`, issues);
   checkExact(value.noModelGaps, true, `${path}.noModelGaps`, issues);
   if (legacy) return;
-  checkExact(value.formalValidationVersion, 'arglogic-0.1', `${path}.formalValidationVersion`, issues);
+  if (!['arglogic-0.1', 'arglogic-0.2'].includes(value.formalValidationVersion)) {
+    issue(issues, `${path}.formalValidationVersion`, 'invalid_value');
+  }
   checkExact(value.noFormalErrors, true, `${path}.noFormalErrors`, issues);
   if (!['complete', 'partial', 'none'].includes(value.formalizationCoverage)) {
     issue(issues, `${path}.formalizationCoverage`, 'invalid_value');

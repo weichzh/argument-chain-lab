@@ -70,7 +70,7 @@
       "properties": {
         "noUnresolvedConflicts": { "const": true },
         "noModelGaps": { "const": true },
-        "formalValidationVersion": { "const": "arglogic-0.1" },
+        "formalValidationVersion": { "enum": ["arglogic-0.1", "arglogic-0.2"] },
         "noFormalErrors": { "const": true },
         "formalizationCoverage": { "enum": ["complete", "partial", "none"] }
       }

@@ -9,6 +9,11 @@ const acceptBothSensitivityScenarios = async (page) => {
   await page.getByRole('button', { name: '这个幅度仍足以采用当前理由', exact: true }).click();
 };
 
+const satisfyFormalQuestions = async (page) => {
+  const answer = page.getByRole('button', { name: '这项条件已满足，继续', exact: true });
+  while (await answer.count()) await answer.click();
+};
+
 test('完整论证只在明确同意后提交，并可刷新恢复报告', async ({ page }) => {
   const requests = [];
   const browserErrors = [];
@@ -42,11 +47,13 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await page.getByRole('button', { name: '成立', exact: true }).click();
   await page.getByRole('button', { name: '成立', exact: true }).click();
   await page.getByRole('button', { name: '接受这条原则', exact: true }).click();
+  await satisfyFormalQuestions(page);
   await page.getByRole('button', { name: /继续追问为什么/ }).click();
   await expect(page.getByText('没有合适选项')).toBeVisible();
   await page.getByRole('button', { name: /因为死亡和重伤会大幅减少人的行动能力/ }).click();
   await page.getByRole('button', { name: '成立', exact: true }).click();
   await page.getByRole('button', { name: '接受这条原则', exact: true }).click();
+  await satisfyFormalQuestions(page);
   await page.getByRole('button', { name: '是，我现在直接接受它', exact: true }).click();
   await page.getByRole('button', { name: '仍然适用', exact: true }).click();
   await page.getByRole('button', { name: '题库中没有我认为成立的反方理由', exact: true }).click();
@@ -57,9 +64,14 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await expect(page.getByRole('heading', { name: '本轮机械报告' })).toBeVisible();
   await page.locator('.report-chain > summary').first().click();
   await expect(page.locator('.report-step')).toHaveCount(2);
-  await expect(page.getByText('正式题库 0.8.2').first()).toBeVisible();
+  await expect(page.getByText('正式题库 0.9.0').first()).toBeVisible();
   await expect(page.locator('.formal-check-details')).toHaveCount(2);
   await expect(page.locator('.formal-check-details > summary').first()).not.toContainText('尚未形式化');
+  await page.locator('.formal-check-details > summary').first().click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.formal-ast-map').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.locator('.report-list').filter({ hasText: '已确认' })).toContainText('避免人的死亡、重伤和严重身体损害');
   expect(requests).toHaveLength(0);
 
@@ -77,7 +89,7 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   expect(requests).toHaveLength(1);
   expect(requests[0].version).toBe(3);
   expect(requests[0].checks).toMatchObject({
-    formalValidationVersion: 'arglogic-0.1',
+    formalValidationVersion: 'arglogic-0.2',
     noFormalErrors: true,
     formalizationCoverage: 'complete',
   });
@@ -208,7 +220,7 @@ test('可自由切换和精确续答，旧语义草稿升级时安全失效', as
   await expect(page.locator('[data-policy-id="speech_restriction"]')).not.toContainText('继续');
   await expect.poll(() => page.evaluate(() => (
     JSON.parse(window.localStorage.getItem('argument-chain-lab:progress:v6')).modelVersion
-  ))).toBe('0.8.2');
+  ))).toBe('0.9.0');
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('argument-chain-lab:progress:v5'))).toBe(null);
 });
 
@@ -268,8 +280,8 @@ test('移动端同答异因使用纵向卡片并显示基准依据', async ({ pa
   await page.goto('/');
   await page.evaluate(async () => {
     const [model, benchmarks] = await Promise.all([
-      fetch('/bank/model-0.8.2.json').then((response) => response.json()),
-      fetch('/bank/ideology-benchmarks-0.8.2.json').then((response) => response.json()),
+      fetch('/bank/model-0.9.0.json').then((response) => response.json()),
+      fetch('/bank/ideology-benchmarks-0.9.0.json').then((response) => response.json()),
     ]);
     const variant = benchmarks.profiles[0].variants[0];
     const state = JSON.parse(localStorage.getItem('argument-chain-lab:progress:v6'));
@@ -302,6 +314,11 @@ test('移动端同答异因使用纵向卡片并显示基准依据', async ({ pa
             bridgeClaimId: argument.bridgeClaimId,
             bridgeResponse: 'accept',
             assessmentMode: 'real_world_belief',
+            formalQuestionResponses: Object.fromEntries(
+              Object.keys(argument.formalization.criticalQuestionAnswers || {})
+                .map((questionId) => [questionId, 'satisfied']),
+            ),
+            dialecticalStatus: 'accepted',
           }],
           terminal: { claimId: variant.fixedPoints[policyId], status: 'provisional_fixed_point' },
           stress: { response: 'apply' },
@@ -318,7 +335,7 @@ test('移动端同答异因使用纵向卡片并显示基准依据', async ({ pa
     });
     localStorage.setItem('argument-chain-lab:progress:v6', JSON.stringify({
       ...state,
-      modelVersion: '0.8.2',
+      modelVersion: '0.9.0',
       storageVersion: 7,
       assessmentMode: 'real_world_belief',
       phase: 'results',

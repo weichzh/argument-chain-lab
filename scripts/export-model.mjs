@@ -6,6 +6,8 @@ const { manifest, model, modelPath } = await loadCurrentFormalModel();
 configureFormalModel(model);
 const {
   arglogicCatalog: _formalRuntimeOnly,
+  formalIndex: _formalIndexRuntimeOnly,
+  formalReviewBenchmark: _formalReviewRuntimeOnly,
   ideologyBenchmarks: _runtimeOnly,
   ...formalModel
 } = model;

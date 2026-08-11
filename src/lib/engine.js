@@ -13,7 +13,11 @@ import {
   getRelevantDilemmas,
   policies,
 } from '../data/model.js';
-import { evaluateFormalCheck } from './formalValidator.js';
+import {
+  evaluateFormalCheck,
+  labelDialecticalPair,
+  nextCriticalQuestion,
+} from './formalValidator.js';
 import { selectNextAdaptivePolicy } from './ideology.js';
 
 const uid = (prefix = 'id') => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -29,6 +33,7 @@ export const PHASES = Object.freeze({
   FACT: 'fact',
   FACT_SENSITIVITY: 'fact_sensitivity',
   BRIDGE: 'bridge',
+  FORMAL_QUESTION: 'formal_question',
   DEPTH: 'depth',
   TERMINAL_CONFIRM: 'terminal_confirm',
   STRESS_REQUIRED: 'stress_test_required',
@@ -72,10 +77,13 @@ export const createInitialState = () => ({
   pendingFactSensitivity: {},
   pendingSensitivity: null,
   pendingCustomStressTest: null,
+  pendingFormalQuestion: null,
   pendingDefeaterArgumentId: null,
   pendingDefeaterFactIndex: 0,
   pendingDefeaterFactResponses: {},
   pendingDefeaterBridgeResponse: null,
+  pendingDefeaterFormalResponses: {},
+  pendingDefeaterFormalStatus: null,
   pendingConflict: null,
   conflicts: [],
   modelGaps: [],
@@ -170,11 +178,22 @@ const responseSummary = (responses) => {
   };
 };
 
-const formalCheckFor = (argument, factResponses, bridgeResponse) => evaluateFormalCheck(
+const formalCheckFor = (
+  argument,
+  factResponses,
+  bridgeResponse,
+  criticalQuestionResponses = {},
+  dialecticalStatus = null,
+) => evaluateFormalCheck(
   formalCertificates[argument?.id],
   argument?.formalization,
   factResponses,
   bridgeResponse,
+  {
+    modelVersion: MODEL_META.version,
+    criticalQuestionResponses,
+    dialecticalStatus,
+  },
 );
 
 const refreshFormalChecks = (chain) => ({
@@ -185,6 +204,8 @@ const refreshFormalChecks = (chain) => ({
       argumentsById[step.argumentId],
       step.factResponses,
       step.bridgeResponse,
+      step.formalQuestionResponses,
+      step.dialecticalStatus,
     ),
   })),
 });
@@ -215,11 +236,36 @@ const matchingStatusFor = (chain, status = chain?.status) => {
 const classifyStoredChain = (chain) => {
   const checked = refreshFormalChecks(chain);
   const status = classifyChain(checked);
+  const stepChecks = checked.steps.map((step) => step.formalCheck);
+  const formalStatus = stepChecks.every((check) => check?.inferenceStatus === 'not_formalized')
+    ? 'not_formalized'
+    : stepChecks.length && stepChecks.every((check) => (
+      check?.wellFormed && check?.locallyLicensed && !check.errors?.length
+    )) ? 'qualified' : 'error';
+  const evidenceStatus = stepChecks.some((check) => check?.evidenceStatus === 'rejected')
+    ? 'rejected'
+    : stepChecks.every((check) => check?.evidenceStatus === 'established') ? 'established' : 'undetermined';
+  const scopeStatus = stepChecks.some((check) => check?.scopeStatus === 'overreach')
+    ? 'overreach'
+    : 'within_scope';
+  const dialecticalStatus = formalStatus === 'not_formalized'
+    ? 'not_evaluated'
+    : stepChecks.some((check) => check?.dialecticalStatus === 'rejected')
+    ? 'rejected'
+    : stepChecks.some((check) => check?.dialecticalStatus === 'undecided') ? 'undecided' : 'accepted';
   return {
     ...checked,
     status,
+    commitmentClosure: status === 'complete' ? 'closed' : status,
+    formalStatus,
+    evidenceStatus,
+    scopeStatus,
+    dialecticalStatus,
+    packageJudgment: checked.defeaterReview?.stanceAfter || checked.direction || null,
     argumentClosure: status === 'complete' ? 'closed' : status,
-    matchingStatus: matchingStatusFor(chain, status),
+    matchingStatus: formalStatus === 'qualified' && dialecticalStatus === 'accepted'
+      ? matchingStatusFor(chain, status)
+      : 'inactive',
   };
 };
 
@@ -446,6 +492,8 @@ const applyBridgeAnswer = (state, response) => {
     factSensitivity: state.pendingFactSensitivity,
     bridgeClaimId: argument.bridgeClaimId,
     bridgeResponse: response,
+    formalQuestionResponses: {},
+    dialecticalStatus: null,
     formalCheck: formalCheckFor(argument, state.pendingFactResponses, response),
     assessmentMode: state.assessmentMode,
     createdAt: now(),
@@ -463,11 +511,24 @@ const applyBridgeAnswer = (state, response) => {
     };
   }
   const bridgeClaim = claims[argument.bridgeClaimId];
+  const nextPhase = bridgeClaim?.kind === 'terminal' ? PHASES.TERMINAL_CONFIRM : PHASES.DEPTH;
+  const question = step.formalCheck.evidenceStatus === 'established'
+    ? nextCriticalQuestion(formalCertificates[argument.id], argument.formalization)
+    : null;
   return {
     ...state,
     currentChain,
     breakReason: null,
-    phase: bridgeClaim?.kind === 'terminal' ? PHASES.TERMINAL_CONFIRM : PHASES.DEPTH,
+    pendingFormalQuestion: question ? {
+      context: 'main',
+      stepId: step.id,
+      argumentId: argument.id,
+      criticalQuestionId: question.id,
+      prompt: question.prompt || question.label,
+      attackKind: question.attackKind,
+      nextPhase,
+    } : null,
+    phase: question ? PHASES.FORMAL_QUESTION : nextPhase,
     updatedAt: now(),
   };
 };
@@ -489,12 +550,32 @@ const applyDefeaterFactAnswer = (state, response) => {
   };
 };
 
-const applyDefeaterBridgeAnswer = (state, response) => ({
-  ...state,
-  pendingDefeaterBridgeResponse: response,
-  phase: PHASES.DEFEATER_IMPACT,
-  updatedAt: now(),
-});
+const applyDefeaterBridgeAnswer = (state, response) => {
+  const argument = argumentsById[state.pendingDefeaterArgumentId];
+  if (!argument) return state;
+  const check = formalCheckFor(argument, state.pendingDefeaterFactResponses, response);
+  const question = response === 'accept' && check.evidenceStatus === 'established'
+    ? nextCriticalQuestion(formalCertificates[argument.id], argument.formalization)
+    : null;
+  return {
+    ...state,
+    pendingDefeaterBridgeResponse: response,
+    pendingDefeaterFormalResponses: {},
+    pendingDefeaterFormalStatus: argument.formalization
+      ? question ? 'in_progress' : check.dialecticalStatus === 'accepted' ? 'qualified' : 'unresolved'
+      : 'not_formalized',
+    pendingFormalQuestion: question ? {
+      context: 'defeater',
+      argumentId: argument.id,
+      criticalQuestionId: question.id,
+      prompt: question.prompt || question.label,
+      attackKind: question.attackKind,
+      nextPhase: PHASES.DEFEATER_IMPACT,
+    } : null,
+    phase: question ? PHASES.FORMAL_QUESTION : PHASES.DEFEATER_IMPACT,
+    updatedAt: now(),
+  };
+};
 
 const finalizeCurrentChain = (state, stress) => {
   const policy = policies[state.policyIndex];
@@ -519,6 +600,7 @@ const finalizeCurrentChain = (state, stress) => {
     currentTargetClaimId: null,
     currentArgumentId: null,
     pendingCustomStressTest: null,
+    pendingFormalQuestion: null,
     pendingDefeaterArgumentId: null,
     phase: ['complete', 'conditional'].includes(stored?.status) ? PHASES.DEFEATER : PHASES.POLICY_COMPLETE,
     updatedAt: now(),
@@ -613,10 +695,13 @@ const startPolicy = (state, index) => {
     pendingFactSensitivity: {},
     pendingSensitivity: null,
     pendingCustomStressTest: null,
+    pendingFormalQuestion: null,
     pendingDefeaterArgumentId: null,
     pendingDefeaterFactIndex: 0,
     pendingDefeaterFactResponses: {},
     pendingDefeaterBridgeResponse: null,
+    pendingDefeaterFormalResponses: {},
+    pendingDefeaterFormalStatus: null,
     pendingConflict: null,
     breakReason: null,
     records: {
@@ -636,6 +721,7 @@ const DRAFT_PHASES = new Set([
   PHASES.FACT,
   PHASES.FACT_SENSITIVITY,
   PHASES.BRIDGE,
+  PHASES.FORMAL_QUESTION,
   PHASES.DEPTH,
   PHASES.TERMINAL_CONFIRM,
   PHASES.STRESS_REQUIRED,
@@ -669,10 +755,13 @@ const stashCurrentDraft = (state) => {
           pendingFactSensitivity: state.pendingFactSensitivity,
           pendingSensitivity: state.pendingSensitivity,
           pendingCustomStressTest: state.pendingCustomStressTest,
+          pendingFormalQuestion: state.pendingFormalQuestion,
           pendingDefeaterArgumentId: state.pendingDefeaterArgumentId,
           pendingDefeaterFactIndex: state.pendingDefeaterFactIndex,
           pendingDefeaterFactResponses: state.pendingDefeaterFactResponses,
           pendingDefeaterBridgeResponse: state.pendingDefeaterBridgeResponse,
+          pendingDefeaterFormalResponses: state.pendingDefeaterFormalResponses,
+          pendingDefeaterFormalStatus: state.pendingDefeaterFormalStatus,
           pendingConflict: state.pendingConflict,
           breakReason: state.breakReason,
         },
@@ -719,10 +808,13 @@ const startDirection = (state, direction) => {
     pendingFactSensitivity: {},
     pendingSensitivity: null,
     pendingCustomStressTest: null,
+    pendingFormalQuestion: null,
     pendingDefeaterArgumentId: null,
     pendingDefeaterFactIndex: 0,
     pendingDefeaterFactResponses: {},
     pendingDefeaterBridgeResponse: null,
+    pendingDefeaterFormalResponses: {},
+    pendingDefeaterFormalStatus: null,
     pendingConflict: null,
     breakReason: null,
     phase: PHASES.ARGUMENT,
@@ -1099,6 +1191,87 @@ export const reducer = (state, action) => {
       return applyBridgeAnswer(state, action.response);
     }
 
+    case 'ANSWER_FORMAL_QUESTION': {
+      const pending = state.pendingFormalQuestion;
+      if (!pending || !['satisfied', 'defeated', 'unknown'].includes(action.response)) return state;
+      const argument = argumentsById[pending.argumentId];
+      if (!argument?.formalization) return state;
+
+      if (pending.context === 'main') {
+        const step = state.currentChain?.steps.find((item) => item.id === pending.stepId);
+        if (!step) return state;
+        const responses = {
+          ...(step.formalQuestionResponses || {}),
+          [pending.criticalQuestionId]: action.response,
+        };
+        const formalCheck = formalCheckFor(
+          argument,
+          step.factResponses,
+          step.bridgeResponse,
+          responses,
+        );
+        const currentChain = {
+          ...state.currentChain,
+          steps: state.currentChain.steps.map((item) => item.id === step.id ? {
+            ...item,
+            formalQuestionResponses: responses,
+            formalCheck,
+          } : item),
+        };
+        if (action.response === 'defeated') {
+          return {
+            ...state,
+            currentChain,
+            pendingFormalQuestion: null,
+            breakReason: '这项反例或例外击败了当前推理；请换一条理由或修订立场。',
+            phase: PHASES.BROKEN,
+            updatedAt: now(),
+          };
+        }
+        const question = action.response === 'satisfied'
+          ? nextCriticalQuestion(formalCertificates[argument.id], argument.formalization, responses)
+          : null;
+        return {
+          ...state,
+          currentChain,
+          pendingFormalQuestion: question ? {
+            ...pending,
+            criticalQuestionId: question.id,
+            prompt: question.prompt || question.label,
+            attackKind: question.attackKind,
+          } : null,
+          phase: question ? PHASES.FORMAL_QUESTION : pending.nextPhase,
+          updatedAt: now(),
+        };
+      }
+
+      if (pending.context === 'defeater') {
+        const responses = {
+          ...(state.pendingDefeaterFormalResponses || {}),
+          [pending.criticalQuestionId]: action.response,
+        };
+        const question = action.response === 'satisfied'
+          ? nextCriticalQuestion(formalCertificates[argument.id], argument.formalization, responses)
+          : null;
+        return {
+          ...state,
+          pendingDefeaterFormalResponses: responses,
+          pendingDefeaterFormalStatus: action.response === 'defeated'
+            ? 'defeated'
+            : action.response === 'unknown' ? 'unresolved' : question ? 'in_progress' : 'qualified',
+          pendingFormalQuestion: question ? {
+            ...pending,
+            criticalQuestionId: question.id,
+            prompt: question.prompt || question.label,
+            attackKind: question.attackKind,
+          } : null,
+          phase: question ? PHASES.FORMAL_QUESTION : pending.nextPhase,
+          updatedAt: now(),
+        };
+      }
+      return state;
+    }
+
     case 'RESOLVE_CONFLICT': {
       const conflict = state.pendingConflict;
       if (!conflict) return state;
@@ -1341,6 +1514,9 @@ export const reducer = (state, action) => {
         pendingDefeaterFactIndex: 0,
         pendingDefeaterFactResponses: {},
         pendingDefeaterBridgeResponse: null,
+        pendingDefeaterFormalResponses: {},
+        pendingDefeaterFormalStatus: null,
+        pendingFormalQuestion: null,
         phase: argument.factIds.length ? PHASES.DEFEATER_FACT : PHASES.DEFEATER_BRIDGE,
         updatedAt: now(),
       };
@@ -1424,6 +1600,12 @@ export const reducer = (state, action) => {
           },
         },
         pendingDefeaterArgumentId: null,
+        pendingDefeaterFactIndex: 0,
+        pendingDefeaterFactResponses: {},
+        pendingDefeaterBridgeResponse: null,
+        pendingDefeaterFormalResponses: {},
+        pendingDefeaterFormalStatus: null,
+        pendingFormalQuestion: null,
         phase: PHASES.POLICY_COMPLETE,
         updatedAt: now(),
       };
@@ -1436,10 +1618,13 @@ export const reducer = (state, action) => {
       const argument = argumentsById[state.pendingDefeaterArgumentId];
       if (!argument) return state;
       const premisesAccepted = argument.factIds.every((factId) => state.pendingDefeaterFactResponses[factId] === 'true');
-      if (effect === 'reject' && premisesAccepted && state.pendingDefeaterBridgeResponse === 'accept') return state;
-      if (effect !== 'reject' && (!premisesAccepted || state.pendingDefeaterBridgeResponse !== 'accept')) return state;
+      const formalResolved = !argument.formalization || state.pendingDefeaterFormalStatus === 'qualified';
+      const established = premisesAccepted && state.pendingDefeaterBridgeResponse === 'accept' && formalResolved;
+      if (effect === 'reject' && established) return state;
+      if (effect !== 'reject' && !established) return state;
       const selectedChain = Object.values(state.records).flatMap((record) => record.chains || [])
         .find((chain) => chain.id === state.selectedChainId);
+      if (!selectedChain?.steps?.length) return state;
       const policy = policies[state.policyIndex];
       const currentRecord = ensurePolicyRecord(state, policy.id);
       const before = currentRecord.packageStanceBeforeDefeater || currentRecord.stance || selectedChain?.direction;
@@ -1448,14 +1633,28 @@ export const reducer = (state, action) => {
         : effect === 'outweigh'
           ? selectedChain?.direction === 'support' ? 'oppose' : 'support'
           : before;
+      const mainArgumentId = selectedChain?.steps?.[0]?.argumentId;
+      const labels = labelDialecticalPair(mainArgumentId, argument.id, effect);
+      const defeaterFormalCheck = formalCheckFor(
+        argument,
+        state.pendingDefeaterFactResponses,
+        state.pendingDefeaterBridgeResponse,
+        state.pendingDefeaterFormalResponses,
+        labels[argument.id],
+      );
       const next = updateStoredChain(state, state.selectedChainId, (chain) => ({
         ...chain,
+        steps: chain.steps.map((step) => step.argumentId === mainArgumentId
+          ? { ...step, dialecticalStatus: labels[mainArgumentId] }
+          : step),
         defeaterReview: {
           argumentId: argument.id,
           factResponses: state.pendingDefeaterFactResponses,
           bridgeClaimId: argument.bridgeClaimId,
           bridgeResponse: state.pendingDefeaterBridgeResponse,
-          accepted: effect !== 'reject' && premisesAccepted && state.pendingDefeaterBridgeResponse === 'accept',
+          formalQuestionResponses: state.pendingDefeaterFormalResponses,
+          formalCheck: defeaterFormalCheck,
+          accepted: effect !== 'reject' && established,
           effect,
           stanceBefore: before,
           stanceAfter: after,
@@ -1478,6 +1677,9 @@ export const reducer = (state, action) => {
         pendingDefeaterFactIndex: 0,
         pendingDefeaterFactResponses: {},
         pendingDefeaterBridgeResponse: null,
+        pendingDefeaterFormalResponses: {},
+        pendingDefeaterFormalStatus: null,
+        pendingFormalQuestion: null,
         phase: PHASES.POLICY_COMPLETE,
         updatedAt: now(),
       };
@@ -1674,7 +1876,7 @@ export const reducer = (state, action) => {
 
 export const migrateSavedState = (state) => {
   if (![4, 5, 6, 7].includes(state?.storageVersion)) return null;
-  if (!['0.7.0', '0.7.1', '0.8.0', '0.8.1', MODEL_META.version].includes(state.modelVersion)) return null;
+  if (!['0.7.0', '0.7.1', '0.8.0', '0.8.1', '0.8.2', MODEL_META.version].includes(state.modelVersion)) return null;
   const legacyRealWorld = state.modelVersion === '0.7.0';
   const upgrading = state.modelVersion !== MODEL_META.version;
   const revisedIds = new Set([
@@ -1745,6 +1947,17 @@ export const migrateSavedState = (state) => {
     if (!flow) return true;
     if (flow.currentChain && !migratedChain) return false;
     if (flow.selectedChainId && invalidatedChainIds.has(flow.selectedChainId)) return false;
+    const pendingFormal = flow.pendingFormalQuestion;
+    if (Boolean(pendingFormal) !== (flow.phase === PHASES.FORMAL_QUESTION)) return false;
+    if (pendingFormal) {
+      const validQuestion = formalCertificates[pendingFormal.argumentId]?.criticalQuestions
+        ?.some((question) => question.id === pendingFormal.criticalQuestionId);
+      const validContext = pendingFormal.context === 'main'
+        ? migratedChain?.steps?.some((step) => step.id === pendingFormal.stepId)
+        : pendingFormal.context === 'defeater'
+          && flow.pendingDefeaterArgumentId === pendingFormal.argumentId;
+      if (!validQuestion || !validContext) return false;
+    }
     const references = [
       flow.currentTargetClaimId,
       flow.currentArgumentId,
@@ -1787,6 +2000,8 @@ export const migrateSavedState = (state) => {
         ...step,
         assessmentMode: step.assessmentMode || (legacyRealWorld ? 'real_world_belief' : state.assessmentMode) || 'real_world_belief',
         factSensitivity: step.factSensitivity || {},
+        formalQuestionResponses: step.formalQuestionResponses || {},
+        dialecticalStatus: step.dialecticalStatus || null,
       })),
     };
     return revised.completedAt ? classifyStoredChain(revised) : revised;
@@ -1830,10 +2045,13 @@ export const migrateSavedState = (state) => {
             pendingFactSensitivity: record.draft.pendingFactSensitivity || {},
             pendingSensitivity: record.draft.pendingSensitivity || null,
             pendingCustomStressTest: record.draft.pendingCustomStressTest || null,
+            pendingFormalQuestion: record.draft.pendingFormalQuestion || null,
             pendingDefeaterArgumentId: record.draft.pendingDefeaterArgumentId || null,
             pendingDefeaterFactIndex: record.draft.pendingDefeaterFactIndex || 0,
             pendingDefeaterFactResponses: record.draft.pendingDefeaterFactResponses || {},
             pendingDefeaterBridgeResponse: record.draft.pendingDefeaterBridgeResponse || null,
+            pendingDefeaterFormalResponses: record.draft.pendingDefeaterFormalResponses || {},
+            pendingDefeaterFormalStatus: record.draft.pendingDefeaterFormalStatus || null,
           }
         : null,
       componentTradeoffs: record.componentTradeoffs || {},
@@ -1896,10 +2114,13 @@ export const migrateSavedState = (state) => {
     pendingFactSensitivity: keepCurrentFlow ? state.pendingFactSensitivity || {} : {},
     pendingSensitivity: keepCurrentFlow ? state.pendingSensitivity || null : null,
     pendingCustomStressTest: keepCurrentFlow ? state.pendingCustomStressTest || null : null,
+    pendingFormalQuestion: keepCurrentFlow ? state.pendingFormalQuestion || null : null,
     pendingDefeaterArgumentId: keepCurrentFlow ? state.pendingDefeaterArgumentId || null : null,
     pendingDefeaterFactIndex: keepCurrentFlow && state.storageVersion >= 6 ? state.pendingDefeaterFactIndex || 0 : 0,
     pendingDefeaterFactResponses: keepCurrentFlow && state.storageVersion >= 6 ? state.pendingDefeaterFactResponses || {} : {},
     pendingDefeaterBridgeResponse: keepCurrentFlow && state.storageVersion >= 6 ? state.pendingDefeaterBridgeResponse || null : null,
+    pendingDefeaterFormalResponses: keepCurrentFlow ? state.pendingDefeaterFormalResponses || {} : {},
+    pendingDefeaterFormalStatus: keepCurrentFlow ? state.pendingDefeaterFormalStatus || null : null,
     phase: !keepCurrentFlow
       ? state.startedAt ? PHASES.POLICY_OVERVIEW : PHASES.LANDING
       : state.storageVersion < 6 && state.phase === PHASES.DEFEATER_IMPACT && state.pendingDefeaterArgumentId

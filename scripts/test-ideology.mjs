@@ -10,6 +10,7 @@ import {
 import { createInitialState } from '../src/lib/engine.js';
 import {
   buildArgumentType,
+  isFormallyQualifiedChain,
   matchIdeologyProfiles,
   profilePositionForPolicy,
   selectNextAdaptivePolicy,
@@ -17,6 +18,16 @@ import {
 
 const { model } = await loadCurrentFormalModel();
 configureFormalModel(model);
+
+const qualifiedStep = (argumentId) => ({
+  argumentId,
+  formalCheck: {
+    wellFormed: true,
+    locallyLicensed: true,
+    errors: [],
+    dialecticalStatus: 'accepted',
+  },
+});
 
 const profile = ideologyBenchmarks.profiles.find((item) => item.name === 'Anarcho-Communism');
 const variant = profile.variants[0];
@@ -48,7 +59,7 @@ Object.entries(variant.policyPositions).forEach(([policyId, position], policyInd
       id: `chain_${policyIndex}`,
       policyId,
       direction: stance,
-      steps: argument ? [{ argumentId: argument.id }] : [],
+      steps: argument ? [qualifiedStep(argument.id)] : [],
       terminal: { claimId: variant.fixedPoints[policyId], status: 'provisional_fixed_point' },
       stress: { response: variant.stressBoundaries[policyId] },
       defeaterReview: { effect: 'none_accepted', stanceBefore: stance, stanceAfter: stance },
@@ -79,7 +90,7 @@ const multipleReasons = {
     speech_restriction: {
       ...speechRecord,
       chains: [
-        { ...speechRecord.chains[0], id: 'alternate_reason', steps: [{ argumentId: alternateArgument.id }] },
+        { ...speechRecord.chains[0], id: 'alternate_reason', steps: [qualifiedStep(alternateArgument.id)] },
         speechRecord.chains[0],
       ],
     },
@@ -126,6 +137,11 @@ const unresolved = {
   modelGaps: [{ id: 'gap', policyId: 'speech_restriction' }],
 };
 assert.equal(matchIdeologyProfiles(unresolved).coverage, 0, 'Unresolved chains and model gaps must not add coverage.');
+
+const formallyRejected = structuredClone(state);
+formallyRejected.records.speech_restriction.chains[0].steps[0].formalCheck.dialecticalStatus = 'rejected';
+assert.equal(isFormallyQualifiedChain(formallyRejected.records.speech_restriction.chains[0]), false);
+assert(matchIdeologyProfiles(formallyRejected).coverage < matching.coverage, 'A defeated formal path must not enter nearest-neighbor features.');
 
 const withDilemma = {
   ...state,

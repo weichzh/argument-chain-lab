@@ -37,11 +37,22 @@ export async function loadCurrentFormalModel() {
     }
     formalSchemaPath = path.resolve(bankDirectory, selected.formalSchema);
     const formalSchemesPath = path.resolve(bankDirectory, selected.formalSchemes);
-    if (!formalSchemaPath.startsWith(boundary) || !formalSchemesPath.startsWith(boundary)) {
+    const formalIndexPath = selected.formalIndex
+      ? path.resolve(bankDirectory, selected.formalIndex)
+      : null;
+    if (!formalSchemaPath.startsWith(boundary)
+      || !formalSchemesPath.startsWith(boundary)
+      || (formalIndexPath && !formalIndexPath.startsWith(boundary))) {
       throw new Error('Bank formal asset path escapes public/bank.');
     }
     formalSchema = await readJson(formalSchemaPath);
     model.arglogicCatalog = await readJson(formalSchemesPath);
+    model.formalIndex = formalIndexPath ? await readJson(formalIndexPath) : null;
+    if (selected.formalReviews) {
+      const formalReviewsPath = path.resolve(bankDirectory, selected.formalReviews);
+      if (!formalReviewsPath.startsWith(boundary)) throw new Error('Bank formal review path escapes public/bank.');
+      model.formalReviewBenchmark = await readJson(formalReviewsPath);
+    }
   }
   return { root, manifest, selected, model, modelPath, formalSchemaPath, formalSchema };
 }

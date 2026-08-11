@@ -1731,6 +1731,30 @@ details > summary {
   grid-column: 1 / -1;
 }
 
+.candidate-ast-review {
+  padding: 20px 0;
+}
+
+.candidate-ast-review summary {
+  cursor: pointer;
+  font-weight: 760;
+}
+
+.candidate-ast-review dl {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 8px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.candidate-ast-review dd {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Results */
 .results-page {
   width: min(1120px, calc(100% - 48px));
@@ -2125,13 +2149,32 @@ details > summary {
 }
 
 .formal-check-details dd {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .formal-check-details ul {
   margin: 8px 0 0;
   padding-left: 18px;
   line-height: 1.6;
+}
+
+.formal-ast-map {
+  margin-top: 12px;
+}
+
+.formal-ast-map li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+
+.formal-ast-map code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: var(--ink);
 }
 
 .report-list {

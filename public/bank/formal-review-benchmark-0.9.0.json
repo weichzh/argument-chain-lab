@@ -1,0 +1,323 @@
+{
+  "schema": "argument-chain-formal-review-benchmark",
+  "version": 1,
+  "modelVersion": "0.9.0",
+  "status": "awaiting_human_review",
+  "minimumReviewers": 2,
+  "dimensions": [
+    "schemeId",
+    "requiredPremiseClaimIds",
+    "targetElementIds",
+    "rebuttalArgumentIds",
+    "undercutterQuestionIds",
+    "contentiousReconstruction"
+  ],
+  "items": [
+    {
+      "argumentId": "speech_harm_support",
+      "tradition": "prevent_severe_harm",
+      "reference": {
+        "schemeId": "harm_prevention",
+        "requiredPremiseClaimIds": [
+          "speech_reduces_serious_assaults",
+          "speech_no_equal_alternative",
+          "speech_costs_proportionate_to_prevented_harm"
+        ],
+        "targetElementIds": [
+          "element:public_expression_scope"
+        ],
+        "rebuttalArgumentIds": [
+          "speech_basic_liberty_oppose",
+          "speech_choice_oppose",
+          "speech_correction_oppose",
+          "speech_discretion_oppose",
+          "speech_inquiry_oppose",
+          "speech_public_reason_oppose"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_ALTERNATIVE",
+          "CQ_PROPORTIONALITY",
+          "CQ_DISTRIBUTION"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "speech_correction_oppose",
+      "tradition": "preserve_error_correction",
+      "reference": {
+        "schemeId": "expression_error_correction",
+        "requiredPremiseClaimIds": [
+          "speech_scope_noncoercive",
+          "speech_blocks_verified_reporting"
+        ],
+        "targetElementIds": [
+          "element:public_expression_scope"
+        ],
+        "rebuttalArgumentIds": [
+          "speech_cooperation_support",
+          "speech_harm_support",
+          "speech_participation_support"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_NONTHREATENING",
+          "CQ_CORRECTION"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "income_material_support",
+      "tradition": "secure_material_capacity",
+      "reference": {
+        "schemeId": "material_floor",
+        "requiredPremiseClaimIds": [
+          "income_reduces_deprivation",
+          "income_no_larger_same_loss"
+        ],
+        "targetElementIds": [
+          "element:universal_adult_cash"
+        ],
+        "rebuttalArgumentIds": [
+          "income_future_oppose",
+          "income_holdings_oppose",
+          "income_reciprocity_oppose"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_AFFORDABILITY",
+          "CQ_DISPLACEMENT"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "carbon_harm_support",
+      "tradition": "prevent_severe_harm",
+      "reference": {
+        "schemeId": "harm_prevention",
+        "requiredPremiseClaimIds": [
+          "carbon_reduces_damage",
+          "carbon_no_equal_alternative",
+          "carbon_costs_proportionate_to_prevented_harm"
+        ],
+        "targetElementIds": [
+          "element:carbon_fee"
+        ],
+        "rebuttalArgumentIds": [
+          "carbon_effectiveness_oppose",
+          "carbon_material_oppose",
+          "carbon_power_oppose"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_ALTERNATIVE",
+          "CQ_PROPORTIONALITY",
+          "CQ_DISTRIBUTION"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "workplace_shared_control_support",
+      "tradition": "share_productive_governance",
+      "reference": {
+        "schemeId": "participatory_governance",
+        "requiredPremiseClaimIds": [
+          "workers_excluded_from_major_decisions",
+          "workplace_cogovernance_scope"
+        ],
+        "targetElementIds": [
+          "element:employee_half_board"
+        ],
+        "rebuttalArgumentIds": [
+          "workplace_continuity_oppose",
+          "workplace_investor_control_oppose",
+          "workplace_wellbeing_oppose"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_AFFECTED_SCOPE",
+          "CQ_GOVERNANCE_COST"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "education_fair_opportunity_support",
+      "tradition": "fair_equality_of_opportunity",
+      "reference": {
+        "schemeId": "fair_opportunity",
+        "requiredPremiseClaimIds": [
+          "education_social_origin_gap",
+          "education_program_reduces_origin_gap",
+          "education_opportunity_program_scope"
+        ],
+        "targetElementIds": [
+          "element:national_formula"
+        ],
+        "rebuttalArgumentIds": [
+          "education_continuity_oppose",
+          "education_future_harm_oppose",
+          "education_local_knowledge_oppose"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_COMPARABLE_PREPARATION",
+          "CQ_LOCAL_ADAPTATION"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "emergency_powers_support_reviewable_emergency_authority_1",
+      "tradition": "constitutional_rule_of_law",
+      "reference": {
+        "schemeId": "reviewable_emergency_action",
+        "requiredPremiseClaimIds": [
+          "emergency_powers_scenario_scope",
+          "emergency_powers_support_reason_1"
+        ],
+        "targetElementIds": [
+          "element:emergency_powers_component_1"
+        ],
+        "rebuttalArgumentIds": [
+          "emergency_powers_oppose_preserve_democratic_final_authority_3",
+          "emergency_powers_oppose_protect_adult_moral_autonomy_2",
+          "emergency_powers_oppose_reviewable_emergency_authority_1"
+        ],
+        "undercutterQuestionIds": [
+          "CQ_NECESSITY",
+          "CQ_REVIEW_EFFECTIVE"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "equal_citizenship_ancestry_support_equal_membership_without_ancestry_1",
+      "tradition": "universal_civic_equality",
+      "reference": {
+        "schemeId": "equal_membership",
+        "requiredPremiseClaimIds": [
+          "equal_citizenship_ancestry_scenario_scope",
+          "equal_citizenship_ancestry_support_reason_1"
+        ],
+        "targetElementIds": [
+          "element:equal_citizenship_ancestry_component_4"
+        ],
+        "rebuttalArgumentIds": [],
+        "undercutterQuestionIds": [
+          "CQ_MEMBERSHIP_SCOPE",
+          "CQ_RELEVANT_DIFFERENCE"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "punishment_desert_support_honor_proportionate_desert_1",
+      "tradition": "deserved_accountability",
+      "reference": {
+        "schemeId": "evidential_policy_support",
+        "requiredPremiseClaimIds": [
+          "punishment_desert_scenario_scope",
+          "punishment_desert_support_reason_1",
+          "honor_proportionate_desert"
+        ],
+        "targetElementIds": [
+          "element:punishment_desert_component_4"
+        ],
+        "rebuttalArgumentIds": [
+          "punishment_desert_oppose_preserve_institutional_learning_2",
+          "punishment_desert_oppose_protect_adult_moral_autonomy_3",
+          "punishment_desert_oppose_restore_rehabilitated_dignity_1"
+        ],
+        "undercutterQuestionIds": [],
+        "contentiousReconstruction": true
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "expert_referendum_veto_support_preserve_reviewable_correction_2",
+      "tradition": "epistemic_competence",
+      "reference": {
+        "schemeId": "epistemic_pause",
+        "requiredPremiseClaimIds": [
+          "expert_referendum_veto_scenario_scope",
+          "expert_referendum_veto_support_reason_2"
+        ],
+        "targetElementIds": [
+          "element:expert_veto"
+        ],
+        "rebuttalArgumentIds": [],
+        "undercutterQuestionIds": [
+          "CQ_EVIDENCE_DECISIVE",
+          "CQ_DEMOCRATIC_OVERRIDE"
+        ],
+        "contentiousReconstruction": false
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "ecological_intrinsic_value_support_protect_ecosystems_intrinsically_1",
+      "tradition": "ecological_integrity",
+      "reference": {
+        "schemeId": "evidential_policy_support",
+        "requiredPremiseClaimIds": [
+          "ecological_intrinsic_value_scenario_scope",
+          "ecological_intrinsic_value_support_reason_1",
+          "protect_ecosystems_intrinsically"
+        ],
+        "targetElementIds": [
+          "element:ecological_intrinsic_value_component_3"
+        ],
+        "rebuttalArgumentIds": [
+          "ecological_intrinsic_value_oppose_compare_impartial_wellbeing_2",
+          "ecological_intrinsic_value_oppose_respect_contractual_investment_control_1",
+          "ecological_intrinsic_value_oppose_respect_self_ownership_boundary_3"
+        ],
+        "undercutterQuestionIds": [],
+        "contentiousReconstruction": true
+      },
+      "resolution": "pending",
+      "reviews": []
+    },
+    {
+      "argumentId": "land_value_tax_support_share_unearned_land_value_1",
+      "tradition": "fair_equality_of_opportunity",
+      "reference": {
+        "schemeId": "evidential_policy_support",
+        "requiredPremiseClaimIds": [
+          "land_value_tax_scenario_scope",
+          "land_value_tax_support_reason_1",
+          "share_unearned_land_value"
+        ],
+        "targetElementIds": [
+          "element:land_value_tax_component_1"
+        ],
+        "rebuttalArgumentIds": [
+          "land_value_tax_oppose_protect_local_land_autonomy_3",
+          "land_value_tax_oppose_respect_contractual_investment_control_2",
+          "land_value_tax_oppose_respect_self_ownership_boundary_1"
+        ],
+        "undercutterQuestionIds": [],
+        "contentiousReconstruction": true
+      },
+      "resolution": "pending",
+      "reviews": []
+    }
+  ]
+}

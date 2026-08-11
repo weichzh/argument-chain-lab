@@ -19,6 +19,7 @@ import {
   getRelevantDilemmas,
   policies,
 } from '../src/data/model.js';
+import { contributionEligibility } from '../src/lib/contribution.js';
 
 const { model } = await loadCurrentFormalModel();
 configureFormalModel(model);
@@ -54,6 +55,22 @@ function answerAllFacts(state, argumentId, response = 'true') {
   return next;
 }
 
+function resolveFormalQuestions(state, response = 'satisfied') {
+  let next = state;
+  while (next.phase === PHASES.FORMAL_QUESTION) {
+    next = act(next, { type: 'ANSWER_FORMAL_QUESTION', response });
+  }
+  return next;
+}
+
+const acceptBridge = (state) => resolveFormalQuestions(
+  act(state, { type: 'ANSWER_BRIDGE', response: 'accept' }),
+);
+
+const acceptDefeaterBridge = (state) => resolveFormalQuestions(
+  act(state, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' }),
+);
+
 const finishDefeater = (state) => state.phase === PHASES.DEFEATER
   ? act(state, { type: 'NO_DEFEATER_ACCEPTED' })
   : state;
@@ -61,7 +78,7 @@ const finishDefeater = (state) => state.phase === PHASES.DEFEATER
 function answerDefeater(state, argumentId, effect) {
   let next = act(state, { type: 'SELECT_DEFEATER', argumentId });
   while (next.phase === PHASES.DEFEATER_FACT) next = act(next, { type: 'ANSWER_DEFEATER_FACT', response: 'true' });
-  next = act(next, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  next = acceptDefeaterBridge(next);
   return act(next, { type: 'ANSWER_DEFEATER', effect });
 }
 
@@ -77,13 +94,13 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = answerFact(state, firstFact);
   for (const _factId of argumentsById.speech_harm_support.factIds.slice(1)) state = answerFact(state, 'true');
   assert.equal(state.phase, PHASES.BRIDGE);
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   assert.equal(state.phase, PHASES.DEPTH);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   assert.equal(state.currentTargetClaimId, 'prevent_severe_harm');
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
   state = answerFact(state, 'true');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   assert.equal(state.phase, PHASES.TERMINAL_CONFIRM);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   assert.equal(state.phase, PHASES.STRESS);
@@ -95,6 +112,30 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   }
   assert.equal(state.phase, PHASES.POLICY_COMPLETE);
   return state;
+}
+
+{
+  let state = createRealWorldState();
+  state = startFirstPolicy(state);
+  state = act(state, { type: 'SET_STANCE', stance: 'support' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
+  state = answerAllFacts(state, 'speech_harm_support');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  assert.equal(state.phase, PHASES.FORMAL_QUESTION);
+  const firstQuestionId = state.pendingFormalQuestion.criticalQuestionId;
+  const invalidResume = migrateSavedState({
+    ...state,
+    pendingFormalQuestion: { ...state.pendingFormalQuestion, criticalQuestionId: 'CQ_UNKNOWN' },
+  });
+  assert.equal(invalidResume.currentChain, null, 'A stale formal question must not leave a restored session stuck.');
+  const defeated = act(state, { type: 'ANSWER_FORMAL_QUESTION', response: 'defeated' });
+  assert.equal(defeated.phase, PHASES.BROKEN);
+  state = act(state, { type: 'ANSWER_FORMAL_QUESTION', response: 'satisfied' });
+  assert.equal(state.phase, PHASES.FORMAL_QUESTION);
+  assert.notEqual(state.pendingFormalQuestion.criticalQuestionId, firstQuestionId, 'Critical questions should be asked one at a time.');
+  state = act(state, { type: 'ANSWER_FORMAL_QUESTION', response: 'unknown' });
+  assert.equal(state.phase, PHASES.DEPTH);
+  assert.equal(state.currentChain.steps.at(-1).formalCheck.dialecticalStatus, 'undecided');
 }
 
 {
@@ -145,11 +186,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'emergency_powers_support_reviewable_emergency_authority_1' });
   state = answerAllFacts(state, 'emergency_powers_support_reviewable_emergency_authority_1');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'reviewable_emergency_authority_to_constitutional_rule_of_law' });
   state = answerAllFacts(state, 'reviewable_emergency_authority_to_constitutional_rule_of_law');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
   state = finishDefeater(state);
@@ -159,11 +200,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'emergency_powers_oppose_preserve_democratic_final_authority_3' });
   state = answerAllFacts(state, 'emergency_powers_oppose_preserve_democratic_final_authority_3');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'preserve_democratic_final_authority_to_democratic_authorship' });
   state = answerAllFacts(state, 'preserve_democratic_final_authority_to_democratic_authorship');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
   assert.equal(getSelectedChain(state).status, 'tension');
@@ -186,7 +227,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
     assert.equal(state.phase, PHASES.FACT);
     state = answerAllFacts(state, argumentId);
     assert.equal(state.phase, PHASES.BRIDGE);
-    state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+    state = acceptBridge(state);
     if (state.phase === PHASES.DEPTH) state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   }
 
@@ -216,6 +257,25 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert(getSelectedChain(state).steps.every((step) => step.formalCheck?.locallyLicensed));
   assert(getSelectedChain(state).steps.every((step) => step.formalCheck?.evidenceStatus === 'established'));
   assert.equal(state.currentChain, null, 'Completed chains must only live in records.');
+}
+
+{
+  let state = { ...completeSpeechChain(), phase: PHASES.DEFEATER };
+  state = act(state, { type: 'SELECT_DEFEATER', argumentId: 'speech_choice_oppose' });
+  state = act(state, { type: 'ANSWER_DEFEATER_FACT', response: 'false' });
+  while (state.phase === PHASES.DEFEATER_FACT) {
+    state = act(state, { type: 'ANSWER_DEFEATER_FACT', response: 'true' });
+  }
+  state = act(state, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  assert.equal(state.phase, PHASES.DEFEATER_IMPACT);
+  state = act(state, { type: 'ANSWER_DEFEATER', effect: 'reject' });
+  const chain = getSelectedChain(state);
+  assert(chain.defeaterReview.formalCheck.openCriticalQuestions.length > 0);
+  assert.equal(
+    contributionEligibility(state, chain).eligible,
+    true,
+    'Critical questions on a counterargument with a failed premise must not block contribution.',
+  );
 }
 
 {
@@ -419,7 +479,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
   state = act(state, { type: 'ANSWER_FACT', response: 'true' });
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'fixed_point' });
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'reject' });
   state = act(state, { type: 'RESOLVE_BREAK', resolution: 'alternate_argument' });
@@ -443,11 +503,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'RETRY_POLICY' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
   state = answerAllFacts(state, 'speech_harm_support');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
   state = answerAllFacts(state, 'severe_harm_to_security');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
   state = finishDefeater(state);
@@ -501,7 +561,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'RESOLVE_CONFLICT', resolution: 'keep_prior' });
   assert.equal(state.pendingDefeaterFactResponses.speech_scope_noncoercive, 'true');
   assert.equal(state.phase, PHASES.DEFEATER_BRIDGE);
-  state = act(state, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  state = acceptDefeaterBridge(state);
   assert.equal(state.phase, PHASES.CONFLICT, 'A defeater bridge must use the same conflict index as the main chain.');
   assert.equal(state.pendingConflict.context, 'defeater_bridge');
 }
@@ -535,7 +595,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = { ...state, phase: PHASES.DEFEATER };
   state = act(state, { type: 'SELECT_DEFEATER', argumentId: 'speech_choice_oppose' });
   state = act(state, { type: 'ANSWER_DEFEATER_FACT', response: 'true' });
-  state = act(state, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  state = acceptDefeaterBridge(state);
   assert.equal(state.phase, PHASES.DEFEATER_IMPACT);
   const rejected = act(state, { type: 'ANSWER_DEFEATER', effect: 'reject' });
   assert.equal(rejected.phase, PHASES.DEFEATER_IMPACT, 'An established counterargument cannot be relabelled as not accepted.');
@@ -595,6 +655,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'ANSWER_BRIDGE', response: 'reject' });
   assert.equal(state.phase, PHASES.CONFLICT, 'Opposite answer to the same bridge should pause the chain.');
   state = act(state, { type: 'RESOLVE_CONFLICT', resolution: 'keep_prior' });
+  state = resolveFormalQuestions(state);
   assert.equal(state.phase, PHASES.DEPTH, 'Keeping the prior accepted bridge should let the current chain continue.');
   assert.equal(state.currentChain.steps.at(-1).bridgeResponse, 'accept');
 }
@@ -621,11 +682,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert.equal(getArgumentsForClaim('workplace_cogovernance_oppose').length, 3);
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'workplace_shared_control_support' });
   state = answerAllFacts(state, 'workplace_shared_control_support');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'production_to_productive_self_governance' });
   state = answerAllFacts(state, 'production_to_productive_self_governance');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
   state = finishDefeater(state);
@@ -651,11 +712,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'education_local_knowledge_oppose' });
   state = answerAllFacts(state, 'education_local_knowledge_oppose');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'local_feedback_to_decentralized_adaptation' });
   state = answerAllFacts(state, 'local_feedback_to_decentralized_adaptation');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
   state = finishDefeater(state);
@@ -674,7 +735,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
   state = act(state, { type: 'ANSWER_FACT', response: 'true' });
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   assert.equal(state.phase, PHASES.DEPTH);
   state = act(state, { type: 'SET_DEPTH', decision: 'fixed_point' });
   assert.equal(state.phase, PHASES.TERMINAL_CONFIRM, 'Any accepted normative bridge can be nominated.');
@@ -698,11 +759,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
   state = answerAllFacts(state, 'speech_harm_support');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
   state = act(state, { type: 'ANSWER_FACT', response: 'true' });
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'uncertain' });
   assert.equal(state.phase, PHASES.POLICY_COMPLETE);
   assert.equal(getSelectedChain(state).status, 'unresolved');
@@ -715,11 +776,11 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'RETRY_POLICY' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
   state = answerAllFacts(state, 'speech_harm_support');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
   state = answerAllFacts(state, 'severe_harm_to_security');
-  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = acceptBridge(state);
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'continue' });
   assert.equal(state.phase, PHASES.ARGUMENT, 'A missing bank argument must not block deeper AI-assisted recursion.');
   assert.equal(state.currentTargetClaimId, 'bodily_security');

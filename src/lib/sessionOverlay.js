@@ -1,4 +1,4 @@
-import { normalizeSessionOverlay } from '../data/model.js';
+import { arglogicCatalog, normalizeSessionOverlay } from '../data/model.js';
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -11,7 +11,7 @@ const exactKeys = (value, allowed) => (
 );
 
 export const validateArgumentCandidate = (candidate, expectedScope, expectedDirection = null) => {
-  if (!exactKeys(candidate, ['scope', 'direction', 'target', 'argument', 'facts', 'bridge', 'stressTest'])) {
+  if (!exactKeys(candidate, ['scope', 'direction', 'schemeId', 'target', 'argument', 'facts', 'bridge', 'stressTest'])) {
     return { ok: false, error: 'AI 返回的候选包含未知字段或结构不完整。' };
   }
   if (candidate.scope !== expectedScope) {
@@ -22,6 +22,9 @@ export const validateArgumentCandidate = (candidate, expectedScope, expectedDire
   }
   if (expectedDirection && candidate.direction !== expectedDirection) {
     return { ok: false, error: '候选方向与当前论证方向不一致。' };
+  }
+  if (!arglogicCatalog?.schemes?.some((scheme) => scheme.id === candidate.schemeId)) {
+    return { ok: false, error: '候选使用了方案目录之外的论证方案。' };
   }
   if (!exactKeys(candidate.target, ['shortLabel', 'text'])
     || !hasText(candidate.target.shortLabel, 160)
@@ -172,6 +175,7 @@ export const mergeCandidateIntoOverlay = (
       bridge: candidate.bridge.text.trim(),
       result: candidate.target.text.trim(),
     },
+    proposedSchemeId: candidate.schemeId,
     origin: 'session_overlay',
   };
 
