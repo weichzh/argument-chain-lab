@@ -127,9 +127,10 @@ assert.equal(facts[protectedFactId].statement, protectedStatement, 'Session over
 applySessionOverlay(installed.overlay);
 assert.equal(policies.find((policy) => policy.id === installed.policyId)?.origin, 'session_overlay');
 assert.equal(claims[installed.targetClaimId].text, candidate.target.text);
+assert.equal(claims[installed.overlay.arguments[installed.argumentId].bridgeClaimId].nominatable, true);
 assert.equal(argumentsById[installed.argumentId].factIds.length, candidate.facts.length);
 
-let state = createInitialState();
+let state = reducer(createInitialState(), { type: 'SET_ASSESSMENT_MODE', mode: 'real_world_belief' });
 state = reducer(state, { type: 'SET_SESSION_OVERLAY', overlay: installed.overlay });
 state = reducer(state, {
   type: 'START_FROM_CANDIDATE',
@@ -187,6 +188,11 @@ applySessionOverlay(installed.overlay);
 
 const contribution = buildContributionPackage(state, state.currentChain);
 assert.equal(contribution.ok, true, contribution.reasons?.join('; '));
+const conditionalContribution = buildContributionPackage(state, {
+  ...state.currentChain,
+  steps: state.currentChain.steps.map((step) => ({ ...step, assessmentMode: 'conditional_scenario' })),
+});
+assert.equal(conditionalContribution.ok, false, 'Conditionally stipulated facts must not enter the public contribution path.');
 assert.equal(validateContributionPackage(contribution.value).ok, true);
 const contributionText = JSON.stringify(contribution.value);
 assert(!contributionText.includes(rawDraft));

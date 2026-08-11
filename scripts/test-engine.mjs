@@ -3,7 +3,9 @@ import { loadCurrentFormalModel } from './lib/load-formal-model.mjs';
 import {
   PHASES,
   calculatePriority,
+  collectTerminalCommitments,
   createInitialState,
+  migrateSavedState,
   reducer,
   sessionSummary,
 } from '../src/lib/engine.js';
@@ -18,6 +20,7 @@ const { model } = await loadCurrentFormalModel();
 configureFormalModel(model);
 
 const act = (state, action) => reducer(state, action);
+const createRealWorldState = () => act(createInitialState(), { type: 'SET_ASSESSMENT_MODE', mode: 'real_world_belief' });
 
 function answerAllFacts(state, argumentId, response = 'true') {
   let next = state;
@@ -27,8 +30,8 @@ function answerAllFacts(state, argumentId, response = 'true') {
   return next;
 }
 
-function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
-  let state = createInitialState();
+function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentMode = 'real_world_belief' } = {}) {
+  let state = act(createInitialState(), { type: 'SET_ASSESSMENT_MODE', mode: assessmentMode });
   state = act(state, { type: 'START' });
   assert.equal(state.phase, PHASES.STANCE);
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
@@ -54,7 +57,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
 }
 
 {
-  let state = createInitialState();
+  let state = createRealWorldState();
   state = act(state, { type: 'START' });
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
 
@@ -90,6 +93,14 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
 }
 
 {
+  const state = completeSpeechChain({ assessmentMode: 'conditional_scenario' });
+  assert.equal(state.currentChain.status, 'conditional');
+  assert.equal(state.records.speech_restriction.hasConditional, true);
+  assert.equal(state.assessmentMode, 'conditional_scenario');
+  assert(sessionSummary(state).tensions.some((item) => item.kind === 'conditional_scenario'));
+}
+
+{
   const state = completeSpeechChain({ firstFact: 'false' });
   assert.equal(state.currentChain.status, 'conditional');
   assert.equal(state.records.speech_restriction.status, 'conditional');
@@ -105,7 +116,51 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
 }
 
 {
-  let state = createInitialState();
+  const state = completeSpeechChain({ stress: 'qualified_exception' });
+  assert.equal(state.currentChain.status, 'tension');
+  assert.equal(collectTerminalCommitments(state).length, 0, 'A qualified scope exception must not enter dilemma eligibility.');
+  assert(sessionSummary(state).tensions.some((item) => item.kind === 'scope_tension'));
+}
+
+{
+  const state = completeSpeechChain({ stress: 'qualified_exception' });
+  const legacyChain = {
+    ...state.currentChain,
+    status: 'complete',
+    steps: state.currentChain.steps.map(({ assessmentMode: _assessmentMode, ...step }) => step),
+  };
+  const migrated = migrateSavedState({
+    ...state,
+    modelVersion: '0.7.0',
+    assessmentMode: undefined,
+    currentChain: legacyChain,
+    sessionOverlay: {
+      ...state.sessionOverlay,
+      claims: {
+        local_claim_legacy: {
+          id: 'local_claim_legacy',
+          kind: 'bridge',
+          stressTest: { scenario: '相似案例', question: '仍适用吗？' },
+        },
+      },
+    },
+    records: {
+      speech_restriction: {
+        ...state.records.speech_restriction,
+        status: 'complete',
+        chains: [legacyChain],
+      },
+    },
+  });
+  assert.equal(migrated.modelVersion, model.meta.version);
+  assert.equal(migrated.assessmentMode, 'real_world_belief');
+  assert.equal(migrated.currentChain.status, 'tension');
+  assert.equal(migrated.records.speech_restriction.hasTension, true);
+  assert.equal(migrated.sessionOverlay.claims.local_claim_legacy.nominatable, true);
+}
+
+{
+  let state = createRealWorldState();
   state = act(state, { type: 'START' });
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
@@ -118,7 +173,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
 }
 
 {
-  let state = createInitialState();
+  let state = createRealWorldState();
   state = act(state, { type: 'START' });
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
@@ -137,6 +192,9 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   state = act(state, { type: 'RETRY_POLICY' });
   state = act(state, { type: 'SKIP_POLICY', reason: 'Regression check.' });
   assert.equal(state.records.speech_restriction.status, 'complete', 'An unresolved retry must not downgrade an existing complete record.');
+  assert.equal(state.records.speech_restriction.mixed, true);
+  assert.equal(state.records.speech_restriction.hasComplete, true);
+  assert.equal(state.records.speech_restriction.hasUnresolved, true);
 }
 
 {
@@ -170,14 +228,15 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   let state = createInitialState();
   state = act(state, { type: 'START' });
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
-  state = act(state, { type: 'NO_ARGUMENT' });
+  state = act(state, { type: 'NO_ARGUMENT', summary: '缺少基于宗教良心的反对理由。' });
   assert.equal(state.phase, PHASES.POLICY_COMPLETE);
   assert.equal(state.currentChain.status, 'unresolved');
   assert.equal(state.modelGaps.length, 1);
+  assert.equal(state.modelGaps[0].summary, '缺少基于宗教良心的反对理由。');
 }
 
 {
-  let state = createInitialState();
+  let state = createRealWorldState();
   state = act(state, { type: 'START_AT_POLICY', policyId: 'workplace_cogovernance' });
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
   assert(getArgumentsForClaim('speech_oppose').some((item) => item.id === 'speech_inquiry_oppose'));
@@ -209,7 +268,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   assert.equal(getArgumentsForClaim('education_opportunity_support').length, 3);
   assert.equal(getArgumentsForClaim('education_opportunity_oppose').length, 3);
 
-  let state = createInitialState();
+  let state = createRealWorldState();
   state = act(state, { type: 'START_AT_POLICY', policyId: 'education_opportunity_fund' });
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'education_local_knowledge_oppose' });
@@ -239,22 +298,24 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
   state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
   assert.equal(state.phase, PHASES.DEPTH);
   state = act(state, { type: 'SET_DEPTH', decision: 'fixed_point' });
-  assert.equal(state.phase, PHASES.TERMINAL_CONFIRM, 'Nominating any bridge must require a separate fixed-point confirmation.');
-  assert.equal(state.currentChain.terminal.status, 'terminal_candidate');
-  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'continue' });
-  assert.equal(state.phase, PHASES.ARGUMENT, 'A user must be able to retract the nomination and continue asking why.');
-  assert.equal(state.currentTargetClaimId, 'protect_nonharmful_choice');
+  assert.equal(state.phase, PHASES.DEPTH, 'A bridge without a structured stress test cannot become a stopping point.');
   assert.equal(state.currentChain.terminal, null);
+  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
+  assert.equal(state.phase, PHASES.ARGUMENT);
+  assert.equal(state.currentTargetClaimId, 'protect_nonharmful_choice');
 }
 
 {
   let state = createInitialState();
   state = act(state, { type: 'START' });
-  state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
-  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
+  state = act(state, { type: 'SET_STANCE', stance: 'support' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
+  state = answerAllFacts(state, 'speech_harm_support');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
   state = act(state, { type: 'ANSWER_FACT', response: 'true' });
   state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
-  state = act(state, { type: 'SET_DEPTH', decision: 'fixed_point' });
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'uncertain' });
   assert.equal(state.phase, PHASES.POLICY_COMPLETE);
   assert.equal(state.currentChain.status, 'unresolved');
@@ -301,7 +362,8 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
     },
   };
   const priority = calculatePriority(state);
-  assert(priority.ranking.length >= 3);
+  assert.equal('ranking' in priority, false, 'Sparse local comparisons must not be converted into a total ranking.');
+  assert.equal(priority.edges.length, 3);
   assert(priority.cycles.some((cycle) => cycle.includes('equal_agency') && cycle.includes('bodily_security') && cycle.includes('democratic_authorship')));
 }
 
@@ -312,6 +374,18 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply' } = {}) {
     dilemmaResponses: { agency_vs_security: { response: 'undecided' } },
   };
   assert.equal(calculatePriority(state).unanswered, 0, 'An explicit undecided response is answered, not missing.');
+}
+
+{
+  const state = {
+    ...createInitialState(),
+    dilemmaQueue: ['agency_vs_security'],
+    dilemmaResponses: { agency_vs_security: { response: 'equal' } },
+  };
+  const priority = calculatePriority(state);
+  assert.equal(priority.ties.length, 1);
+  assert.equal(priority.edges.length, 0);
+  assert.equal(priority.incomparables.length, 0);
 }
 
 {

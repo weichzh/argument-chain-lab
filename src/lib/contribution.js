@@ -64,8 +64,11 @@ export const contributionEligibility = (state, chain) => {
     || step.bridgeResponse !== 'accept'
   ))) reasons.push('仍有事实或规范原则未被完整接受。');
   if (chain?.terminal?.status !== 'provisional_fixed_point') reasons.push('当前基本价值尚未被独立确认。');
-  if (!chain?.stress || ['unexplained_exception', 'retract', 'uncertain'].includes(chain.stress.response)) {
+  if (!chain?.stress || ['unexplained_exception', 'qualified_exception', 'retract', 'uncertain'].includes(chain.stress.response)) {
     reasons.push('压力测试仍有未说明张力。');
+  }
+  if (chain?.steps?.some((step) => step.assessmentMode !== 'real_world_belief')) {
+    reasons.push('只有现实判断模式确认的经验前提可以进入公开贡献。');
   }
   if (chain?.scopeConflicts?.length) reasons.push('仍有未说明的适用范围冲突。');
   if (state.pendingConflict?.chainId === chain?.id) reasons.push('当前论证仍有未处理冲突。');

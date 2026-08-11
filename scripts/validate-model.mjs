@@ -20,6 +20,7 @@ const forbiddenNormativeTerms = [
   '权利', '善', '恶', '值得', '合理', '不合理', '可接受', '不可接受', '优先',
 ];
 const allowedFactKinds = new Set(['stipulated', 'empirical', 'descriptive']);
+const allowedEvaluationModes = new Set(['scenario_assumption', 'empirical_claim_inside_scenario', 'descriptive_claim']);
 const allowedClaimKinds = new Set(['policy', 'bridge', 'terminal']);
 
 const ids = new Set();
@@ -42,6 +43,7 @@ for (const [id, item] of Object.entries(facts)) {
   }
   if (item.statement.length > 120) warnings.push(`Fact ${id} is longer than 120 Chinese characters and should be reviewed for readability.`);
   if (!allowedFactKinds.has(item.kind)) failures.push(`Fact ${id} has invalid kind ${item.kind}.`);
+  if (!allowedEvaluationModes.has(item.evaluationMode)) failures.push(`Fact ${id} has invalid evaluationMode ${item.evaluationMode}.`);
   const searchable = [item.statement, item.truthConditions, item.falsifier, item.note].filter(Boolean).join(' ');
   for (const term of forbiddenNormativeTerms) {
     if (searchable.includes(term)) failures.push(`Fact ${id} contains normative term “${term}”: ${item.statement}`);
@@ -59,7 +61,10 @@ for (const [id, claim] of Object.entries(claims)) {
   if (claim.kind !== 'policy' && (!claim.example || typeof claim.example !== 'string')) failures.push(`Normative claim ${id} has no concrete example.`);
   if (claim.text?.length > 130) warnings.push(`Claim ${id} is longer than 130 Chinese characters and should be reviewed for readability.`);
   if (claim.kind === 'policy' && !claim.policyId) failures.push(`Policy claim ${id} has no policyId.`);
-  if (claim.kind === 'terminal' && !claim.stressTest) failures.push(`Terminal claim ${id} has no stress test.`);
+  if ((claim.kind === 'terminal' || claim.nominatable === true) && !claim.stressTest) {
+    failures.push(`Nominatable claim ${id} has no stress test.`);
+  }
+  if (claim.kind !== 'policy' && typeof claim.nominatable !== 'boolean') failures.push(`Normative claim ${id} has no nominatable flag.`);
 }
 
 for (const [id, argument] of Object.entries(argumentsById)) {
@@ -91,6 +96,23 @@ for (const policy of policies) {
     const candidates = getArgumentsForClaim(claimId);
     if (candidates.length < 3) failures.push(`Policy claim ${claimId} needs at least 3 candidate arguments; found ${candidates.length}.`);
   }
+  if (!Array.isArray(policy.components) || policy.components.length < 2) {
+    failures.push(`Policy ${policy.id} needs independently reviewable components.`);
+  } else if (new Set(policy.components.map((component) => component.id)).size !== policy.components.length) {
+    failures.push(`Policy ${policy.id} has duplicate component ids.`);
+  }
+}
+
+for (const mode of ['conditional_scenario', 'real_world_belief']) {
+  if (!model.assessmentModes?.[mode]?.label || !model.assessmentModes?.[mode]?.instruction) {
+    failures.push(`Assessment mode ${mode} is incomplete.`);
+  }
+}
+if (!['conditional_scenario', 'real_world_belief'].includes(model.assessmentModes?.default)) {
+  failures.push('Assessment modes need a supported default.');
+}
+if (!model.dilemmaResponseScale?.allowed?.includes('equal') || !model.dilemmaResponseScale?.allowed?.includes('undecided')) {
+  failures.push('Dilemma response scale must distinguish equal from undecided.');
 }
 
 for (const claim of Object.values(claims)) {

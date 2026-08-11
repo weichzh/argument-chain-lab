@@ -157,6 +157,7 @@ export const mergeCandidateIntoOverlay = (
       question: candidate.stressTest.question.trim(),
       distinctions: [],
     },
+    nominatable: true,
     origin: 'session_overlay',
   };
   next.arguments[argumentId] = {

@@ -1,5 +1,6 @@
 import {
   MODEL_META,
+  assessmentModes,
   argumentsById,
   claims,
   dilemmas,
@@ -34,6 +35,7 @@ export const PHASES = Object.freeze({
 export const createInitialState = () => ({
   modelVersion: MODEL_META.version,
   storageVersion: 4,
+  assessmentMode: assessmentModes.default || 'real_world_belief',
   phase: PHASES.LANDING,
   entryPath: null,
   sessionOverlay: {
@@ -86,6 +88,11 @@ const ensurePolicyRecord = (state, policyId, patch = {}) => ({
   chains: [],
   draft: null,
   status: 'not_started',
+  hasComplete: false,
+  hasConditional: false,
+  hasTension: false,
+  hasUnresolved: false,
+  mixed: false,
   ...state.records[policyId],
   ...patch,
 });
@@ -121,7 +128,7 @@ const responseSummary = (responses) => {
 const classifyChain = (chain) => {
   if (!chain?.terminal || chain.terminal.status !== 'provisional_fixed_point') return 'unresolved';
   if (!chain.stress) return 'unresolved';
-  if (chain.stress?.response === 'unexplained_exception') return 'tension';
+  if (['unexplained_exception', 'qualified_exception'].includes(chain.stress?.response)) return 'tension';
   if (chain.scopeConflicts?.length) return 'tension';
   if (chain.stress?.response === 'retract' || chain.stress?.response === 'uncertain') return 'unresolved';
 
@@ -129,6 +136,7 @@ const classifyChain = (chain) => {
   const allBridgesAccepted = chain.steps.every((step) => step.bridgeResponse === 'accept');
   if (!allBridgesAccepted) return 'unresolved';
   if (factValues.some((value) => value !== 'true')) return 'conditional';
+  if (chain.steps.some((step) => step.assessmentMode === 'conditional_scenario')) return 'conditional';
   return 'complete';
 };
 
@@ -143,6 +151,17 @@ const classifyRecordStatus = (chains) => (
           ? 'unresolved'
           : 'in_progress'
 );
+
+const recordStatusFlags = (chains) => {
+  const statuses = new Set(chains.map((chain) => chain.status));
+  return {
+    hasComplete: statuses.has('complete'),
+    hasConditional: statuses.has('conditional'),
+    hasTension: statuses.has('tension'),
+    hasUnresolved: statuses.has('unresolved'),
+    mixed: statuses.size > 1,
+  };
+};
 
 const visitSteps = (state, visitor) => {
   Object.values(state.records).forEach((record) => {
@@ -186,7 +205,12 @@ const replacePriorResponses = (state, kind, propositionId, response) => {
       const revised = { ...chain, steps: chain.steps.map(replaceStep) };
       return { ...revised, status: classifyChain(revised) };
     });
-    return [policyId, { ...record, chains, status: classifyRecordStatus(chains) }];
+    return [policyId, {
+      ...record,
+      chains,
+      status: classifyRecordStatus(chains),
+      ...recordStatusFlags(chains),
+    }];
   }));
 
   const currentChain = state.currentChain
@@ -224,6 +248,7 @@ const applyBridgeAnswer = (state, response) => {
     factResponses: state.pendingFactResponses,
     bridgeClaimId: argument.bridgeClaimId,
     bridgeResponse: response,
+    assessmentMode: state.assessmentMode,
     createdAt: now(),
   };
   const currentChain = appendStep(state.currentChain, step);
@@ -270,6 +295,7 @@ const finalizeCurrentChain = (state, stress) => {
         chains,
         draft: null,
         status: recordStatus,
+        ...recordStatusFlags(chains),
       },
     },
     currentChain: chain,
@@ -297,6 +323,7 @@ const finalizeAsUnresolved = (state, reason) => {
         chains,
         draft: null,
         status: classifyRecordStatus(chains),
+        ...recordStatusFlags(chains),
       },
     },
     currentChain: chain,
@@ -417,14 +444,27 @@ const startDirection = (state, direction) => {
   };
 };
 
+export const canNominateClaim = (claim) => Boolean(claim?.nominatable && claim?.stressTest);
+const isAssessmentMode = (mode) => typeof assessmentModes[mode] === 'object';
+
 export const reducer = (state, action) => {
   switch (action.type) {
+    case 'SET_ASSESSMENT_MODE':
+      if (Object.keys(state.records).length || !isAssessmentMode(action.mode)) return state;
+      return { ...state, assessmentMode: action.mode, updatedAt: now() };
+
     case 'START':
-      return startPolicy({ ...createInitialState(), entryPath: 'bank', startedAt: now() }, 0);
+      return startPolicy({
+        ...createInitialState(),
+        assessmentMode: state.assessmentMode,
+        entryPath: 'bank',
+        startedAt: now(),
+      }, 0);
 
     case 'START_OVERVIEW':
       return {
         ...createInitialState(),
+        assessmentMode: state.assessmentMode,
         entryPath: 'bank',
         phase: PHASES.POLICY_OVERVIEW,
         startedAt: now(),
@@ -453,6 +493,7 @@ export const reducer = (state, action) => {
       return startPolicy(
         {
           ...createInitialState(),
+          assessmentMode: state.assessmentMode,
           entryPath: 'bank',
           sessionOverlay: state.sessionOverlay,
           startedAt: now(),
@@ -474,6 +515,7 @@ export const reducer = (state, action) => {
       const initial = startPolicy(
         {
           ...createInitialState(),
+          assessmentMode: state.assessmentMode,
           entryPath: 'custom',
           sessionOverlay: state.sessionOverlay,
           startedAt: now(),
@@ -538,11 +580,13 @@ export const reducer = (state, action) => {
     }
 
     case 'NO_ARGUMENT': {
+      const summary = typeof action.summary === 'string' ? action.summary.trim().slice(0, 400) : '';
       const gap = {
         id: uid('gap'),
         policyId: policies[state.policyIndex]?.id || null,
         chainId: state.currentChain?.id || null,
         targetClaimId: state.currentTargetClaimId,
+        summary: summary || null,
         createdAt: now(),
       };
       return finalizeAsUnresolved(
@@ -663,6 +707,7 @@ export const reducer = (state, action) => {
       if (!lastStep) return state;
       const bridgeClaimId = lastStep.bridgeClaimId;
       if (action.decision === 'fixed_point') {
+        if (!canNominateClaim(claims[bridgeClaimId])) return state;
         return {
           ...state,
           currentChain: {
@@ -938,6 +983,59 @@ export const reducer = (state, action) => {
   }
 };
 
+export const migrateSavedState = (state) => {
+  if (state?.storageVersion !== 4) return null;
+  if (state.modelVersion === MODEL_META.version) {
+    return {
+      ...state,
+      assessmentMode: isAssessmentMode(state.assessmentMode)
+        ? state.assessmentMode
+        : assessmentModes.default || 'real_world_belief',
+    };
+  }
+  if (state.modelVersion !== '0.7.0' || MODEL_META.version !== '0.7.1') return null;
+
+  const migrateChain = (chain) => {
+    if (!chain) return chain;
+    const revised = {
+      ...chain,
+      steps: (chain.steps || []).map((step) => ({
+        ...step,
+        assessmentMode: step.assessmentMode || 'real_world_belief',
+      })),
+    };
+    return revised.completedAt ? { ...revised, status: classifyChain(revised) } : revised;
+  };
+  const records = Object.fromEntries(Object.entries(state.records || {}).map(([policyId, record]) => {
+    const chains = (record.chains || []).map(migrateChain);
+    return [policyId, {
+      ...record,
+      chains,
+      draft: record.draft
+        ? { ...record.draft, currentChain: migrateChain(record.draft.currentChain) }
+        : null,
+      status: record.draft ? 'in_progress' : classifyRecordStatus(chains),
+      ...recordStatusFlags(chains),
+    }];
+  }));
+  const sessionOverlay = {
+    ...state.sessionOverlay,
+    claims: Object.fromEntries(Object.entries(state.sessionOverlay?.claims || {}).map(([claimId, claim]) => [
+      claimId,
+      claim.kind === 'policy' ? claim : { ...claim, nominatable: Boolean(claim.stressTest) },
+    ])),
+  };
+
+  return {
+    ...state,
+    modelVersion: MODEL_META.version,
+    assessmentMode: 'real_world_belief',
+    sessionOverlay,
+    records,
+    currentChain: migrateChain(state.currentChain),
+  };
+};
+
 export const getCurrentPolicy = (state) => policies[state.policyIndex] || null;
 export const getCurrentArgument = (state) => argumentsById[state.currentArgumentId] || null;
 export const getCurrentFact = (state) => {
@@ -959,7 +1057,7 @@ export const collectTerminalCommitments = (state) => {
     record.chains.forEach((chain) => {
       if (!chain.terminal?.claimId) return;
       if (chain.terminal.status !== 'provisional_fixed_point') return;
-      if (!['complete', 'conditional', 'tension'].includes(chain.status)) return;
+      if (!['complete', 'conditional'].includes(chain.status)) return;
       items.push({
         claimId: chain.terminal.claimId,
         policyId: chain.policyId,
@@ -1020,7 +1118,7 @@ export const analyzeTensions = (state) => {
       id: `model_gap_${gap.id}`,
       kind: 'model_gap',
       title: '预设理由没有覆盖用户的实际理由',
-      detail: `${getPolicy(gap.policyId)?.title || gap.policyId || '未知政策'}：系统没有替你选择价值原则；这条理由链停在题库没有覆盖你实际理由的位置。`,
+      detail: `${getPolicy(gap.policyId)?.title || gap.policyId || '未知政策'}：系统没有替你选择价值原则；这条理由链停在题库没有覆盖你实际理由的位置。${gap.summary ? ` 用户确认保存的缺口摘要：${gap.summary}` : ''}`,
       severity: 'low',
     });
   });
@@ -1052,20 +1150,25 @@ export const analyzeTensions = (state) => {
   Object.values(state.records).forEach((record) => {
     record.chains.forEach((chain) => {
       if (chain.status === 'conditional') {
+        const conditionalScenario = chain.steps.some((step) => step.assessmentMode === 'conditional_scenario');
         tensions.push({
           id: `conditional_${chain.id}`,
-          kind: 'empirical_break',
-          title: '规范理由已经说明，但事实前提仍未确定',
-          detail: `${getPolicy(chain.policyId)?.title || chain.policyId}：这条路径目前只能说明：如果相关事实以后得到确认，这套规范理由会为结论提供支持。`,
+          kind: conditionalScenario ? 'conditional_scenario' : 'empirical_break',
+          title: conditionalScenario ? '理由链只在条件性题设下闭合' : '规范理由已经说明，但事实前提仍未确定',
+          detail: conditionalScenario
+            ? `${getPolicy(chain.policyId)?.title || chain.policyId}：本轮采用了题设中的经验描述来检验规范结构，没有确认这些描述在现实中成立。`
+            : `${getPolicy(chain.policyId)?.title || chain.policyId}：这条路径目前只能说明：如果相关事实以后得到确认，这套规范理由会为结论提供支持。`,
           severity: 'medium',
         });
       }
-      if (chain.stress?.response === 'unexplained_exception') {
+      if (['unexplained_exception', 'qualified_exception'].includes(chain.stress?.response)) {
         tensions.push({
           id: `scope_${chain.id}`,
           kind: 'scope_tension',
-          title: '原则在结构相似案例中被例外处理，但尚无相关差别',
-          detail: claims[chain.terminal?.claimId]?.text || '未命名原则',
+          title: chain.stress.response === 'qualified_exception'
+            ? '原则在结构相似案例中需要限定，限定尚未完成审查'
+            : '原则在结构相似案例中被例外处理，但尚无相关差别',
+          detail: chain.stress.distinction || claims[chain.terminal?.claimId]?.text || '未命名原则',
           severity: 'medium',
         });
       }
@@ -1084,12 +1187,22 @@ export const analyzeTensions = (state) => {
   return tensions;
 };
 
-const responseToEdge = (item, response) => {
-  if (!response || response === 'undecided') return null;
-  if (response === 'left_strong') return { winner: item.left, loser: item.right, weight: 2 };
-  if (response === 'left_slight') return { winner: item.left, loser: item.right, weight: 1 };
-  if (response === 'right_slight') return { winner: item.right, loser: item.left, weight: 1 };
-  if (response === 'right_strong') return { winner: item.right, loser: item.left, weight: 2 };
+const responseToRelation = (item, response) => {
+  if (!response) return null;
+  if (response === 'left_strong') {
+    return { dilemmaId: item.id, type: 'preference', winner: item.left, loser: item.right, strength: 'strong', weight: 2 };
+  }
+  if (response === 'left_slight') {
+    return { dilemmaId: item.id, type: 'preference', winner: item.left, loser: item.right, strength: 'slight', weight: 1 };
+  }
+  if (response === 'right_slight') {
+    return { dilemmaId: item.id, type: 'preference', winner: item.right, loser: item.left, strength: 'slight', weight: 1 };
+  }
+  if (response === 'right_strong') {
+    return { dilemmaId: item.id, type: 'preference', winner: item.right, loser: item.left, strength: 'strong', weight: 2 };
+  }
+  if (response === 'equal') return { dilemmaId: item.id, type: 'equal', left: item.left, right: item.right };
+  if (response === 'undecided') return { dilemmaId: item.id, type: 'incomparable', left: item.left, right: item.right };
   return null;
 };
 
@@ -1141,37 +1254,19 @@ export const calculatePriority = (state) => {
   const items = state.dilemmaQueue
     .map((id) => dilemmas.find((item) => item.id === id))
     .filter(Boolean);
-  const edges = items
-    .map((item) => responseToEdge(item, state.dilemmaResponses[item.id]?.response))
+  const relations = items
+    .map((item) => responseToRelation(item, state.dilemmaResponses[item.id]?.response))
     .filter(Boolean);
+  const edges = relations.filter((relation) => relation.type === 'preference');
+  const ties = relations.filter((relation) => relation.type === 'equal');
+  const incomparables = relations.filter((relation) => relation.type === 'incomparable');
   const nodes = [...new Set(items.flatMap((item) => [item.left, item.right]))];
-  const scores = new Map(nodes.map((node) => [node, { id: node, won: 0, lost: 0, comparisons: 0, net: 0 }]));
-
-  items.forEach((item) => {
-    const response = state.dilemmaResponses[item.id]?.response;
-    if (!response || response === 'undecided') return;
-    const left = scores.get(item.left);
-    const right = scores.get(item.right);
-    left.comparisons += 1;
-    right.comparisons += 1;
-  });
-
-  edges.forEach((edge) => {
-    const winner = scores.get(edge.winner);
-    const loser = scores.get(edge.loser);
-    winner.won += edge.weight;
-    loser.lost += edge.weight;
-  });
-
-  scores.forEach((value) => {
-    value.net = value.won - value.lost;
-  });
-
-  const ranking = [...scores.values()].sort((a, b) => b.net - a.net || b.comparisons - a.comparisons || a.id.localeCompare(b.id));
   const cycles = stronglyConnectedComponents(nodes, edges).filter((component) => component.length > 1);
   return {
-    ranking,
+    relations,
     edges,
+    ties,
+    incomparables,
     cycles,
     unanswered: items.filter((item) => !state.dilemmaResponses[item.id]).length,
   };

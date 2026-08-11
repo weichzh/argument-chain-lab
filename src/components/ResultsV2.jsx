@@ -22,7 +22,7 @@ import { sessionSummary } from '../lib/engine.js';
 
 const statusCopy = {
   complete: '严格完整',
-  conditional: '事实未完全确认',
+  conditional: '条件性闭合',
   tension: '仍有张力',
   unresolved: '尚未完成',
 };
@@ -32,6 +32,12 @@ const factResponseCopy = {
   false: '不成立',
   unknown: '不能判断',
 };
+
+const factResponseLabel = (response, assessmentMode) => (
+  assessmentMode === 'conditional_scenario'
+    ? { true: '作为题设采用', false: '不采用这项题设', unknown: '暂不采用' }[response]
+    : factResponseCopy[response]
+);
 
 const bridgeResponseCopy = {
   accept: '接受',
@@ -78,7 +84,7 @@ function ArgumentPreview({ chain }) {
                 <div className="preview-node fact" key={factId}>
                   <span>F</span>
                   <p>{facts[factId]?.statement}</p>
-                  <em>{factResponseCopy[step.factResponses?.[factId]]}</em>
+                  <em>{factResponseLabel(step.factResponses?.[factId], step.assessmentMode)}</em>
                 </div>
               ))}
               <div className="preview-operator">＋</div>
@@ -139,6 +145,7 @@ function MechanicalReport({ state, chains }) {
     if (response === 'left_slight') return { id, text: `${left} ≻ ${right}`, note: '略微优先' };
     if (response === 'right_strong') return { id, text: `${right} ≻ ${left}`, note: '明显优先' };
     if (response === 'right_slight') return { id, text: `${right} ≻ ${left}`, note: '略微优先' };
+    if (response === 'equal') return { id, text: `${left} ≈ ${right}`, note: '本题中同等重要' };
     if (response === 'undecided') return { id, text: `${left} ? ${right}`, note: '本题无法比较' };
     return { id, text: `${left} ? ${right}`, note: '未回答' };
   }).filter(Boolean);
@@ -179,7 +186,7 @@ function MechanicalReport({ state, chains }) {
                       <div>
                         <p>{facts[factId]?.statement}</p>
                         <dl>
-                          <dt>回答</dt><dd>{factResponseCopy[step.factResponses?.[factId]] || '未回答'}</dd>
+                          <dt>回答</dt><dd>{factResponseLabel(step.factResponses?.[factId], step.assessmentMode) || '未回答'}</dd>
                           <dt>成立条件</dt><dd>{facts[factId]?.plainTruthConditions || facts[factId]?.truthConditions}</dd>
                           <dt>否定条件</dt><dd>{facts[factId]?.plainFalsifier || facts[factId]?.falsifier}</dd>
                         </dl>

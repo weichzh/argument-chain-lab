@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import {
+  assessmentModes,
   claims,
   dilemmas,
   facts,
@@ -20,6 +21,7 @@ import {
 } from '../data/model.js';
 import { sessionDraftKey } from '../hooks/useSession.js';
 import {
+  canNominateClaim,
   collectTerminalCommitments,
   getCurrentArgument,
   getCurrentBridge,
@@ -88,6 +90,7 @@ function FreeInput({ state, dispatch, onAskAi, aiLoading, scope = 'current_targe
       return '';
     }
   });
+  const [saveGapSummary, setSaveGapSummary] = useState(false);
 
   useEffect(() => {
     try {
@@ -95,6 +98,7 @@ function FreeInput({ state, dispatch, onAskAi, aiLoading, scope = 'current_targe
     } catch {
       setDraft('');
     }
+    setSaveGapSummary(false);
   }, [key]);
 
   const update = (value) => {
@@ -120,13 +124,21 @@ function FreeInput({ state, dispatch, onAskAi, aiLoading, scope = 'current_targe
           placeholder="写下你的判断、理由或需要补充的条件…"
         />
         <div className="free-input-actions">
-          <p>原文不会写入本地进度；只有选择 AI 梳理时才会发送。</p>
+          <p>原文默认不会写入本地进度；只有选择 AI 梳理时才会发送。</p>
+          {draft.trim() ? (
+            <label className="gap-summary-consent">
+              <input type="checkbox" checked={saveGapSummary} onChange={(event) => setSaveGapSummary(event.target.checked)} />
+              <span>把前 400 字作为题库缺口摘要保存到本地和导出中</span>
+            </label>
+          ) : null}
           <button
             className="button quiet"
             type="button"
             onClick={() => {
+              const summary = saveGapSummary ? draft.trim() : null;
               update('');
-              dispatch({ type: 'NO_ARGUMENT' });
+              setSaveGapSummary(false);
+              dispatch({ type: 'NO_ARGUMENT', summary });
             }}
           >
             记录题库缺口并结束本题
@@ -260,7 +272,10 @@ function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
       <div className="argument-options" id="question-options">
         {argumentsForDisplay.map((argument) => (
           <button className="argument-row" type="button" key={argument.id} onClick={() => dispatch({ type: 'SELECT_ARGUMENT', argumentId: argument.id })}>
-            <strong>{argument.title}</strong>
+            <span className="argument-copy">
+              <strong>{argument.title}</strong>
+              <small>{argument.summary}</small>
+            </span>
             <ArrowRight size={18} />
           </button>
         ))}
@@ -273,9 +288,31 @@ function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
 
 function FactQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const fact = getCurrentFact(state);
+  const conditional = state.assessmentMode === 'conditional_scenario';
+  const stipulated = fact?.evaluationMode === 'scenario_assumption';
+  const title = conditional
+    ? stipulated ? '这项条件与当前题设一致吗？' : '把这项经验描述作为本轮题设条件吗？'
+    : '根据你掌握的现实证据，这个事实成立吗？';
+  const options = conditional
+    ? stipulated
+      ? [
+          ['true', '与题设一致', 'support'],
+          ['false', '与题设不一致', 'oppose'],
+          ['unknown', '暂时无法确认', null],
+        ]
+      : [
+          ['true', '作为题设条件采用', 'support'],
+          ['false', '不采用这项题设条件', 'oppose'],
+          ['unknown', '暂不采用', null],
+        ]
+    : [
+        ['true', '成立', 'support'],
+        ['false', '不成立', 'oppose'],
+        ['unknown', '我还不能判断', null],
+      ];
   return (
     <>
-      <QuestionHeader state={state} label="事实" title="你认为这个事实成立吗？" statement={fact?.statement} />
+      <QuestionHeader state={state} label="事实" title={title} statement={fact?.statement} />
       <details className="evidence-details">
         <summary>查看判断说明与条件</summary>
         <div>
@@ -284,11 +321,12 @@ function FactQuestion({ state, dispatch, onAskAi, aiLoading }) {
           <strong>否定条件</strong><p>{fact?.plainFalsifier || fact?.falsifier}</p>
         </div>
       </details>
-      <ChoiceList options={[
-        { id: 'true', label: '成立', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_FACT', response: 'true' }) },
-        { id: 'false', label: '不成立', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_FACT', response: 'false' }) },
-        { id: 'unknown', label: '我还不能判断', onSelect: () => dispatch({ type: 'ANSWER_FACT', response: 'unknown' }) },
-      ]} />
+      <ChoiceList options={options.map(([id, label, tone]) => ({
+        id,
+        label,
+        tone,
+        onSelect: () => dispatch({ type: 'ANSWER_FACT', response: id }),
+      }))} />
       <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
     </>
   );
@@ -319,11 +357,17 @@ function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
 
 function DepthQuestion({ state, dispatch }) {
   const bridge = claims[state.currentChain?.steps.at(-1)?.bridgeClaimId];
+  const canNominate = canNominateClaim(bridge);
   return (
     <>
       <QuestionHeader state={state} label="继续追问" title="这条原则还需要更深的规范理由吗？" statement={bridge?.text} />
       <ChoiceList options={[
-        { id: 'fixed', label: '它可以作为本轮当前基本价值候选', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'fixed_point' }) },
+        {
+          id: 'fixed',
+          label: canNominate ? '它可以作为本轮当前基本价值候选' : '这条原则还没有结构化反例测试，不能在这里停止',
+          disabled: !canNominate,
+          onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'fixed_point' }),
+        },
         { id: 'deeper', label: '继续追问为什么', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'deeper' }) },
         { id: 'uncertain', label: '暂时无法判断', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'uncertain' }) },
       ]} />
@@ -359,7 +403,7 @@ function StressQuestion({ state, dispatch }) {
       {stress.distinctions?.length ? <ul className="distinction-list">{stress.distinctions.map((item) => <li key={item}>{item}</li>)}</ul> : null}
       <ChoiceList options={[
         { id: 'apply', label: '仍然适用', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'apply' }) },
-        { id: 'qualified', label: '有一个相关区别需要写清楚', onSelect: () => setDistinctionOpen(true) },
+        { id: 'qualified', label: '有一个相关区别需要写清楚（将记录为仍有张力）', onSelect: () => setDistinctionOpen(true) },
         { id: 'unexplained', label: '只在原案例适用，但我说不清区别', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'unexplained_exception' }) },
         { id: 'retract', label: '我撤回这条原则', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'retract' }) },
         { id: 'uncertain', label: '暂时无法判断', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'uncertain' }) },
@@ -409,9 +453,12 @@ function BrokenQuestion({ state, dispatch }) {
 function PolicyComplete({ state, dispatch }) {
   const policy = getCurrentPolicy(state);
   const status = state.currentChain?.status || 'unresolved';
+  const conditionalScenario = state.currentChain?.steps?.some((step) => step.assessmentMode === 'conditional_scenario');
   const copy = {
-    complete: ['这条论证已经完整', '事实、原则、当前基本价值和压力测试都已确认。'],
-    conditional: ['这条论证依赖尚未确认的事实', '结构已经记录，但不能进入公开候选区。'],
+    complete: ['这条单一理由链已经闭合', '事实、原则、当前基本价值和压力测试都已确认；这不表示政策结论已经压倒全部反对理由。'],
+    conditional: conditionalScenario
+      ? ['这条理由链只在题设条件下闭合', '规范结构已经记录，但经验前提没有在现实中得到确认，不能进入公开候选区。']
+      : ['这条论证依赖尚未确认的事实', '结构已经记录，但不能进入公开候选区。'],
     tension: ['这条论证仍有适用范围张力', '结构已经记录，但需要先说明例外或区别。'],
     unresolved: ['这条论证仍未解决', '未完成内容继续只保存在本地。'],
   }[status];
@@ -432,10 +479,12 @@ function PolicyComplete({ state, dispatch }) {
 
 function DilemmaIntro({ state, dispatch }) {
   const commitments = collectTerminalCommitments(state);
+  const uniqueCommitments = [...new Map(commitments.map((item) => [item.claimId, item])).values()];
   return (
     <section className="completion-screen">
       <span className="completion-icon complete"><Check /></span>
-      <h1>已确认 {commitments.length} 项当前基本价值</h1>
+      <h1>已确认 {uniqueCommitments.length} 项当前基本价值</h1>
+      {commitments.length !== uniqueCommitments.length ? <p>这些价值来自 {commitments.length} 条已结束的理由链。</p> : null}
       <p>接下来只比较题库中同时涉及两项已确认价值的具体冲突；也可以直接查看阶段结果。</p>
       <div className="completion-actions">
         <button className="button primary" type="button" onClick={() => dispatch({ type: 'START_DILEMMAS' })}>开始具体冲突检验</button>
@@ -462,6 +511,7 @@ function DilemmaQuestion({ state, dispatch }) {
       <ChoiceList options={[
         { id: 'left-strong', label: '明显选择 A', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'left_strong' }) },
         { id: 'left-slight', label: '略微选择 A', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'left_slight' }) },
+        { id: 'equal', label: 'A 与 B 同等重要', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'equal' }) },
         { id: 'undecided', label: '本题无法比较', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'undecided' }) },
         { id: 'right-slight', label: '略微选择 B', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'right_slight' }) },
         { id: 'right-strong', label: '明显选择 B', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'right_strong' }) },
@@ -476,6 +526,32 @@ const recordStatusCopy = {
   tension: '已结束，有张力',
   unresolved: '已结束，未解决',
 };
+
+function AssessmentModeSelector({ state, dispatch }) {
+  const modes = Object.entries(assessmentModes).filter(([, value]) => value && typeof value === 'object');
+  const current = assessmentModes[state.assessmentMode];
+  const locked = Object.keys(state.records).length > 0;
+  return (
+    <fieldset className="assessment-mode" disabled={locked}>
+      <legend>事实回答方式</legend>
+      <div className="assessment-mode-options">
+        {modes.map(([id, mode]) => (
+          <label key={id}>
+            <input
+              type="radio"
+              name="assessment-mode"
+              value={id}
+              checked={state.assessmentMode === id}
+              onChange={() => dispatch({ type: 'SET_ASSESSMENT_MODE', mode: id })}
+            />
+            <span>{mode.label}</span>
+          </label>
+        ))}
+      </div>
+      <p>{current?.instruction}{locked ? ' 本轮已有答题进度，回答方式已锁定。' : ''}</p>
+    </fieldset>
+  );
+}
 
 function PolicyOverview({ state, dispatch }) {
   const finished = policies.filter((policy) => state.records[policy.id]?.chains?.length).length;
@@ -497,6 +573,8 @@ function PolicyOverview({ state, dispatch }) {
         </div>
       </header>
 
+      <AssessmentModeSelector state={state} dispatch={dispatch} />
+
       <div className="overview-progress" aria-label="答题进度">
         <strong>{finished} / {policies.length}</strong>
         <span>道题已结束{inProgress ? ` · ${inProgress} 道进行中` : ''}</span>
@@ -510,7 +588,7 @@ function PolicyOverview({ state, dispatch }) {
           const direction = record?.draft?.currentChain?.direction || record?.direction || record?.stance;
           const tone = direction === 'support' || direction === 'oppose' ? direction : 'neutral';
           const actionLabel = hasDraft ? '继续' : hasChains ? '再做一次' : '开始';
-          const status = hasDraft ? '进行中' : hasChains ? recordStatusCopy[record.status] || '已结束' : '未开始';
+          const status = hasDraft ? '进行中' : hasChains ? record.mixed ? '已结束，状态混合' : recordStatusCopy[record.status] || '已结束' : '未开始';
           const statusClass = hasDraft ? 'active' : hasChains ? record.status : 'not-started';
           return (
             <li className="policy-row" data-policy-id={policy.id} key={policy.id}>

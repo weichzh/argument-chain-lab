@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
-import { applySessionOverlay, MODEL_META, normalizeSessionOverlay } from '../data/model.js';
-import { createInitialState, reducer } from '../lib/engine.js';
+import { applySessionOverlay, normalizeSessionOverlay } from '../data/model.js';
+import { createInitialState, migrateSavedState, reducer } from '../lib/engine.js';
 
 const STORAGE_KEY = 'argument-chain-lab:progress:v4';
 const DRAFT_PREFIX = 'argument-chain-lab:draft:';
@@ -10,12 +10,14 @@ const loadState = () => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return createInitialState();
     const parsed = JSON.parse(raw);
-    if (parsed?.storageVersion !== 4 || parsed?.modelVersion !== MODEL_META.version) {
+    const sessionOverlay = normalizeSessionOverlay(parsed.sessionOverlay);
+    const migrated = migrateSavedState({ ...parsed, sessionOverlay });
+    if (!migrated) {
+      applySessionOverlay(normalizeSessionOverlay());
       return createInitialState();
     }
-    const sessionOverlay = normalizeSessionOverlay(parsed.sessionOverlay);
-    applySessionOverlay(sessionOverlay);
-    return { ...parsed, sessionOverlay };
+    applySessionOverlay(migrated.sessionOverlay);
+    return migrated;
   } catch {
     applySessionOverlay(normalizeSessionOverlay());
     return createInitialState();
