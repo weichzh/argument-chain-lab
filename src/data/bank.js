@@ -162,8 +162,11 @@ export const loadFormalBank = async () => {
   const modelUrl = new URL(selected.path, manifestUrl).toString();
   const extensionEntries = Array.isArray(manifest.extensions) ? manifest.extensions : [];
 
-  const [model, extensionFiles] = await Promise.all([
+  const [model, benchmarks, extensionFiles] = await Promise.all([
     fetchJson(modelUrl),
+    selected.benchmarks
+      ? fetchJson(new URL(selected.benchmarks, manifestUrl).toString())
+      : Promise.resolve(null),
     Promise.all(extensionEntries.map(async (entry) => {
       const extensionUrl = new URL(entry.path, manifestUrl).toString();
       return fetchJson(extensionUrl, { optional: entry.required === false });
@@ -173,13 +176,14 @@ export const loadFormalBank = async () => {
   const extension = extensionFiles.reduce(mergeExtension, emptyExtension());
   const mergedModel = {
     ...model,
+    ideologyBenchmarks: benchmarks || { profiles: [] },
     facts: { ...model.facts, ...extension.facts },
     claims: { ...model.claims, ...extension.claims },
     arguments: { ...model.arguments, ...extension.arguments },
     policies: [...model.policies, ...extension.policies],
     dilemmas: [...model.dilemmas, ...extension.dilemmas],
   };
-  return { manifest, model: mergedModel, extension };
+  return { manifest, model: mergedModel, extension, benchmarks };
 };
 
 export const bankManifestConstants = Object.freeze({

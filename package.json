@@ -1,13 +1,13 @@
 {
   "name": "argument-atlas-dialogue",
   "private": true,
-  "version": "0.7.1",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/test-engine.mjs && node scripts/validate-model.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs",
+    "test": "node scripts/test-engine.mjs && node scripts/validate-model.mjs && node scripts/test-ideology.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs",
     "test:e2e": "playwright test",
     "export:model": "node scripts/export-model.mjs",
     "dev:worker": "wrangler -c worker/wrangler.jsonc dev",

@@ -22,6 +22,7 @@ const forbiddenNormativeTerms = [
 const allowedFactKinds = new Set(['stipulated', 'empirical', 'descriptive']);
 const allowedEvaluationModes = new Set(['scenario_assumption', 'empirical_claim_inside_scenario', 'descriptive_claim']);
 const allowedClaimKinds = new Set(['policy', 'bridge', 'terminal']);
+const sourceIdSet = new Set(model.sources.map((source) => source.id));
 
 const ids = new Set();
 const registerId = (id, category) => {
@@ -44,6 +45,25 @@ for (const [id, item] of Object.entries(facts)) {
   if (item.statement.length > 120) warnings.push(`Fact ${id} is longer than 120 Chinese characters and should be reviewed for readability.`);
   if (!allowedFactKinds.has(item.kind)) failures.push(`Fact ${id} has invalid kind ${item.kind}.`);
   if (!allowedEvaluationModes.has(item.evaluationMode)) failures.push(`Fact ${id} has invalid evaluationMode ${item.evaluationMode}.`);
+  if (!item.scenarioProfile || typeof item.scenarioProfile !== 'string') failures.push(`Fact ${id} has no scenarioProfile.`);
+  if (!Array.isArray(item.mutuallyExclusiveWith) || !Array.isArray(item.dependsOn) || !Array.isArray(item.sourceIds)) {
+    failures.push(`Fact ${id} needs structured compatibility and source arrays.`);
+  }
+  for (const relatedId of [...(item.mutuallyExclusiveWith || []), ...(item.dependsOn || [])]) {
+    if (!facts[relatedId]) failures.push(`Fact ${id} references unknown compatibility fact ${relatedId}.`);
+  }
+  for (const sourceId of item.sourceIds || []) if (!sourceIdSet.has(sourceId)) failures.push(`Fact ${id} references unknown source ${sourceId}.`);
+  for (const otherId of item.mutuallyExclusiveWith || []) {
+    if (!facts[otherId]?.mutuallyExclusiveWith?.includes(id)) failures.push(`Fact exclusivity ${id} -> ${otherId} is not symmetric.`);
+  }
+  if (item.sensitivity) {
+    if (!item.sensitivity.label || !item.sensitivity.baseline || item.sensitivity.scenarios?.length !== 2) {
+      failures.push(`Fact ${id} has an incomplete low/high sensitivity test.`);
+    }
+    if (new Set(item.sensitivity.scenarios?.map((scenario) => scenario.id)).size !== item.sensitivity.scenarios?.length) {
+      failures.push(`Fact ${id} has duplicate sensitivity scenarios.`);
+    }
+  }
   const searchable = [item.statement, item.truthConditions, item.falsifier, item.note].filter(Boolean).join(' ');
   for (const term of forbiddenNormativeTerms) {
     if (searchable.includes(term)) failures.push(`Fact ${id} contains normative term “${term}”: ${item.statement}`);
@@ -65,6 +85,8 @@ for (const [id, claim] of Object.entries(claims)) {
     failures.push(`Nominatable claim ${id} has no stress test.`);
   }
   if (claim.kind !== 'policy' && typeof claim.nominatable !== 'boolean') failures.push(`Normative claim ${id} has no nominatable flag.`);
+  if (claim.kind !== 'policy' && !claim.valueFamilyId) failures.push(`Normative claim ${id} has no valueFamilyId.`);
+  for (const sourceId of claim.sourceIds || []) if (!sourceIdSet.has(sourceId)) failures.push(`Claim ${id} references unknown source ${sourceId}.`);
 }
 
 for (const [id, argument] of Object.entries(argumentsById)) {
@@ -79,6 +101,8 @@ for (const [id, argument] of Object.entries(argumentsById)) {
   for (const factId of argument.factIds || []) if (!facts[factId]) failures.push(`Argument ${id} has unknown fact ${factId}.`);
   if (!argument.summary || typeof argument.summary !== 'string') failures.push(`Argument ${id} has no human-readable summary.`);
   if (!argument.plainSteps || !Array.isArray(argument.plainSteps.facts)) failures.push(`Argument ${id} has no readable step breakdown.`);
+  if (!argument.reasonFamilyId || !claims[argument.reasonFamilyId]) failures.push(`Argument ${id} has no valid reasonFamilyId.`);
+  for (const sourceId of argument.sourceIds || []) if (!sourceIdSet.has(sourceId)) failures.push(`Argument ${id} references unknown source ${sourceId}.`);
   if (argument.summary?.length > 110) warnings.push(`Argument ${id} summary is longer than 110 Chinese characters.`);
 }
 
@@ -101,7 +125,21 @@ for (const policy of policies) {
   } else if (new Set(policy.components.map((component) => component.id)).size !== policy.components.length) {
     failures.push(`Policy ${policy.id} has duplicate component ids.`);
   }
+  if (!['core', 'adaptive'].includes(policy.selection?.tier) || !policy.selection?.domain || !Number.isFinite(policy.selection?.priority)) {
+    failures.push(`Policy ${policy.id} needs adaptive selection metadata.`);
+  }
+  if (!Array.isArray(policy.selection?.prototypeSignals?.supportTags) || !Array.isArray(policy.selection?.prototypeSignals?.opposeTags)) {
+    failures.push(`Policy ${policy.id} needs prototype signal arrays.`);
+  }
 }
+
+const corePolicies = policies.filter((policy) => policy.selection?.tier === 'core');
+const adaptivePolicies = policies.filter((policy) => policy.selection?.tier === 'adaptive');
+if (policies.length < 20 || policies.length > 30) failures.push(`Adaptive candidate bank needs 20-30 policies; found ${policies.length}.`);
+if (corePolicies.length !== model.adaptiveAssessment?.coreCount || corePolicies.length !== 8) failures.push(`Core policy count must be 8; found ${corePolicies.length}.`);
+if (adaptivePolicies.length < model.adaptiveAssessment?.adaptiveMax) failures.push('Adaptive bank has fewer candidates than the maximum adaptive path length.');
+const matchingWeightTotal = Object.values(model.adaptiveAssessment?.matchingWeights || {}).reduce((sum, weight) => sum + weight, 0);
+if (matchingWeightTotal !== 100) failures.push(`Ideology matching weights must total 100; found ${matchingWeightTotal}.`);
 
 for (const mode of ['conditional_scenario', 'real_world_belief']) {
   if (!model.assessmentModes?.[mode]?.label || !model.assessmentModes?.[mode]?.instruction) {
@@ -168,6 +206,29 @@ for (const dilemma of dilemmas) {
   if (!Array.isArray(dilemma.fixedFacts) || dilemma.fixedFacts.length < 2) failures.push(`Dilemma ${dilemma.id} needs explicit fixed facts.`);
   for (const field of ['title', 'scenario', 'leftAction', 'rightAction']) {
     if (!dilemma[field]) failures.push(`Dilemma ${dilemma.id} is missing ${field}.`);
+  }
+  if (dilemma.sensitivity?.scenarios?.length !== 2) failures.push(`Dilemma ${dilemma.id} needs low/high sensitivity scenarios.`);
+}
+
+const benchmarks = model.ideologyBenchmarks;
+if (benchmarks?.schema !== 'argument-chain-ideology-benchmarks' || benchmarks?.modelVersion !== MODEL_META.version) {
+  failures.push('Ideology benchmark schema or model version does not match the formal bank.');
+} else {
+  if (benchmarks.profiles?.length !== 52) failures.push(`Ideology benchmark needs 52 prototypes; found ${benchmarks.profiles?.length || 0}.`);
+  const profileIds = new Set();
+  for (const profile of benchmarks.profiles || []) {
+    if (profileIds.has(profile.id)) failures.push(`Duplicate ideology profile ${profile.id}.`);
+    profileIds.add(profile.id);
+    if (!profile.displayName || !Array.isArray(profile.tags) || !profile.variants?.length) failures.push(`Ideology profile ${profile.id} is incomplete.`);
+    const variantIds = new Set();
+    for (const variant of profile.variants || []) {
+      if (variantIds.has(variant.id)) failures.push(`Duplicate variant ${profile.id}/${variant.id}.`);
+      variantIds.add(variant.id);
+      if (!variant.source?.label || !variant.source?.caveat) failures.push(`Variant ${profile.id}/${variant.id} has no source boundary.`);
+      for (const policyId of Object.keys(variant.policyPositions || {})) if (!policyIds.has(policyId)) failures.push(`Variant ${profile.id}/${variant.id} references unknown policy ${policyId}.`);
+      for (const reasonId of Object.values(variant.primaryReasons || {}).filter(Boolean)) if (!claims[reasonId]) failures.push(`Variant ${profile.id}/${variant.id} references unknown reason family ${reasonId}.`);
+      for (const claimId of Object.values(variant.fixedPoints || {}).filter(Boolean)) if (!claims[claimId]) failures.push(`Variant ${profile.id}/${variant.id} references unknown fixed point ${claimId}.`);
+    }
   }
 }
 

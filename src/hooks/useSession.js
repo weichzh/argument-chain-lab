@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { applySessionOverlay, normalizeSessionOverlay } from '../data/model.js';
 import { createInitialState, migrateSavedState, reducer } from '../lib/engine.js';
 
-const STORAGE_KEY = 'argument-chain-lab:progress:v4';
+const STORAGE_KEY = 'argument-chain-lab:progress:v5';
+const LEGACY_STORAGE_KEY = 'argument-chain-lab:progress:v4';
 const DRAFT_PREFIX = 'argument-chain-lab:draft:';
 
 const loadState = () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return createInitialState();
     const parsed = JSON.parse(raw);
     const sessionOverlay = normalizeSessionOverlay(parsed.sessionOverlay);
@@ -43,6 +44,7 @@ export function useSession() {
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       // The protocol remains usable when storage is blocked.
     }
@@ -62,6 +64,7 @@ export function useSession() {
   const clearLocalData = useCallback(() => {
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       // Continue with the in-memory reset.
     }

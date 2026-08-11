@@ -5,6 +5,7 @@ import {
   BarChart3,
   Check,
   CircleHelp,
+  GitBranch,
   ListChecks,
   LogOut,
   Search,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   assessmentModes,
+  argumentsById,
   claims,
   dilemmas,
   facts,
@@ -28,22 +30,27 @@ import {
   getCurrentFact,
   getCurrentPolicy,
   getCurrentTargetClaim,
+  getSelectedChain,
   PHASES,
 } from '../lib/engine.js';
+import { adaptiveProgress, selectNextAdaptivePolicy } from '../lib/ideology.js';
 import ProofView from './ProofView.jsx';
 
 const STAGES = [
-  ['判断', [PHASES.STANCE, PHASES.DIRECTION, PHASES.ARGUMENT]],
-  ['事实', [PHASES.FACT]],
+  ['判断', [PHASES.COMPONENTS, PHASES.STANCE, PHASES.PACKAGE_TRADEOFF, PHASES.DIRECTION, PHASES.ARGUMENT]],
+  ['事实', [PHASES.FACT, PHASES.FACT_SENSITIVITY]],
   ['原则', [PHASES.BRIDGE, PHASES.DEPTH]],
   ['价值', [PHASES.TERMINAL_CONFIRM]],
   ['检验', [
     PHASES.STRESS,
+    PHASES.DEFEATER,
+    PHASES.DEFEATER_IMPACT,
     PHASES.CONFLICT,
     PHASES.BROKEN,
     PHASES.POLICY_COMPLETE,
     PHASES.DILEMMA_INTRO,
     PHASES.DILEMMA,
+    PHASES.DILEMMA_SENSITIVITY,
   ]],
 ];
 
@@ -165,7 +172,7 @@ const directionCopy = {
 
 function PolicyFrame({ state }) {
   const policy = getCurrentPolicy(state);
-  if (!policy || [PHASES.DILEMMA, PHASES.DILEMMA_INTRO].includes(state.phase)) return null;
+  if (!policy || [PHASES.DILEMMA, PHASES.DILEMMA_SENSITIVITY, PHASES.DILEMMA_INTRO].includes(state.phase)) return null;
   const record = state.records[policy.id];
   const direction = state.currentChain?.direction || record?.direction || record?.stance;
   const tone = direction === 'support' || direction === 'oppose' ? direction : 'neutral';
@@ -198,6 +205,107 @@ function QuestionHeader({ state, label, title, statement }) {
         <h1>{title}</h1>
         {statement && statement !== policy?.proposition ? <p>{statement}</p> : null}
       </header>
+    </>
+  );
+}
+
+const componentPositionCopy = {
+  support: '赞成',
+  oppose: '反对',
+  conditional: '需调整',
+  undecided: '无独立判断',
+};
+
+function ComponentQuestion({ state, dispatch }) {
+  const policy = getCurrentPolicy(state);
+  const record = state.records[policy.id] || {};
+  const positions = record.componentPositions || {};
+  const complete = policy.components.every((component) => positions[component.id]);
+  return (
+    <>
+      <QuestionHeader state={state} label="政策组件" title="先分别判断这项政策里的决定" statement="这些回答不会自动合并成整包立场。" />
+      <div className="component-question-list">
+        {policy.components.map((component) => (
+          <fieldset className="component-question" key={component.id}>
+            <legend>{component.label}</legend>
+            <div className="segmented-control">
+              {Object.entries(componentPositionCopy).map(([position, label]) => (
+                <button
+                  type="button"
+                  key={position}
+                  className={positions[component.id] === position ? 'active' : ''}
+                  aria-pressed={positions[component.id] === position}
+                  onClick={() => dispatch({ type: 'SET_COMPONENT_POSITION', componentId: component.id, position })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+      <div className="component-actions">
+        {!complete ? (
+          <button
+            className="button quiet"
+            type="button"
+            onClick={() => {
+              policy.components.filter((component) => !positions[component.id]).forEach((component) => {
+                dispatch({ type: 'SET_COMPONENT_POSITION', componentId: component.id, position: 'undecided' });
+              });
+              dispatch({ type: 'COMPLETE_COMPONENTS' });
+            }}
+          >
+            其余组件暂不判断
+          </button>
+        ) : null}
+        <button className="button primary" type="button" disabled={!complete} onClick={() => dispatch({ type: 'COMPLETE_COMPONENTS' })}>
+          判断整个政策包<ArrowRight size={17} />
+        </button>
+      </div>
+    </>
+  );
+}
+
+function PackageTradeoffQuestion({ state, dispatch }) {
+  const policy = getCurrentPolicy(state);
+  const record = state.records[policy.id] || {};
+  const tradeoffs = record.componentTradeoffs || {};
+  const values = Object.values(tradeoffs);
+  const ready = values.includes('required') && values.includes('tradeable');
+  return (
+    <>
+      <QuestionHeader state={state} label="包内取舍" title="哪些组件是底线，哪些可以交换？" statement="你的整包判断与组件判断不完全一致；这里保留实际取舍，不强行归并。" />
+      <div className="component-question-list compact">
+        {policy.components.map((component) => (
+          <fieldset className="component-question" key={component.id}>
+            <legend><span>{componentPositionCopy[record.componentPositions?.[component.id]]}</span>{component.label}</legend>
+            <div className="segmented-control three">
+              {[
+                ['required', '必须保留'],
+                ['tradeable', '可为其他组件让步'],
+                ['neutral', '不参与交换'],
+              ].map(([position, label]) => (
+                <button
+                  type="button"
+                  key={position}
+                  className={tradeoffs[component.id] === position ? 'active' : ''}
+                  aria-pressed={tradeoffs[component.id] === position}
+                  onClick={() => dispatch({ type: 'SET_COMPONENT_TRADEOFF', componentId: component.id, position })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+      <div className="component-actions">
+        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'COMPLETE_PACKAGE_TRADEOFF', mode: 'none' })}>没有可接受的组件交换</button>
+        <button className="button primary" type="button" disabled={!ready} onClick={() => dispatch({ type: 'COMPLETE_PACKAGE_TRADEOFF', mode: 'specified' })}>
+          记录取舍并检查理由<ArrowRight size={17} />
+        </button>
+      </div>
     </>
   );
 }
@@ -332,6 +440,23 @@ function FactQuestion({ state, dispatch, onAskAi, aiLoading }) {
   );
 }
 
+function FactSensitivityQuestion({ state, dispatch }) {
+  const fact = facts[state.pendingSensitivity?.factId];
+  const scenario = fact?.sensitivity?.scenarios?.[state.pendingSensitivity?.index];
+  if (!fact || !scenario) return null;
+  return (
+    <>
+      <QuestionHeader state={state} label="阈值敏感性" title={scenario.question} statement={`${fact.sensitivity.label}：${scenario.label}`} />
+      <p className="explanation-line">基准情景是“{fact.sensitivity.baseline}”。这里记录理由在哪个幅度开始翻转，不修改你刚才的事实回答。</p>
+      <ChoiceList options={[
+        { id: 'sufficient', label: '这个幅度仍足以采用当前理由', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_FACT_SENSITIVITY', response: 'sufficient' }) },
+        { id: 'insufficient', label: '这个幅度已不足以采用当前理由', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_FACT_SENSITIVITY', response: 'insufficient' }) },
+        { id: 'uncertain', label: '暂时无法判断翻转点', onSelect: () => dispatch({ type: 'ANSWER_FACT_SENSITIVITY', response: 'uncertain' }) },
+      ]} />
+    </>
+  );
+}
+
 function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const bridge = getCurrentBridge(state);
   const target = getCurrentTargetClaim(state);
@@ -419,6 +544,49 @@ function StressQuestion({ state, dispatch }) {
   );
 }
 
+function DefeaterQuestion({ state, dispatch }) {
+  const chain = getSelectedChain(state);
+  const policy = getCurrentPolicy(state);
+  const oppositeClaimId = chain?.direction === 'support' ? policy?.opposeClaimId : policy?.supportClaimId;
+  const candidates = getArgumentsForClaim(oppositeClaimId);
+  return (
+    <>
+      <QuestionHeader state={state} label="最强反方" title="哪一条是你认为最值得认真对待的反方理由？" statement="先选题库里最强的一条，再记录它是否改变整包立场。" />
+      <div className="argument-options">
+        {candidates.map((argument) => (
+          <button className="argument-row" type="button" key={argument.id} onClick={() => dispatch({ type: 'SELECT_DEFEATER', argumentId: argument.id })}>
+            <span className="argument-copy"><strong>{argument.title}</strong><small>{argument.summary}</small></span>
+            <ArrowRight size={18} />
+          </button>
+        ))}
+      </div>
+      <button className="button quiet full-width" type="button" onClick={() => dispatch({ type: 'NO_DEFEATER_ACCEPTED' })}>题库中没有我认为成立的反方理由</button>
+    </>
+  );
+}
+
+function DefeaterImpactQuestion({ state, dispatch }) {
+  const argument = argumentsById[state.pendingDefeaterArgumentId];
+  const bridge = claims[argument?.bridgeClaimId];
+  if (!argument) return null;
+  return (
+    <>
+      <QuestionHeader state={state} label="反方影响" title="把这条反方理由计入后，你的整包立场怎样变化？" statement={argument.title} />
+      <section className="defeater-preview">
+        <strong>反方路径</strong>
+        <ul>{(argument.plainSteps?.facts || []).map((statement) => <li key={statement}>{statement}</li>)}</ul>
+        <p><b>B</b>{bridge?.text}</p>
+      </section>
+      <ChoiceList options={[
+        { id: 'unchanged', label: '这条理由成立，但我仍维持原立场', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', impact: 'unchanged' }) },
+        { id: 'weakened', label: '这条理由使我的整包立场变为暂不确定', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', impact: 'weakened' }) },
+        { id: 'reversed', label: '这条理由使我改为相反立场', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', impact: 'reversed' }) },
+        { id: 'rejected', label: '核对后，我不接受这条反方理由', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', impact: 'rejected' }) },
+      ]} />
+    </>
+  );
+}
+
 function ConflictQuestion({ state, dispatch }) {
   const conflict = state.pendingConflict;
   const text = conflict?.kind === 'fact'
@@ -452,10 +620,16 @@ function BrokenQuestion({ state, dispatch }) {
 
 function PolicyComplete({ state, dispatch }) {
   const policy = getCurrentPolicy(state);
-  const status = state.currentChain?.status || 'unresolved';
-  const conditionalScenario = state.currentChain?.steps?.some((step) => step.assessmentMode === 'conditional_scenario');
+  const chain = getSelectedChain(state);
+  const status = chain?.status || 'unresolved';
+  const conditionalScenario = chain?.steps?.some((step) => step.assessmentMode === 'conditional_scenario');
+  const nextAdaptive = state.adaptiveMode ? selectNextAdaptivePolicy(state) : null;
   const copy = {
-    complete: ['这条单一理由链已经闭合', '事实、原则、当前基本价值和压力测试都已确认；这不表示政策结论已经压倒全部反对理由。'],
+    complete: ['这条理由链和反方复核已经结束', chain?.defeaterReview?.impact === 'unchanged'
+      ? '你接受了所选最强反方理由，但整包立场没有改变。'
+      : chain?.defeaterReview?.impact === 'rejected' || chain?.defeaterReview?.impact === 'none_accepted'
+        ? '题库中的反方理由没有改变你的整包立场。'
+        : '事实、原则、当前基本价值和反方复核都已记录。'],
     conditional: conditionalScenario
       ? ['这条理由链只在题设条件下闭合', '规范结构已经记录，但经验前提没有在现实中得到确认，不能进入公开候选区。']
       : ['这条论证依赖尚未确认的事实', '结构已经记录，但不能进入公开候选区。'],
@@ -469,7 +643,11 @@ function PolicyComplete({ state, dispatch }) {
       <p>{copy[1]}</p>
       <strong>{policy?.title}</strong>
       <div className="completion-actions">
-        <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}>返回题目列表</button>
+        {state.adaptiveMode ? (
+          <button className="button primary" type="button" onClick={() => dispatch({ type: 'NEXT_ADAPTIVE' })}>
+            {nextAdaptive ? `下一道推荐题：${nextAdaptive.shortTitle}` : '进入价值冲突检验'}
+          </button>
+        ) : <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}>返回题目列表</button>}
         <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>查看阶段结果</button>
         <button className="button quiet" type="button" onClick={() => dispatch({ type: 'RETRY_POLICY' })}>为这项判断换一条理由</button>
       </div>
@@ -494,6 +672,19 @@ function DilemmaIntro({ state, dispatch }) {
   );
 }
 
+const dilemmaOptions = (dispatch, type) => [
+  ['left_strong', '明显选择 A'],
+  ['left_slight', '略微选择 A'],
+  ['equal', 'A 与 B 同等重要'],
+  ['undecided', '本题无法比较'],
+  ['right_slight', '略微选择 B'],
+  ['right_strong', '明显选择 B'],
+].map(([response, label]) => ({
+  id: response,
+  label,
+  onSelect: () => dispatch({ type, response }),
+}));
+
 function DilemmaQuestion({ state, dispatch }) {
   const id = state.dilemmaQueue[state.dilemmaIndex];
   const item = dilemmas.find((entry) => entry.id === id);
@@ -508,14 +699,21 @@ function DilemmaQuestion({ state, dispatch }) {
         <div><span>A · {left?.shortLabel}</span><p>{item.leftAction}</p></div>
         <div><span>B · {right?.shortLabel}</span><p>{item.rightAction}</p></div>
       </div>
-      <ChoiceList options={[
-        { id: 'left-strong', label: '明显选择 A', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'left_strong' }) },
-        { id: 'left-slight', label: '略微选择 A', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'left_slight' }) },
-        { id: 'equal', label: 'A 与 B 同等重要', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'equal' }) },
-        { id: 'undecided', label: '本题无法比较', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'undecided' }) },
-        { id: 'right-slight', label: '略微选择 B', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'right_slight' }) },
-        { id: 'right-strong', label: '明显选择 B', onSelect: () => dispatch({ type: 'ANSWER_DILEMMA', response: 'right_strong' }) },
-      ]} />
+      <ChoiceList options={dilemmaOptions(dispatch, 'ANSWER_DILEMMA')} />
+    </>
+  );
+}
+
+function DilemmaSensitivityQuestion({ state, dispatch }) {
+  const pending = state.dilemmaSensitivity;
+  const item = dilemmas.find((entry) => entry.id === pending?.dilemmaId);
+  const scenario = item?.sensitivity?.scenarios?.[pending?.index];
+  if (!item || !scenario) return null;
+  return (
+    <>
+      <QuestionHeader state={state} label="两难敏感性" title={scenario.question} statement={`${item.sensitivity.label}：${scenario.label}`} />
+      <p className="explanation-line">基准回答已经保留；这个变体只检查量化差额改变后，局部价值关系是否翻转。</p>
+      <ChoiceList options={dilemmaOptions(dispatch, 'ANSWER_DILEMMA_SENSITIVITY')} />
     </>
   );
 }
@@ -559,13 +757,15 @@ function PolicyOverview({ state, dispatch }) {
   const commitments = collectTerminalCommitments(state);
   const canStartDilemmas = getRelevantDilemmas(commitments.map((item) => item.claimId)).length > 0;
   const canResumeDilemmas = Boolean(state.dilemmaQueue[state.dilemmaIndex]);
+  const progress = adaptiveProgress(state);
+  const recommended = selectNextAdaptivePolicy(state);
   return (
     <main className="policy-overview">
       <header className="overview-header">
         <div>
           <span>题目列表</span>
-          <h1>按自己的顺序做题</h1>
-          <p>随时离开，进度会保存在这台设备。阶段结果只统计已经结束的题目。</p>
+          <h1>走推荐路径，或自由选择题目</h1>
+          <p>候选库有 {policies.length} 个场景；推荐路径只选 8 个核心场景和 2—4 个当前最有区分力的场景。</p>
         </div>
         <div className="overview-actions">
           {finished ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><BarChart3 size={17} />查看阶段结果</button> : null}
@@ -575,9 +775,22 @@ function PolicyOverview({ state, dispatch }) {
 
       <AssessmentModeSelector state={state} dispatch={dispatch} />
 
+      <section className="adaptive-entry" aria-label="自适应测评">
+        <GitBranch size={26} aria-hidden="true" />
+        <div>
+          <strong>{recommended ? `下一道推荐：${recommended.shortTitle || recommended.title}` : '推荐路径已经取得足够区分信息'}</strong>
+          <p>核心 {progress.coreDone} / {progress.coreTotal} · 自适应区分 {progress.adaptiveDone} / {progress.adaptiveMin}—{progress.adaptiveMax}</p>
+        </div>
+        {recommended ? (
+          <button className="button primary" type="button" onClick={() => dispatch({ type: 'START_ADAPTIVE' })}>
+            {progress.coreDone + progress.adaptiveDone ? '继续推荐路径' : '开始推荐路径'}<ArrowRight size={17} />
+          </button>
+        ) : <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>查看结果</button>}
+      </section>
+
       <div className="overview-progress" aria-label="答题进度">
-        <strong>{finished} / {policies.length}</strong>
-        <span>道题已结束{inProgress ? ` · ${inProgress} 道进行中` : ''}</span>
+        <strong>{finished}</strong>
+        <span>道题已结束{inProgress ? ` · ${inProgress} 道进行中` : ''} · 不需要回答整个候选库</span>
       </div>
 
       <ol className="policy-list">
@@ -595,6 +808,8 @@ function PolicyOverview({ state, dispatch }) {
               <span className="policy-number">{String(index + 1).padStart(2, '0')}</span>
               <div className="policy-row-title">
                 <h2>{policy.shortTitle || policy.title}</h2>
+                <small>{policy.selection?.domain}{policy.selection?.tier === 'core' ? ' · 核心场景' : ' · 自适应场景'}</small>
+                {recommended?.id === policy.id ? <span className="recommended-badge">当前推荐</span> : null}
                 {direction ? <span className={`direction-badge ${tone}`}>{directionCopy[direction]}</span> : null}
               </div>
               <span className={`policy-status ${statusClass}`}>{status}</span>
@@ -621,19 +836,25 @@ function PolicyOverview({ state, dispatch }) {
 function PhaseQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const props = { state, dispatch, onAskAi, aiLoading };
   switch (state.phase) {
+    case PHASES.COMPONENTS: return <ComponentQuestion state={state} dispatch={dispatch} />;
     case PHASES.STANCE: return <StanceQuestion {...props} />;
+    case PHASES.PACKAGE_TRADEOFF: return <PackageTradeoffQuestion state={state} dispatch={dispatch} />;
     case PHASES.DIRECTION: return <DirectionQuestion {...props} />;
     case PHASES.ARGUMENT: return <ArgumentQuestion {...props} />;
     case PHASES.FACT: return <FactQuestion {...props} />;
+    case PHASES.FACT_SENSITIVITY: return <FactSensitivityQuestion state={state} dispatch={dispatch} />;
     case PHASES.BRIDGE: return <BridgeQuestion {...props} />;
     case PHASES.DEPTH: return <DepthQuestion {...props} />;
     case PHASES.TERMINAL_CONFIRM: return <TerminalQuestion {...props} />;
     case PHASES.STRESS: return <StressQuestion {...props} />;
+    case PHASES.DEFEATER: return <DefeaterQuestion state={state} dispatch={dispatch} />;
+    case PHASES.DEFEATER_IMPACT: return <DefeaterImpactQuestion state={state} dispatch={dispatch} />;
     case PHASES.CONFLICT: return <ConflictQuestion {...props} />;
     case PHASES.BROKEN: return <BrokenQuestion {...props} />;
     case PHASES.POLICY_COMPLETE: return <PolicyComplete state={state} dispatch={dispatch} />;
     case PHASES.DILEMMA_INTRO: return <DilemmaIntro state={state} dispatch={dispatch} />;
     case PHASES.DILEMMA: return <DilemmaQuestion state={state} dispatch={dispatch} />;
+    case PHASES.DILEMMA_SENSITIVITY: return <DilemmaSensitivityQuestion state={state} dispatch={dispatch} />;
     default: return <div className="empty-state"><AlertTriangle />当前步骤无法显示。</div>;
   }
 }

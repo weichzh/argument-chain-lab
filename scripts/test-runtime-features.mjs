@@ -23,7 +23,7 @@ import {
 } from '../src/lib/aiConfig.js';
 import { HttpBankClient } from '../src/lib/bankClient.js';
 import { buildContributionPackage } from '../src/lib/contribution.js';
-import { createInitialState, PHASES, reducer } from '../src/lib/engine.js';
+import { createInitialState, getSelectedChain, PHASES, reducer } from '../src/lib/engine.js';
 import sitesWorker from '../public/server/index.js';
 import {
   candidateRequestMatchesState,
@@ -145,23 +145,31 @@ state = reducer(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
 assert.equal(state.phase, PHASES.TERMINAL_CONFIRM);
 state = reducer(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
 state = reducer(state, { type: 'ANSWER_STRESS', response: 'apply' });
-assert.equal(state.currentChain.status, 'complete');
+assert.equal(state.phase, PHASES.DEFEATER);
+state = reducer(state, { type: 'NO_DEFEATER_ACCEPTED' });
+const completedChain = getSelectedChain(state);
+assert.equal(completedChain.status, 'complete');
 
 const staleContext = {
   updatedAt: state.updatedAt,
   policyIndex: state.policyIndex,
   phase: state.phase,
-  chainId: state.currentChain.id,
+  chainId: state.currentChain?.id || null,
   targetClaimId: state.currentTargetClaimId,
   argumentId: state.currentArgumentId,
   factIndex: state.currentFactIndex,
-  stepCount: state.currentChain.steps.length,
+  stepCount: state.currentChain?.steps.length || 0,
 };
 assert.equal(candidateRequestMatchesState(state, staleContext), true);
 assert.equal(candidateRequestMatchesState({ ...state, phase: PHASES.RESULTS }, staleContext), false);
 
 configureFormalModel(model);
-let recursiveState = reducer(reducer(createInitialState(), { type: 'START' }), { type: 'SET_STANCE', stance: 'support' });
+let recursiveState = reducer(createInitialState(), { type: 'START' });
+for (const component of policies[recursiveState.policyIndex].components) {
+  recursiveState = reducer(recursiveState, { type: 'SET_COMPONENT_POSITION', componentId: component.id, position: 'undecided' });
+}
+recursiveState = reducer(recursiveState, { type: 'COMPLETE_COMPONENTS' });
+recursiveState = reducer(recursiveState, { type: 'SET_STANCE', stance: 'support' });
 const recursiveCandidate = {
   ...candidate,
   scope: 'current_target',
@@ -186,11 +194,11 @@ assert.equal(recursiveState.phase, PHASES.ARGUMENT);
 assert.equal(recursiveState.currentTargetClaimId, recursiveInstalled.overlay.arguments[recursiveInstalled.argumentId].bridgeClaimId);
 applySessionOverlay(installed.overlay);
 
-const contribution = buildContributionPackage(state, state.currentChain);
+const contribution = buildContributionPackage(state, completedChain);
 assert.equal(contribution.ok, true, contribution.reasons?.join('; '));
 const conditionalContribution = buildContributionPackage(state, {
-  ...state.currentChain,
-  steps: state.currentChain.steps.map((step) => ({ ...step, assessmentMode: 'conditional_scenario' })),
+  ...completedChain,
+  steps: completedChain.steps.map((step) => ({ ...step, assessmentMode: 'conditional_scenario' })),
 });
 assert.equal(conditionalContribution.ok, false, 'Conditionally stipulated facts must not enter the public contribution path.');
 assert.equal(validateContributionPackage(contribution.value).ok, true);

@@ -122,7 +122,7 @@ function ReadyApp({ bankManifest }) {
   useEffect(() => () => aiRequestController.current?.abort(), []);
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [state.phase, state.policyIndex, state.currentFactIndex, state.dilemmaIndex]);
+  }, [state.phase, state.policyIndex, state.currentFactIndex, state.pendingSensitivity?.index, state.dilemmaIndex, state.dilemmaSensitivity?.index]);
 
   const bankClient = useMemo(() => new HttpBankClient({
     endpoint: import.meta.env.VITE_BANK_ENDPOINT || window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ || '',

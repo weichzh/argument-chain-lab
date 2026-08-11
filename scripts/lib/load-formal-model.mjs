@@ -24,5 +24,10 @@ export async function loadCurrentFormalModel() {
   if (model?.meta?.version !== manifest.current) {
     throw new Error(`Bank model version ${model?.meta?.version} does not match manifest ${manifest.current}.`);
   }
+  if (selected.benchmarks) {
+    const benchmarkPath = path.resolve(bankDirectory, selected.benchmarks);
+    if (!benchmarkPath.startsWith(boundary)) throw new Error('Bank benchmark path escapes public/bank.');
+    model.ideologyBenchmarks = await readJson(benchmarkPath);
+  }
   return { root, manifest, selected, model, modelPath };
 }

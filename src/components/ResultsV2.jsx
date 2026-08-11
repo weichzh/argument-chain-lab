@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Check,
   Download,
+  Info,
   ListChecks,
   LogOut,
   Send,
@@ -12,13 +13,19 @@ import {
   claims,
   dilemmas,
   facts,
+  ideologyBenchmarks,
   policies,
 } from '../data/model.js';
 import {
   buildContributionPackage,
   contributionEligibility,
 } from '../lib/contribution.js';
-import { sessionSummary } from '../lib/engine.js';
+import { exportSession, sessionSummary } from '../lib/engine.js';
+import {
+  buildArgumentType,
+  matchIdeologyProfiles,
+  profilePositionForPolicy,
+} from '../lib/ideology.js';
 
 const statusCopy = {
   complete: '严格完整',
@@ -51,6 +58,11 @@ const fixedPointCopy = {
   retracted: '压力测试后撤回',
   unconfirmed: '未确认',
 };
+const lifecycleCopy = {
+  active: '当前有效',
+  orphaned: '链条修订后已孤立',
+  superseded: '已被后续事件取代',
+};
 
 const originCopy = (argument, modelVersion) => {
   if (argument?.origin === 'session_overlay') return '本轮 AI 会话扩展';
@@ -69,6 +81,162 @@ const downloadJson = (filename, value) => {
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+const stanceCopy = { support: '支持', oppose: '反对', undecided: '未定', conditional: '有条件' };
+const componentCopy = { support: '赞成', oppose: '反对', conditional: '需调整', undecided: '未判断' };
+const relationFamily = (response) => response?.startsWith('left_') ? 'left' : response?.startsWith('right_') ? 'right' : response;
+const stressCopy = {
+  apply: '相似案例仍适用',
+  qualified_exception: '范围待修订',
+  unexplained_exception: '例外未解释',
+  retract: '压力测试后撤回',
+  uncertain: '边界未定',
+};
+
+function LineageGraph({ state, chains, selectedId, onSelect }) {
+  return (
+    <section className="lineage-section" aria-labelledby="lineage-title">
+      <header>
+        <span>正式结果</span>
+        <h2 id="lineage-title">论证谱系</h2>
+        <p>先显示政策包、首要理由与固定点；选择一行可展开完整 F + B ⇝ V。</p>
+      </header>
+      <div className="lineage-axis" aria-hidden="true"><span>政策与组件</span><span>理由族</span><span>当前固定点</span><span>反例边界</span></div>
+      <div className="lineage-rows">
+        {chains.map((chain) => {
+          const policy = policies.find((item) => item.id === chain.policyId);
+          const record = state.records[chain.policyId] || {};
+          const firstArgument = argumentsById[chain.steps?.[0]?.argumentId];
+          const reason = claims[firstArgument?.reasonFamilyId || firstArgument?.bridgeClaimId];
+          const terminal = claims[chain.terminal?.claimId];
+          const positions = Object.values(record.componentPositions || {});
+          return (
+            <button
+              className={`lineage-row${selectedId === chain.id ? ' selected' : ''}`}
+              type="button"
+              key={chain.id}
+              onClick={() => onSelect(chain.id)}
+              aria-pressed={selectedId === chain.id}
+            >
+              <span className="lineage-node policy-node"><b className="node-shape policy">P</b><strong>{policy?.shortTitle || policy?.title}</strong><small>{stanceCopy[record.stance] || '未定'}整包 · {positions.filter((value) => value === 'support').length} 赞成 / {positions.filter((value) => value === 'oppose').length} 反对</small></span>
+              <i aria-hidden="true">→</i>
+              <span className="lineage-node reason-node"><b className="node-shape bridge">B</b><strong>{reason?.shortLabel || firstArgument?.title || '理由未闭合'}</strong><small>{firstArgument?.reasonFamilyId || '未记录理由族'}</small></span>
+              <i aria-hidden="true">→</i>
+              <span className="lineage-node fixed-node"><b className="node-shape fixed">G</b><strong>{terminal?.shortLabel || '没有固定点'}</strong><small>{statusCopy[chain.status] || chain.status}</small></span>
+              <i className={chain.status === 'conditional' ? 'conditional' : chain.status === 'tension' ? 'tension' : ''} aria-hidden="true">→</i>
+              <span className="lineage-node stress-node"><b className="node-shape stress">!</b><strong>{stressCopy[chain.stress?.response] || '尚未检验'}</strong><small>{chain.defeaterReview ? `反方：${({ unchanged: '立场不变', weakened: '转为未定', reversed: '立场反转', rejected: '未接受', none_accepted: '无可接受项' })[chain.defeaterReview.impact]}` : '反方尚未复核'}</small></span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+const prototypeCell = (profile, variant, policy) => ({
+  stance: profilePositionForPolicy(profile, variant, policy),
+  reason: variant.primaryReasons?.[policy.id],
+  fixedPoint: variant.fixedPoints?.[policy.id],
+  stress: variant.stressBoundaries?.[policy.id],
+});
+
+function SameAnswerMatrix({ state, matching }) {
+  const comparisons = matching.matches.slice(0, 2);
+  const rows = policies.filter((policy) => state.records[policy.id]?.chains?.length);
+  if (!rows.length || comparisons.length < 2) return null;
+  const userCell = (policy) => {
+    const record = state.records[policy.id];
+    const chain = record.chains.at(-1);
+    const argument = argumentsById[chain.steps?.[0]?.argumentId];
+    return {
+      stance: record.stance,
+      reason: argument?.reasonFamilyId || argument?.bridgeClaimId,
+      fixedPoint: chain.terminal?.claimId,
+      stress: chain.stress?.response,
+    };
+  };
+  const renderCell = (cell) => (
+    <span className="matrix-cell-copy">
+      <b>{stanceCopy[cell.stance] || '未回答'}</b>
+      <span>{claims[cell.reason]?.shortLabel || '理由未覆盖'}</span>
+      <span>{claims[cell.fixedPoint]?.shortLabel || '固定点未覆盖'}</span>
+      <small>{stressCopy[cell.stress] || '范围未记录'}</small>
+    </span>
+  );
+  return (
+    <section className="reason-matrix" aria-labelledby="reason-matrix-title">
+      <header><span>同答异因</span><h3 id="reason-matrix-title">相同政策答案，不等于相同论证</h3></header>
+      <div className="matrix-scroll">
+        <table>
+          <thead><tr><th>政策</th><th>你的路径</th>{comparisons.map(({ profile }) => <th key={profile.id}>{profile.displayName}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((policy) => {
+              const user = userCell(policy);
+              return (
+                <tr key={policy.id}>
+                  <th>{policy.shortTitle || policy.title}</th>
+                  <td>{renderCell(user)}</td>
+                  {comparisons.map(({ profile, variant }) => {
+                    const cell = prototypeCell(profile, variant || {}, policy);
+                    const sameAnswerDifferentReason = cell.stance === user.stance && cell.reason && user.reason && cell.reason !== user.reason;
+                    return <td className={sameAnswerDifferentReason ? 'same-answer-different-reason' : ''} key={profile.id}>{renderCell(cell)}</td>;
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function PrototypeOverlay({ state }) {
+  const [enabled, setEnabled] = useState(false);
+  const matching = useMemo(() => matchIdeologyProfiles(state), [state]);
+  const argumentType = useMemo(() => buildArgumentType(state, matching), [state, matching]);
+  const top = matching.matches[0];
+  const second = matching.matches[1];
+  const answered = policies.filter((policy) => state.records[policy.id]?.chains?.length);
+  const sameStanceGroup = matching.matches.filter(({ profile, variant }) => answered.every((policy) => (
+    profilePositionForPolicy(profile, variant || {}, policy) === state.records[policy.id]?.stance
+  ))).length;
+  return (
+    <section className="prototype-overlay" aria-labelledby="prototype-title">
+      <header>
+        <div><span>可选娱乐层</span><h2 id="prototype-title">最近邻论证原型</h2></div>
+        <label className="prototype-toggle"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>启用基准匹配</span></label>
+      </header>
+      {!enabled ? <p className="overlay-closed"><Info size={17} />正式报告不会把政策答案转换成政治身份；这里由你选择是否叠加可解释的最近邻基准。</p> : (
+        <>
+          <div className="prototype-summary">
+            <div><small>基准库中最接近</small><strong>{top?.profile.displayName || '覆盖不足'}</strong><span>路径相似度 {top?.similarity || 0}</span></div>
+            <dl>
+              <dt>与第二名差距</dt><dd>{matching.gap}</dd>
+              <dt>当前覆盖度</dt><dd>{matching.coverage}</dd>
+              <dt>稳定性</dt><dd>{matching.stability}</dd>
+            </dl>
+          </div>
+          <div className="reveal-layers">
+            <div><b>1</b><span>政策外观</span><strong>只看已答政策，你与 {sameStanceGroup || '少量'} 个原型处于同一回答组。</strong></div>
+            <div><b>2</b><span>理由内核</span><strong>加入理由与固定点后，当前前两名为 {top?.profile.displayName}、{second?.profile.displayName}。</strong></div>
+            <div><b>3</b><span>反例边界</span><strong>压力测试和局部关系使第一名领先 {matching.gap} 分；差距小时不会强行唯一化。</strong></div>
+          </div>
+          <div className="argument-type">
+            <small>你的唯一化论证型</small><strong>{argumentType.label}</strong><code>{argumentType.code}</code>
+          </div>
+          <ol className="prototype-list">
+            {matching.matches.slice(0, 5).map((match, index) => (
+              <li key={match.profile.id}><b>{index + 1}</b><span><strong>{match.profile.displayName}</strong><small>{match.variant?.source?.label}</small></span><em>{match.similarity}</em></li>
+            ))}
+          </ol>
+          <SameAnswerMatrix state={state} matching={matching} />
+          <p className="benchmark-disclaimer">{ideologyBenchmarks.disclaimer}</p>
+        </>
+      )}
+    </section>
+  );
+}
 
 function ArgumentPreview({ chain }) {
   if (!chain) return <p className="empty-state">本轮还没有可预览的论证。</p>;
@@ -132,6 +300,7 @@ function MechanicalReport({ state, chains }) {
         chainId: chain.id,
         claimId: chain.terminal.claimId,
         status,
+        lifecycle: 'active',
       }];
     }),
   ];
@@ -141,13 +310,15 @@ function MechanicalReport({ state, chains }) {
     const response = state.dilemmaResponses[id]?.response;
     const left = claims[item.left]?.shortLabel || claims[item.left]?.text || item.left;
     const right = claims[item.right]?.shortLabel || claims[item.right]?.text || item.right;
-    if (response === 'left_strong') return { id, text: `${left} ≻ ${right}`, note: '明显优先' };
-    if (response === 'left_slight') return { id, text: `${left} ≻ ${right}`, note: '略微优先' };
-    if (response === 'right_strong') return { id, text: `${right} ≻ ${left}`, note: '明显优先' };
-    if (response === 'right_slight') return { id, text: `${right} ≻ ${left}`, note: '略微优先' };
-    if (response === 'equal') return { id, text: `${left} ≈ ${right}`, note: '本题中同等重要' };
-    if (response === 'undecided') return { id, text: `${left} ? ${right}`, note: '本题无法比较' };
-    return { id, text: `${left} ? ${right}`, note: '未回答' };
+    const sensitivity = state.dilemmaResponses[id]?.sensitivity || {};
+    const changed = Object.values(sensitivity).some((value) => relationFamily(value) !== relationFamily(response));
+    if (response === 'left_strong') return { id, left, symbol: '≻', right, note: changed ? '明显优先 · 幅度变化时会翻转' : '明显优先' };
+    if (response === 'left_slight') return { id, left, symbol: '→', right, note: changed ? '略微优先 · 幅度变化时会翻转' : '略微优先' };
+    if (response === 'right_strong') return { id, left: right, symbol: '≻', right: left, note: changed ? '明显优先 · 幅度变化时会翻转' : '明显优先' };
+    if (response === 'right_slight') return { id, left: right, symbol: '→', right: left, note: changed ? '略微优先 · 幅度变化时会翻转' : '略微优先' };
+    if (response === 'equal') return { id, left, symbol: '≈', right, note: changed ? '同等重要 · 幅度变化时会翻转' : '本题中同等重要' };
+    if (response === 'undecided') return { id, left, symbol: '—', right, note: '本题无法比较' };
+    return { id, left, symbol: '—', right, note: '未回答' };
   }).filter(Boolean);
 
   return (
@@ -163,6 +334,28 @@ function MechanicalReport({ state, chains }) {
           <div key={status}><strong>{chains.filter((chain) => chain.status === status).length}</strong><span>{statusCopy[status]}</span></div>
         ))}
       </div>
+
+      <section className="report-block">
+        <h3>政策组件、整包判断与取舍</h3>
+        <div className="package-report-list">
+          {policies.filter((policy) => state.records[policy.id]?.chains?.length).map((policy) => {
+            const record = state.records[policy.id];
+            return (
+              <details key={policy.id}>
+                <summary><span>{policy.shortTitle || policy.title}</span><strong>{stanceCopy[record.stance] || '未定'}整包{record.packageConflict ? ' · 包内冲突' : ''}</strong></summary>
+                <dl>
+                  {policy.components.map((component) => (
+                    <React.Fragment key={component.id}>
+                      <dt>{component.label}</dt>
+                      <dd>{componentCopy[record.componentPositions?.[component.id]] || '未回答'}{record.componentTradeoffs?.[component.id] ? ` · ${{ required: '必须保留', tradeable: '可交换', neutral: '不参与交换' }[record.componentTradeoffs[component.id]]}` : ''}</dd>
+                    </React.Fragment>
+                  ))}
+                </dl>
+              </details>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="report-block">
         <h3>F + B ⇝ V 与事实信条</h3>
@@ -189,6 +382,9 @@ function MechanicalReport({ state, chains }) {
                           <dt>回答</dt><dd>{factResponseLabel(step.factResponses?.[factId], step.assessmentMode) || '未回答'}</dd>
                           <dt>成立条件</dt><dd>{facts[factId]?.plainTruthConditions || facts[factId]?.truthConditions}</dd>
                           <dt>否定条件</dt><dd>{facts[factId]?.plainFalsifier || facts[factId]?.falsifier}</dd>
+                          <dt>情景</dt><dd>{facts[factId]?.scenarioProfile || '未标注'}</dd>
+                          <dt>证据状态</dt><dd>{facts[factId]?.sourceStatus === 'stipulated_scenario' ? '题设条件' : '现实证据待核实'}</dd>
+                          {Object.keys(step.factSensitivity?.[factId] || {}).length ? <><dt>阈值测试</dt><dd>{Object.entries(step.factSensitivity[factId]).map(([scenario, response]) => `${scenario}：${{ sufficient: '仍足够', insufficient: '不足', uncertain: '未定' }[response]}`).join('；')}</dd></> : null}
                         </dl>
                       </div>
                     </div>
@@ -204,6 +400,13 @@ function MechanicalReport({ state, chains }) {
                 </div>
               );
             })}
+            {chain.defeaterReview ? (
+              <div className="report-defeater">
+                <strong>最强反方复核</strong>
+                <p>{chain.defeaterReview.argumentId ? argumentsById[chain.defeaterReview.argumentId]?.title : '题库中没有用户认为成立的反方理由'}</p>
+                <small>影响：{({ unchanged: '接受反方理由，立场不变', weakened: '整包立场转为未定', reversed: '整包立场反转', rejected: '核对后不接受', none_accepted: '没有可接受项' })[chain.defeaterReview.impact]}</small>
+              </div>
+            ) : null}
           </details>
         )) : <p className="empty-state">本轮没有形成论证链。</p>}
       </section>
@@ -216,7 +419,7 @@ function MechanicalReport({ state, chains }) {
               <li key={event.id}>
                 <strong>{fixedPointCopy[event.status] || event.status}</strong>
                 <span>{claims[event.claimId]?.text || event.claimId}</span>
-                <small>{policies.find((policy) => policy.id === event.policyId)?.title || event.policyId}</small>
+                <small>{policies.find((policy) => policy.id === event.policyId)?.title || event.policyId} · {lifecycleCopy[event.lifecycle] || event.lifecycle || '当前有效'}{event.invalidatedByConflictId ? ` · 冲突 ${event.invalidatedByConflictId}` : ''}</small>
               </li>
             ))}
           </ul>
@@ -235,9 +438,9 @@ function MechanicalReport({ state, chains }) {
       <section className="report-block">
         <h3>两难题的局部价值关系</h3>
         {relationRows.length ? (
-          <ul className="report-list relations">
-            {relationRows.map((row) => <li key={row.id}><strong>{row.text}</strong><span>{row.note}</span></li>)}
-          </ul>
+          <div className="relation-graph">
+            {relationRows.map((row) => <div key={row.id}><strong>{row.left}</strong><b>{row.symbol}</b><strong>{row.right}</strong><span>{row.note}</span></div>)}
+          </div>
         ) : <p className="empty-state">本轮没有满足双端点条件的两难题。</p>}
         {analysis.priority.cycles.length ? <p className="cycle-note">检测到循环：{analysis.priority.cycles.map((cycle) => cycle.map((id) => claims[id]?.shortLabel || id).join(' → ')).join('；')}</p> : null}
       </section>
@@ -248,7 +451,7 @@ function MechanicalReport({ state, chains }) {
 export default function ResultsV2({ state, dispatch, bankClient }) {
   const chains = useMemo(() => Object.values(state.records).flatMap((record) => record.chains || []), [state.records]);
   const [selectedId, setSelectedId] = useState(() => (
-    chains.find((chain) => chain.status === 'complete')?.id || chains[0]?.id || null
+    state.selectedChainId || chains.find((chain) => chain.status === 'complete')?.id || chains[0]?.id || null
   ));
   const [consent, setConsent] = useState(false);
   const [submitState, setSubmitState] = useState({ loading: false, success: null, error: null });
@@ -285,14 +488,21 @@ export default function ResultsV2({ state, dispatch, bankClient }) {
         </div>
         <div className="results-header-actions">
           <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />返回题目列表</button>
+          <button className="button secondary" type="button" onClick={() => downloadJson('argument-chain-session.json', exportSession(state))}><Download size={17} />导出正式报告</button>
           <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><LogOut size={17} />退出</button>
         </div>
       </header>
 
       <div className="results-progress">
-        <strong>{finishedPolicies} / {policies.length}</strong>
-        <span>道题已结束{inProgressPolicies ? ` · ${inProgressPolicies} 道进行中未计入` : ''}</span>
+        <strong>{finishedPolicies}</strong>
+        <span>道题已结束 · 候选库共 {policies.length} 道，不要求全部完成{inProgressPolicies ? ` · ${inProgressPolicies} 道进行中未计入` : ''}</span>
       </div>
+
+      <LineageGraph state={state} chains={chains} selectedId={selected?.id} onSelect={(chainId) => {
+        setSelectedId(chainId);
+        setConsent(false);
+        setSubmitState({ loading: false, success: null, error: null });
+      }} />
 
       {chains.length > 1 ? (
         <label className="chain-selector">
@@ -324,6 +534,8 @@ export default function ResultsV2({ state, dispatch, bankClient }) {
         <summary>查看详细报告</summary>
         <MechanicalReport state={state} chains={chains} />
       </details>
+
+      <PrototypeOverlay state={state} />
 
       <details className="results-disclosure">
         <summary>导出或贡献所选论证</summary>

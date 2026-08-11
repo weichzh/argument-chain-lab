@@ -25,6 +25,8 @@ export let policies = [];
 export let dilemmas = [];
 export let sources = [];
 export let assessmentModes = { default: 'real_world_belief' };
+export let ideologyBenchmarks = { profiles: [] };
+export let adaptiveAssessment = {};
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const isLocalId = (value) => typeof value === 'string' && value.startsWith('local_');
@@ -95,6 +97,8 @@ const applyModel = () => {
   dilemmas = mergeById(formalModel.dilemmas, overlay.dilemmas);
   sources = formalModel.sources;
   assessmentModes = formalModel.assessmentModes || { default: 'real_world_belief' };
+  ideologyBenchmarks = formalModel.ideologyBenchmarks || { profiles: [] };
+  adaptiveAssessment = formalModel.adaptiveAssessment || {};
 };
 
 export const configureFormalModel = (model, overlay = EMPTY_OVERLAY) => {
@@ -125,6 +129,8 @@ export const getModelSnapshot = () => ({
   dilemmas,
   sources,
   assessmentModes,
+  ideologyBenchmarks,
+  adaptiveAssessment,
 });
 
 export const getArgumentsForClaim = (claimId) =>

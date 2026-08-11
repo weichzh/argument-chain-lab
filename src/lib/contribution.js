@@ -71,6 +71,11 @@ export const contributionEligibility = (state, chain) => {
     reasons.push('只有现实判断模式确认的经验前提可以进入公开贡献。');
   }
   if (chain?.scopeConflicts?.length) reasons.push('仍有未说明的适用范围冲突。');
+  if (chain?.compatibilityIssues?.length) reasons.push('论证依赖与其他路径不相容的事实情景。');
+  if (!chain?.defeaterReview) reasons.push('尚未完成最强反方理由复核。');
+  if (['weakened', 'reversed'].includes(chain?.defeaterReview?.impact)) {
+    reasons.push('最强反方理由已经削弱或改变当前政策立场。');
+  }
   if (state.pendingConflict?.chainId === chain?.id) reasons.push('当前论证仍有未处理冲突。');
   if ((state.modelGaps || []).some((gap) => gap.chainId === chain?.id)) {
     reasons.push('当前论证仍有题库未覆盖的缺口。');

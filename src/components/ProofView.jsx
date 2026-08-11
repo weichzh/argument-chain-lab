@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronUp, ListTree } from 'lucide-react';
 import { argumentsById, claims, facts } from '../data/model.js';
+import { getSelectedChain } from '../lib/engine.js';
 
 const responseCopy = {
   true: '成立',
@@ -13,13 +14,14 @@ const responseCopy = {
 
 export default function ProofView({ state }) {
   const [open, setOpen] = useState(false);
-  const steps = state.currentChain?.steps || [];
+  const chain = state.currentChain || getSelectedChain(state);
+  const steps = chain?.steps || [];
   return (
     <aside className={`argument-ledger${open ? ' open' : ''}`} aria-label="论证记录">
       <button className="ledger-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <ListTree size={20} />
         <strong>当前论证 · 已确认 {steps.length} 步</strong>
-        <span>{state.currentChain?.status === 'complete' ? '严格完整' : '仅保存在本地'}</span>
+        <span>{chain?.status === 'complete' ? '严格完整' : '仅保存在本地'}</span>
         <ChevronUp className={open ? '' : 'collapsed'} />
       </button>
       {open ? (

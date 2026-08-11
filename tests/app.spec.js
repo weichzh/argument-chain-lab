@@ -1,5 +1,14 @@
 import { expect, test } from 'playwright/test';
 
+const finishComponents = async (page) => {
+  await page.getByRole('button', { name: '其余组件暂不判断', exact: true }).click();
+};
+
+const acceptBothSensitivityScenarios = async (page) => {
+  await page.getByRole('button', { name: '这个幅度仍足以采用当前理由', exact: true }).click();
+  await page.getByRole('button', { name: '这个幅度仍足以采用当前理由', exact: true }).click();
+};
+
 test('完整论证只在明确同意后提交，并可刷新恢复报告', async ({ page }) => {
   const requests = [];
   const browserErrors = [];
@@ -24,9 +33,11 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await page.getByRole('button', { name: '从题库开始', exact: true }).click();
   await page.getByRole('radio', { name: '现实判断模式', exact: true }).check();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^开始/ }).click();
+  await finishComponents(page);
   await page.getByRole('button', { name: /^支持题设/ }).click();
   await page.getByRole('button', { name: /因为禁令确实能减少针对群体的重伤/ }).click();
   await page.getByRole('button', { name: '成立', exact: true }).click();
+  await acceptBothSensitivityScenarios(page);
   await page.getByRole('button', { name: '成立', exact: true }).click();
   await page.getByRole('button', { name: '接受这条原则', exact: true }).click();
   await page.getByRole('button', { name: /继续追问为什么/ }).click();
@@ -36,6 +47,7 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await page.getByRole('button', { name: '接受这条原则', exact: true }).click();
   await page.getByRole('button', { name: '是，我现在直接接受它', exact: true }).click();
   await page.getByRole('button', { name: '仍然适用', exact: true }).click();
+  await page.getByRole('button', { name: '题库中没有我认为成立的反方理由', exact: true }).click();
   await page.getByRole('button', { name: '查看阶段结果', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 
@@ -43,9 +55,14 @@ test('完整论证只在明确同意后提交，并可刷新恢复报告', async
   await expect(page.getByRole('heading', { name: '本轮机械报告' })).toBeVisible();
   await page.locator('.report-chain > summary').first().click();
   await expect(page.locator('.report-step')).toHaveCount(2);
-  await expect(page.getByText('正式题库 0.7.1').first()).toBeVisible();
+  await expect(page.getByText('正式题库 0.8.0').first()).toBeVisible();
   await expect(page.locator('.report-list').filter({ hasText: '已确认' })).toContainText('避免人的死亡、重伤和严重身体损害');
   expect(requests).toHaveLength(0);
+
+  await expect(page.getByRole('heading', { name: '论证谱系' })).toBeVisible();
+  await page.getByRole('checkbox', { name: '启用基准匹配', exact: true }).check();
+  await expect(page.getByText('基准库中最接近', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '相同政策答案，不等于相同论证' })).toBeVisible();
 
   await page.getByText('导出或贡献所选论证', { exact: true }).click();
   await page.getByRole('checkbox', { name: /我已检查完整预览/ }).check();
@@ -94,6 +111,7 @@ test('短桌面视口可点击底部立场，并可在无 AI 时记录题库缺�
   await page.goto('/');
   await page.getByRole('button', { name: '从题库开始', exact: true }).click();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^开始/ }).click();
+  await finishComponents(page);
   await page.getByRole('button', { name: /^暂时没有立场/ }).click();
   await page.getByRole('button', { name: '检查反对题设的理由', exact: true }).click();
   await page.getByText('没有合适选项', { exact: true }).click();
@@ -116,14 +134,17 @@ test('可自由切换题目、退出，并从精确步骤继续', async ({ page 
   await page.goto('/');
   await page.getByRole('button', { name: '从题库开始', exact: true }).click();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^开始/ }).click();
+  await finishComponents(page);
   await page.getByRole('button', { name: '支持题设', exact: true }).click();
   await page.getByRole('button', { name: /因为禁令确实能减少针对群体的重伤/ }).click();
   await page.getByRole('button', { name: '作为题设条件采用', exact: true }).click();
+  await acceptBothSensitivityScenarios(page);
   await expect(page.getByText('事实 2 / 2', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
   await expect(page.locator('[data-policy-id="speech_restriction"]')).toContainText('进行中');
   await page.locator('[data-policy-id="education_opportunity_fund"]').getByRole('button', { name: /^开始/ }).click();
+  await finishComponents(page);
   await expect(page.getByRole('heading', { name: /你目前倾向支持还是反对/ })).toBeVisible();
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^继续/ }).click();
@@ -135,8 +156,10 @@ test('可自由切换题目、退出，并从精确步骤继续', async ({ page 
   await expect(page.locator('[data-policy-id="speech_restriction"]')).toContainText('进行中');
 
   await page.evaluate(() => {
-    const key = 'argument-chain-lab:progress:v4';
-    const state = JSON.parse(window.localStorage.getItem(key));
+    const currentKey = 'argument-chain-lab:progress:v5';
+    const legacyKey = 'argument-chain-lab:progress:v4';
+    const state = JSON.parse(window.localStorage.getItem(currentKey));
+    state.storageVersion = 4;
     state.modelVersion = '0.7.0';
     delete state.assessmentMode;
     Object.values(state.records).forEach((record) => {
@@ -144,22 +167,24 @@ test('可自由切换题目、退出，并从精确步骤继续', async ({ page 
       record.draft?.currentChain?.steps.forEach((step) => delete step.assessmentMode);
     });
     state.currentChain?.steps.forEach((step) => delete step.assessmentMode);
-    window.localStorage.setItem(key, JSON.stringify(state));
+    window.localStorage.setItem(legacyKey, JSON.stringify(state));
+    window.localStorage.removeItem(currentKey);
   });
   await page.reload();
   await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /^继续/ }).click();
   await expect(page.getByText('事实 2 / 2', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '成立', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => (
-    JSON.parse(window.localStorage.getItem('argument-chain-lab:progress:v4')).modelVersion
-  ))).toBe('0.7.1');
+    JSON.parse(window.localStorage.getItem('argument-chain-lab:progress:v5')).modelVersion
+  ))).toBe('0.8.0');
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('argument-chain-lab:progress:v4'))).toBe(null);
 });
 
 test('两难题区分同等重要与无法比较', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: '从题库开始', exact: true })).toBeVisible();
   await page.evaluate(() => {
-    const key = 'argument-chain-lab:progress:v4';
+    const key = 'argument-chain-lab:progress:v5';
     const state = JSON.parse(window.localStorage.getItem(key));
     window.localStorage.setItem(key, JSON.stringify({
       ...state,
@@ -173,7 +198,32 @@ test('两难题区分同等重要与无法比较', async ({ page }) => {
   await page.reload();
 
   await page.getByRole('button', { name: 'A 与 B 同等重要', exact: true }).click();
+  await page.getByRole('button', { name: 'A 与 B 同等重要', exact: true }).click();
+  await page.getByRole('button', { name: 'A 与 B 同等重要', exact: true }).click();
   await page.getByText('查看详细报告', { exact: true }).click();
-  await expect(page.locator('.report-list.relations')).toContainText('≈');
-  await expect(page.locator('.report-list.relations')).toContainText('本题中同等重要');
+  await expect(page.locator('.relation-graph')).toContainText('≈');
+  await expect(page.locator('.relation-graph')).toContainText('本题中同等重要');
+});
+
+test('推荐路径不会展开全部题库，组件冲突进入明确取舍', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '从题库开始', exact: true }).click();
+  await expect(page.getByText(/候选库有 20 个场景/)).toBeVisible();
+  await page.getByRole('button', { name: '开始推荐路径', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '先分别判断这项政策里的决定' })).toBeVisible();
+  await page.getByRole('button', { name: '题目列表', exact: true }).click();
+
+  await page.locator('[data-policy-id="carbon_fee"]').getByRole('button', { name: /^开始/ }).click();
+  const components = page.locator('.component-question');
+  await components.nth(0).getByRole('button', { name: '赞成', exact: true }).click();
+  await components.nth(1).getByRole('button', { name: '反对', exact: true }).click();
+  await finishComponents(page);
+  await page.getByRole('button', { name: '支持题设', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '哪些组件是底线，哪些可以交换？' })).toBeVisible();
+
+  const tradeoffs = page.locator('.component-question');
+  await tradeoffs.nth(0).getByRole('button', { name: '必须保留', exact: true }).click();
+  await tradeoffs.nth(1).getByRole('button', { name: '可为其他组件让步', exact: true }).click();
+  await page.getByRole('button', { name: /记录取舍并检查理由/ }).click();
+  await expect(page.getByRole('heading', { name: '哪一条最接近你实际采用的理由？' })).toBeVisible();
 });
