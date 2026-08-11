@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { loadPiCatalog } from '../lib/aiAgent.js';
+import useDialogFocus from '../hooks/useDialogFocus.js';
 import {
   AI_CONFIG_SCHEMA,
   AI_CONFIG_VERSION,
@@ -43,6 +44,7 @@ const downloadText = (text) => {
 };
 
 export default function AIConfigPanel({ open, value, onApply, onClear, onClose }) {
+  const dialogRef = useDialogFocus(open, onClose);
   const [catalog, setCatalog] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -161,7 +163,7 @@ export default function AIConfigPanel({ open, value, onApply, onClear, onClose }
     <div className="side-panel-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <aside className="side-panel ai-config-panel" role="dialog" aria-modal="true" aria-labelledby="ai-config-title">
+      <aside ref={dialogRef} className="side-panel ai-config-panel" role="dialog" aria-modal="true" aria-labelledby="ai-config-title">
         <header className="panel-header">
           <div><h2 id="ai-config-title">AI 配置</h2><p>由浏览器直接调用你选择的模型服务商。</p></div>
           <button className="icon-button" type="button" onClick={onClose} title="关闭"><X /></button>

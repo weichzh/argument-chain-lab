@@ -5,6 +5,7 @@ import {
   dilemmas,
   facts,
   getArgumentsForClaim,
+  getPolicyElements,
   policies,
   configureFormalModel,
 } from '../src/data/model.js';
@@ -81,9 +82,6 @@ for (const [id, claim] of Object.entries(claims)) {
   if (claim.kind !== 'policy' && (!claim.example || typeof claim.example !== 'string')) failures.push(`Normative claim ${id} has no concrete example.`);
   if (claim.text?.length > 130) warnings.push(`Claim ${id} is longer than 130 Chinese characters and should be reviewed for readability.`);
   if (claim.kind === 'policy' && !claim.policyId) failures.push(`Policy claim ${id} has no policyId.`);
-  if ((claim.kind === 'terminal' || claim.nominatable === true) && !claim.stressTest) {
-    failures.push(`Nominatable claim ${id} has no stress test.`);
-  }
   if (claim.kind !== 'policy' && typeof claim.nominatable !== 'boolean') failures.push(`Normative claim ${id} has no nominatable flag.`);
   if (claim.kind !== 'policy' && !claim.valueFamilyId) failures.push(`Normative claim ${id} has no valueFamilyId.`);
   for (const sourceId of claim.sourceIds || []) if (!sourceIdSet.has(sourceId)) failures.push(`Claim ${id} references unknown source ${sourceId}.`);
@@ -120,10 +118,13 @@ for (const policy of policies) {
     const candidates = getArgumentsForClaim(claimId);
     if (candidates.length < 3) failures.push(`Policy claim ${claimId} needs at least 3 candidate arguments; found ${candidates.length}.`);
   }
-  if (!Array.isArray(policy.components) || policy.components.length < 2) {
-    failures.push(`Policy ${policy.id} needs independently reviewable components.`);
-  } else if (new Set(policy.components.map((component) => component.id)).size !== policy.components.length) {
-    failures.push(`Policy ${policy.id} has duplicate component ids.`);
+  const elements = getPolicyElements(policy);
+  const interactiveElements = getPolicyElements(policy, ['policy_choice', 'safeguard', 'parameter']);
+  if (interactiveElements.length < 1) failures.push(`Policy ${policy.id} needs an independently reviewable policy element.`);
+  if (new Set(elements.map((element) => element.id)).size !== elements.length) failures.push(`Policy ${policy.id} has duplicate policy element ids.`);
+  for (const element of elements) {
+    if (!['scenario_condition', 'policy_choice', 'safeguard', 'parameter'].includes(element.kind)) failures.push(`Policy element ${element.id} has invalid kind ${element.kind}.`);
+    if (!element.label || !element.plainExplanation || !element.whyItMatters) failures.push(`Policy element ${element.id} is missing plain-language metadata.`);
   }
   if (!['core', 'adaptive'].includes(policy.selection?.tier) || !policy.selection?.domain || !Number.isFinite(policy.selection?.priority)) {
     failures.push(`Policy ${policy.id} needs adaptive selection metadata.`);
@@ -139,7 +140,8 @@ if (policies.length < 20 || policies.length > 30) failures.push(`Adaptive candid
 if (corePolicies.length !== model.adaptiveAssessment?.coreCount || corePolicies.length !== 8) failures.push(`Core policy count must be 8; found ${corePolicies.length}.`);
 if (adaptivePolicies.length < model.adaptiveAssessment?.adaptiveMax) failures.push('Adaptive bank has fewer candidates than the maximum adaptive path length.');
 const matchingWeightTotal = Object.values(model.adaptiveAssessment?.matchingWeights || {}).reduce((sum, weight) => sum + weight, 0);
-if (matchingWeightTotal !== 100) failures.push(`Ideology matching weights must total 100; found ${matchingWeightTotal}.`);
+if (matchingWeightTotal <= 0 || matchingWeightTotal > 100) failures.push(`Ideology matching weights must total between 1 and 100; found ${matchingWeightTotal}.`);
+if (model.adaptiveAssessment?.matchingWeights?.dilemmaRelation !== 0) failures.push('Dilemma matching weight must stay zero until benchmark dilemma responses exist.');
 
 for (const mode of ['conditional_scenario', 'real_world_belief']) {
   if (!model.assessmentModes?.[mode]?.label || !model.assessmentModes?.[mode]?.instruction) {
@@ -149,8 +151,8 @@ for (const mode of ['conditional_scenario', 'real_world_belief']) {
 if (!['conditional_scenario', 'real_world_belief'].includes(model.assessmentModes?.default)) {
   failures.push('Assessment modes need a supported default.');
 }
-if (!model.dilemmaResponseScale?.allowed?.includes('equal') || !model.dilemmaResponseScale?.allowed?.includes('undecided')) {
-  failures.push('Dilemma response scale must distinguish equal from undecided.');
+if (!['equal', 'depends_on_context', 'incomparable', 'undecided'].every((response) => model.dilemmaResponseScale?.allowed?.includes(response))) {
+  failures.push('Dilemma response scale must distinguish equal, contextual, incomparable and undecided responses.');
 }
 
 for (const claim of Object.values(claims)) {
@@ -225,7 +227,13 @@ if (benchmarks?.schema !== 'argument-chain-ideology-benchmarks' || benchmarks?.m
       if (variantIds.has(variant.id)) failures.push(`Duplicate variant ${profile.id}/${variant.id}.`);
       variantIds.add(variant.id);
       if (!variant.source?.label || !variant.source?.caveat) failures.push(`Variant ${profile.id}/${variant.id} has no source boundary.`);
-      for (const policyId of Object.keys(variant.policyPositions || {})) if (!policyIds.has(policyId)) failures.push(`Variant ${profile.id}/${variant.id} references unknown policy ${policyId}.`);
+      for (const [policyId, position] of Object.entries(variant.policyPositions || {})) {
+        if (!policyIds.has(policyId)) failures.push(`Variant ${profile.id}/${variant.id} references unknown policy ${policyId}.`);
+        if (!['support', 'oppose', 'conditional', 'undecided'].includes(position?.stance)) failures.push(`Variant ${profile.id}/${variant.id} has an invalid stance for ${policyId}.`);
+        if (!['explicit', 'reconstruction'].includes(position?.basis) || !['low', 'medium', 'high'].includes(position?.confidence) || typeof position?.rationale !== 'string') {
+          failures.push(`Variant ${profile.id}/${variant.id} has no auditable basis for ${policyId}.`);
+        }
+      }
       for (const reasonId of Object.values(variant.primaryReasons || {}).filter(Boolean)) if (!claims[reasonId]) failures.push(`Variant ${profile.id}/${variant.id} references unknown reason family ${reasonId}.`);
       for (const claimId of Object.values(variant.fixedPoints || {}).filter(Boolean)) if (!claims[claimId]) failures.push(`Variant ${profile.id}/${variant.id} references unknown fixed point ${claimId}.`);
     }

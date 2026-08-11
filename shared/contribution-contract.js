@@ -1,5 +1,5 @@
 export const CONTRIBUTION_SCHEMA = 'argument-chain-contribution';
-export const CONTRIBUTION_VERSION = 1;
+export const CONTRIBUTION_VERSION = 2;
 export const CONSENT_VERSION = 1;
 export const CANDIDATE_RECORD_SCHEMA = 'argument-chain-candidate-record';
 export const COMMUNITY_BANK_SCHEMA = 'argument-chain-community-bank';
@@ -12,6 +12,7 @@ const TARGET_KINDS = new Set(['policy', 'bridge']);
 const FACT_KINDS = new Set(['stipulated', 'empirical', 'descriptive']);
 const BRIDGE_KINDS = new Set(['bridge', 'terminal']);
 const STRESS_RESPONSES = new Set(['applies', 'relevant_distinction']);
+const DEFEATER_EFFECTS = new Set(['supplement', 'weaken', 'offset', 'outweigh', 'reject', 'none_accepted']);
 const FORBIDDEN_TEXT_CONTROLS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/u;
 const RESERVED_PLACEHOLDERS = new Set(['未命名结论', '未命名事实', '未命名原则', '未命名规范原则', '未命名当前基本价值']);
 
@@ -129,6 +130,32 @@ function validateStressTest(value, path, issues) {
   }
 }
 
+function validateDefeaterReview(value, path, issues) {
+  const keys = ['argumentTitle', 'facts', 'bridge', 'effect', 'stanceBefore', 'stanceAfter'];
+  if (!checkObject(value, path, keys, keys, issues)) return;
+  if (value.argumentTitle !== null) checkString(value.argumentTitle, `${path}.argumentTitle`, issues, { max: 1200 });
+  if (!Array.isArray(value.facts)) {
+    issue(issues, `${path}.facts`, 'expected_array');
+  } else {
+    value.facts.forEach((fact, index) => {
+      const factPath = `${path}.facts[${index}]`;
+      if (!checkObject(fact, factPath, ['statement', 'response'], ['statement', 'response'], issues)) return;
+      checkString(fact.statement, `${factPath}.statement`, issues, { max: 1200 });
+      if (!['true', 'false', 'unknown'].includes(fact.response)) issue(issues, `${factPath}.response`, 'invalid_value');
+    });
+  }
+  if (value.bridge !== null) {
+    const bridgePath = `${path}.bridge`;
+    if (checkObject(value.bridge, bridgePath, ['text', 'response'], ['text', 'response'], issues)) {
+      checkString(value.bridge.text, `${bridgePath}.text`, issues, { max: 1600 });
+      if (!['accept', 'reject', 'uncertain'].includes(value.bridge.response)) issue(issues, `${bridgePath}.response`, 'invalid_value');
+    }
+  }
+  if (!DEFEATER_EFFECTS.has(value.effect)) issue(issues, `${path}.effect`, 'invalid_value');
+  if (!['support', 'oppose', 'undecided'].includes(value.stanceBefore)) issue(issues, `${path}.stanceBefore`, 'invalid_value');
+  if (!['support', 'oppose', 'undecided'].includes(value.stanceAfter)) issue(issues, `${path}.stanceAfter`, 'invalid_value');
+}
+
 function validateChecks(value, path, issues) {
   const keys = ['noUnresolvedConflicts', 'noModelGaps'];
   if (!checkObject(value, path, keys, keys, issues)) return;
@@ -137,7 +164,7 @@ function validateChecks(value, path, issues) {
 }
 
 function validateArgument(value, path, issues) {
-  const keys = ['direction', 'target', 'steps', 'fixedPoint', 'stressTest'];
+  const keys = ['direction', 'target', 'steps', 'fixedPoint', 'stressTest', 'defeaterReview'];
   if (!checkObject(value, path, keys, keys, issues)) return;
   if (!DIRECTIONS.has(value.direction)) issue(issues, `${path}.direction`, 'invalid_value');
   validateTarget(value.target, `${path}.target`, issues);
@@ -150,6 +177,7 @@ function validateArgument(value, path, issues) {
   }
   validateFixedPoint(value.fixedPoint, `${path}.fixedPoint`, issues);
   validateStressTest(value.stressTest, `${path}.stressTest`, issues);
+  validateDefeaterReview(value.defeaterReview, `${path}.defeaterReview`, issues);
 
   if (!Array.isArray(value.steps) || !value.steps.length) return;
   const firstTarget = value.steps[0]?.target?.text;

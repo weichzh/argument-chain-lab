@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Download, HardDrive, KeyRound, Trash2, Upload, X } from 'lucide-react';
+import useDialogFocus from '../hooks/useDialogFocus.js';
 
 const downloadProgress = (state) => {
   const payload = {
@@ -26,6 +27,7 @@ export default function LocalDataPanel({
   onClear,
   onClose,
 }) {
+  const dialogRef = useDialogFocus(open, onClose);
   const [clearArmed, setClearArmed] = useState(false);
   if (!open) return null;
   const hasProgress = Boolean(state.startedAt);
@@ -45,7 +47,7 @@ export default function LocalDataPanel({
     <div className="side-panel-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) close();
     }}>
-      <aside className="side-panel local-data-panel" role="dialog" aria-modal="true" aria-labelledby="local-data-title">
+      <aside ref={dialogRef} className="side-panel local-data-panel" role="dialog" aria-modal="true" aria-labelledby="local-data-title">
         <header className="panel-header">
           <div><h2 id="local-data-title">本地数据</h2><p>正式题库版本 {bankVersion}</p></div>
           <button className="icon-button" type="button" onClick={close} title="关闭"><X /></button>

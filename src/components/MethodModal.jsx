@@ -1,23 +1,17 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { X } from 'lucide-react';
 import { sources } from '../data/model.js';
+import useDialogFocus from '../hooks/useDialogFocus.js';
 
 export default function MethodModal({ open, onClose }) {
-  useEffect(() => {
-    if (!open) return undefined;
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose, open]);
+  const dialogRef = useDialogFocus(open, onClose);
 
   if (!open) return null;
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <section className="modal-sheet method-sheet" role="dialog" aria-modal="true" aria-labelledby="method-title">
+      <section ref={dialogRef} className="modal-sheet method-sheet" role="dialog" aria-modal="true" aria-labelledby="method-title">
         <header className="panel-header">
           <div><h2 id="method-title">方法与边界</h2><p>论证协议，不是政治人格测试。</p></div>
           <button className="icon-button" type="button" onClick={onClose} title="关闭"><X /></button>

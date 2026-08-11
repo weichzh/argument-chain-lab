@@ -42,7 +42,7 @@ const toBridge = (claimId, isFinal) => {
 
 const stressTestFrom = (chain) => {
   const claim = claims[chain.terminal.claimId];
-  const source = claim?.stressTest || {};
+  const source = chain.stress?.test || claim?.stressTest || {};
   const response = chain.stress?.response;
   const relevantDistinction = ['qualified', 'distinction', 'qualified_exception'].includes(response);
   return {
@@ -55,9 +55,29 @@ const stressTestFrom = (chain) => {
   };
 };
 
+const defeaterReviewFrom = (chain) => {
+  const review = chain.defeaterReview;
+  const argument = argumentsById[review?.argumentId];
+  return {
+    argumentTitle: argument?.title || null,
+    facts: (argument?.factIds || []).map((factId) => ({
+      statement: facts[factId].statement,
+      response: review.factResponses?.[factId] || 'unknown',
+    })),
+    bridge: argument ? {
+      text: claims[argument.bridgeClaimId].text,
+      response: review.bridgeResponse || 'uncertain',
+    } : null,
+    effect: review.effect || review.impact,
+    stanceBefore: review.stanceBefore || chain.direction,
+    stanceAfter: review.stanceAfter || chain.direction,
+  };
+};
+
 export const contributionEligibility = (state, chain) => {
   const reasons = [];
-  if (!chain || chain.status !== 'complete') reasons.push('这条论证尚未达到严格完整状态。');
+  if (!chain || chain.status !== 'complete') reasons.push('这条理由链尚未闭合。');
+  if (chain?.matchingStatus !== 'active') reasons.push('这条理由链当前不是可用于报告或匹配的有效路径。');
   if (!chain?.steps?.length) reasons.push('论证没有已确认步骤。');
   if (chain?.steps?.some((step) => (
     Object.values(step.factResponses || {}).some((response) => response !== 'true')
@@ -73,7 +93,16 @@ export const contributionEligibility = (state, chain) => {
   if (chain?.scopeConflicts?.length) reasons.push('仍有未说明的适用范围冲突。');
   if (chain?.compatibilityIssues?.length) reasons.push('论证依赖与其他路径不相容的事实情景。');
   if (!chain?.defeaterReview) reasons.push('尚未完成最强反方理由复核。');
-  if (['weakened', 'reversed'].includes(chain?.defeaterReview?.impact)) {
+  if (chain?.defeaterReview?.argumentId) {
+    const defeater = argumentsById[chain.defeaterReview.argumentId];
+    if ((defeater?.factIds || []).some((factId) => !['true', 'false'].includes(chain.defeaterReview.factResponses?.[factId]))) {
+      reasons.push('最强反方理由仍有事实前提未判断。');
+    }
+    if (!['accept', 'reject'].includes(chain.defeaterReview.bridgeResponse)) {
+      reasons.push('最强反方理由的判断依据仍未决定。');
+    }
+  }
+  if (['weaken', 'offset', 'outweigh'].includes(chain?.defeaterReview?.effect || chain?.defeaterReview?.impact)) {
     reasons.push('最强反方理由已经削弱或改变当前政策立场。');
   }
   if (state.pendingConflict?.chainId === chain?.id) reasons.push('当前论证仍有未处理冲突。');
@@ -138,6 +167,7 @@ export const buildContributionPackage = (state, chain) => {
         confirmation: 'independently_accepted',
       },
       stressTest: stressTestFrom(chain),
+      defeaterReview: defeaterReviewFrom(chain),
     },
   };
   const normalized = normalizeContributionPackage(value);

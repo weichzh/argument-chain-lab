@@ -28,6 +28,13 @@ export let assessmentModes = { default: 'real_world_belief' };
 export let ideologyBenchmarks = { profiles: [] };
 export let adaptiveAssessment = {};
 
+export const POLICY_ELEMENT_GROUPS = Object.freeze({
+  scenario_condition: 'scenarioConditions',
+  policy_choice: 'policyChoices',
+  safeguard: 'safeguards',
+  parameter: 'parameters',
+});
+
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const isLocalId = (value) => typeof value === 'string' && value.startsWith('local_');
 
@@ -50,6 +57,22 @@ export const validateFormalModel = (model) => {
   assertRecord(model.claims, 'claims');
   assertRecord(model.arguments, 'arguments');
   assertArray(model.policies, 'policies');
+  model.policies.forEach((policy) => {
+    if (policy.origin === 'community' || policy.origin === 'session_overlay') return;
+    const elementIds = new Set();
+    Object.entries(POLICY_ELEMENT_GROUPS).forEach(([kind, group]) => {
+      assertArray(policy[group], `policies.${policy.id}.${group}`);
+      policy[group].forEach((element) => {
+        assertRecord(element, `policies.${policy.id}.${group}[]`);
+        if (!element.id || elementIds.has(element.id)) throw new Error(`政策 ${policy.id} 的元素 ID 缺失或重复。`);
+        if (element.kind !== kind) throw new Error(`政策元素 ${element.id} 的 kind 与所在分组不一致。`);
+        if (!element.label || !element.plainExplanation || !element.whyItMatters) {
+          throw new Error(`政策元素 ${element.id} 缺少通俗说明。`);
+        }
+        elementIds.add(element.id);
+      });
+    });
+  });
   assertArray(model.dilemmas, 'dilemmas');
   assertArray(model.sources, 'sources');
   return model;
@@ -137,6 +160,15 @@ export const getArgumentsForClaim = (claimId) =>
   Object.values(argumentsById).filter((argument) => argument.targetClaimId === claimId);
 
 export const getPolicy = (policyId) => policies.find((policy) => policy.id === policyId);
+
+export const getPolicyElements = (policy, kinds = Object.keys(POLICY_ELEMENT_GROUPS)) => {
+  if (!policy) return [];
+  const typed = kinds.flatMap((kind) => (
+    policy[POLICY_ELEMENT_GROUPS[kind]] || []
+  ));
+  if (typed.length || !kinds.includes('policy_choice')) return typed;
+  return (policy.components || []).map((item) => ({ ...item, kind: 'policy_choice' }));
+};
 
 export const getTerminalClaims = () =>
   Object.values(claims).filter((claim) => claim.kind === 'terminal');

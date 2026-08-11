@@ -16,12 +16,16 @@ export default function ProofView({ state }) {
   const [open, setOpen] = useState(false);
   const chain = state.currentChain || getSelectedChain(state);
   const steps = chain?.steps || [];
+  const defeaterEffect = chain?.defeaterReview?.effect || chain?.defeaterReview?.impact;
+  const status = chain?.status === 'complete'
+    ? ['offset', 'outweigh'].includes(defeaterEffect) ? '理由链闭合，整包已修订' : '本条理由链已闭合'
+    : '仅保存在本地';
   return (
     <aside className={`argument-ledger${open ? ' open' : ''}`} aria-label="论证记录">
       <button className="ledger-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <ListTree size={20} />
         <strong>当前论证 · 已确认 {steps.length} 步</strong>
-        <span>{chain?.status === 'complete' ? '严格完整' : '仅保存在本地'}</span>
+        <span>{status}</span>
         <ChevronUp className={open ? '' : 'collapsed'} />
       </button>
       {open ? (

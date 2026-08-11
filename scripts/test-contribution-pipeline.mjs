@@ -42,6 +42,14 @@ async function testContract() {
   falseFact.argument.steps[0].facts[0].response = 'false';
   expectIssue(falseFact, 'invalid_value');
 
+  const missingDefeaterReview = clone(fixture);
+  delete missingDefeaterReview.argument.defeaterReview;
+  expectIssue(missingDefeaterReview, 'required');
+
+  const invalidDefeaterEffect = clone(fixture);
+  invalidDefeaterEffect.argument.defeaterReview.effect = 'identity_label';
+  expectIssue(invalidDefeaterEffect, 'invalid_value');
+
   const conflict = clone(fixture);
   conflict.checks.noUnresolvedConflicts = false;
   expectIssue(conflict, 'invalid_value');

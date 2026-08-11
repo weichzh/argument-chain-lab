@@ -7,7 +7,7 @@
   "required": ["schema", "version", "bankVersion", "consentVersion", "status", "checks", "argument"],
   "properties": {
     "schema": { "const": "argument-chain-contribution" },
-    "version": { "const": 1 },
+    "version": { "const": 2 },
     "bankVersion": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
     "consentVersion": { "const": 1 },
     "status": { "const": "complete" },
@@ -75,7 +75,7 @@
     "argument": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["direction", "target", "steps", "fixedPoint", "stressTest"],
+      "required": ["direction", "target", "steps", "fixedPoint", "stressTest", "defeaterReview"],
       "properties": {
         "direction": { "enum": ["support", "oppose", "undirected"] },
         "target": { "$ref": "#/$defs/target" },
@@ -109,6 +109,38 @@
               "then": { "properties": { "distinction": { "type": "string", "minLength": 1 } } }
             }
           ]
+        },
+        "defeaterReview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["argumentTitle", "facts", "bridge", "effect", "stanceBefore", "stanceAfter"],
+          "properties": {
+            "argumentTitle": { "type": ["string", "null"], "minLength": 1, "maxLength": 1200 },
+            "facts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["statement", "response"],
+                "properties": {
+                  "statement": { "type": "string", "minLength": 1, "maxLength": 1200 },
+                  "response": { "enum": ["true", "false", "unknown"] }
+                }
+              }
+            },
+            "bridge": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": ["text", "response"],
+              "properties": {
+                "text": { "type": "string", "minLength": 1, "maxLength": 1600 },
+                "response": { "enum": ["accept", "reject", "uncertain"] }
+              }
+            },
+            "effect": { "enum": ["supplement", "weaken", "offset", "outweigh", "reject", "none_accepted"] },
+            "stanceBefore": { "enum": ["support", "oppose", "undecided"] },
+            "stanceAfter": { "enum": ["support", "oppose", "undecided"] }
+          }
         }
       }
     }

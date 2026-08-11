@@ -691,6 +691,23 @@ p {
   border-bottom: 1px solid var(--line);
 }
 
+.mode-badge {
+  margin-right: auto;
+  padding: 7px 10px;
+  display: inline-flex;
+  align-self: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.results-header .mode-badge {
+  margin-top: 12px;
+}
+
 .workspace-toolbar .button {
   min-height: 40px;
 }
@@ -831,6 +848,54 @@ p {
   color: var(--ink-soft);
   font-size: 13px;
   line-height: 1.7;
+}
+
+.policy-frame .policy-scope {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(112, 117, 126, 0.25);
+}
+
+.scenario-condition-list {
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  list-style: none;
+}
+
+.scenario-condition-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.scenario-condition-list strong {
+  flex: 0 0 auto;
+  color: var(--green);
+  font-size: 10px;
+}
+
+.evidence-warning,
+.mode-result-warning {
+  margin: 14px 0;
+  padding: 11px 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-soft);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.evidence-warning svg,
+.mode-result-warning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .policy-frame details {
@@ -1748,6 +1813,38 @@ details > summary {
   font-size: 12px;
 }
 
+.policy-result-summary {
+  margin: 18px 0 8px;
+  padding: 16px 18px;
+  border-left: 4px solid var(--green);
+  background: var(--wash);
+}
+
+.policy-result-summary > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.policy-result-summary h2 {
+  margin: 5px 0 8px;
+  font-size: 18px;
+}
+
+.policy-result-summary p,
+.policy-result-summary strong {
+  display: block;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.policy-result-summary strong {
+  margin-top: 7px;
+  color: var(--ink);
+}
+
 .status-dot {
   width: 9px;
   height: 9px;
@@ -2172,6 +2269,32 @@ details > summary {
   margin-right: 8px;
   color: var(--amber);
   font-size: 12px;
+}
+
+.component-question > p,
+.component-question > small {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.component-question > small {
+  color: var(--muted);
+}
+
+.element-note {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.element-note textarea {
+  width: 100%;
+  resize: vertical;
 }
 
 .segmented-control {
@@ -2664,6 +2787,11 @@ details > summary {
 }
 
 .package-report-list dt { color: var(--ink-soft); }
+.package-report-list dt span {
+  margin-right: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
 .package-report-list dd { margin: 0; text-align: right; font-weight: 650; }
 
 .report-defeater {
@@ -3047,6 +3175,12 @@ details > summary {
 
   .workspace-toolbar {
     padding: 6px 10px;
+    flex-wrap: wrap;
+  }
+
+  .workspace-toolbar .mode-badge {
+    width: 100%;
+    justify-content: center;
   }
 
   .workspace-toolbar .button {
@@ -3213,6 +3347,51 @@ details > summary {
   .report-list li,
   .report-list.relations li {
     grid-template-columns: 1fr;
+  }
+
+  .matrix-scroll {
+    overflow: visible;
+  }
+
+  .reason-matrix table,
+  .reason-matrix tbody,
+  .reason-matrix tr,
+  .reason-matrix th,
+  .reason-matrix td {
+    width: 100%;
+    min-width: 0;
+    display: block;
+  }
+
+  .reason-matrix thead {
+    display: none;
+  }
+
+  .reason-matrix tr {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+
+  .reason-matrix th,
+  .reason-matrix td {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .reason-matrix tr > :last-child {
+    border-bottom: 0;
+  }
+
+  .reason-matrix th::before,
+  .reason-matrix td::before {
+    margin-bottom: 5px;
+    display: block;
+    color: var(--muted);
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 760;
   }
 }
 

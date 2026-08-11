@@ -1,7 +1,7 @@
 {
   "schema": "argument-chain-contribution",
-  "version": 1,
-  "bankVersion": "0.5.0",
+  "version": 2,
+  "bankVersion": "0.8.1",
   "consentVersion": 1,
   "status": "complete",
   "checks": {
@@ -52,6 +52,14 @@
       "question": "这条原则在该案例中是否仍然适用？",
       "response": "applies",
       "distinction": null
+    },
+    "defeaterReview": {
+      "argumentTitle": null,
+      "facts": [],
+      "bridge": null,
+      "effect": "none_accepted",
+      "stanceBefore": "support",
+      "stanceAfter": "support"
     }
   }
 }

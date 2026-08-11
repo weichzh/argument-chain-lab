@@ -5,6 +5,7 @@ import {
   calculatePriority,
   collectTerminalCommitments,
   createInitialState,
+  exportSession,
   getSelectedChain,
   migrateSavedState,
   reducer,
@@ -14,6 +15,7 @@ import {
   argumentsById,
   configureFormalModel,
   getArgumentsForClaim,
+  getPolicyElements,
   getRelevantDilemmas,
   policies,
 } from '../src/data/model.js';
@@ -27,8 +29,9 @@ const createRealWorldState = () => act(createInitialState(), { type: 'SET_ASSESS
 function answerComponents(state, position = 'undecided') {
   if (state.phase !== PHASES.COMPONENTS) return state;
   let next = state;
-  for (const component of policies[state.policyIndex].components) {
-    next = act(next, { type: 'SET_COMPONENT_POSITION', componentId: component.id, position });
+  for (const element of getPolicyElements(policies[state.policyIndex], ['policy_choice', 'safeguard', 'parameter'])) {
+    const response = element.kind === 'policy_choice' ? position : 'uncertain';
+    next = act(next, { type: 'SET_POLICY_ELEMENT_RESPONSE', elementId: element.id, response });
   }
   return act(next, { type: 'COMPLETE_COMPONENTS' });
 }
@@ -55,7 +58,14 @@ const finishDefeater = (state) => state.phase === PHASES.DEFEATER
   ? act(state, { type: 'NO_DEFEATER_ACCEPTED' })
   : state;
 
-function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentMode = 'real_world_belief', defeaterImpact = 'none', initialStance = 'support', direction = 'support' } = {}) {
+function answerDefeater(state, argumentId, effect) {
+  let next = act(state, { type: 'SELECT_DEFEATER', argumentId });
+  while (next.phase === PHASES.DEFEATER_FACT) next = act(next, { type: 'ANSWER_DEFEATER_FACT', response: 'true' });
+  next = act(next, { type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' });
+  return act(next, { type: 'ANSWER_DEFEATER', effect });
+}
+
+function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentMode = 'real_world_belief', defeaterEffect = 'none', initialStance = 'support', direction = 'support' } = {}) {
   let state = act(createInitialState(), { type: 'SET_ASSESSMENT_MODE', mode: assessmentMode });
   state = startFirstPolicy(state);
   assert.equal(state.phase, PHASES.STANCE);
@@ -78,9 +88,8 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
   assert.equal(state.phase, PHASES.STRESS);
   state = act(state, { type: 'ANSWER_STRESS', response: stress });
-  if (state.phase === PHASES.DEFEATER && defeaterImpact !== 'none') {
-    state = act(state, { type: 'SELECT_DEFEATER', argumentId: 'speech_choice_oppose' });
-    state = act(state, { type: 'ANSWER_DEFEATER', impact: defeaterImpact });
+  if (state.phase === PHASES.DEFEATER && defeaterEffect !== 'none') {
+    state = answerDefeater(state, 'speech_choice_oppose', defeaterEffect);
   } else {
     state = finishDefeater(state);
   }
@@ -91,20 +100,24 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
 {
   let state = act(createInitialState(), { type: 'START_OVERVIEW' });
   state = act(state, { type: 'OPEN_POLICY', policyId: 'carbon_fee' });
-  const components = policies[state.policyIndex].components;
-  components.forEach((component, index) => {
+  const elements = getPolicyElements(policies[state.policyIndex], ['policy_choice', 'safeguard', 'parameter']);
+  const choices = getPolicyElements(policies[state.policyIndex], ['policy_choice']);
+  elements.forEach((element) => {
+    const index = choices.findIndex((choice) => choice.id === element.id);
     state = act(state, {
-      type: 'SET_COMPONENT_POSITION',
-      componentId: component.id,
-      position: index === 0 ? 'support' : index === 1 ? 'oppose' : 'undecided',
+      type: 'SET_POLICY_ELEMENT_RESPONSE',
+      elementId: element.id,
+      response: element.kind === 'policy_choice'
+        ? index === 0 ? 'support' : index === 1 ? 'oppose' : 'undecided'
+        : 'uncertain',
     });
   });
   state = act(state, { type: 'COMPLETE_COMPONENTS' });
   assert.equal(state.records.carbon_fee.packageConflict, true);
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
   assert.equal(state.phase, PHASES.PACKAGE_TRADEOFF);
-  state = act(state, { type: 'SET_COMPONENT_TRADEOFF', componentId: components[0].id, position: 'required' });
-  state = act(state, { type: 'SET_COMPONENT_TRADEOFF', componentId: components[1].id, position: 'tradeable' });
+  state = act(state, { type: 'SET_COMPONENT_TRADEOFF', componentId: choices[0].id, position: 'required' });
+  state = act(state, { type: 'SET_COMPONENT_TRADEOFF', componentId: choices[1].id, position: 'tradeable' });
   state = act(state, { type: 'COMPLETE_PACKAGE_TRADEOFF', mode: 'specified' });
   assert.equal(state.phase, PHASES.ARGUMENT);
 }
@@ -115,6 +128,14 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert.equal(state.adaptiveMode, true);
   assert.equal(policies[state.policyIndex].id, 'speech_restriction');
   assert.equal(state.phase, PHASES.COMPONENTS);
+}
+
+{
+  let state = act(createInitialState(), { type: 'START_AT_POLICY', policyId: 'majority_morality_law' });
+  const scenario = getPolicyElements(policies[state.policyIndex], ['scenario_condition'])[0];
+  assert(scenario, 'The policy should expose display-only scenario conditions.');
+  state = act(state, { type: 'SET_POLICY_ELEMENT_RESPONSE', elementId: scenario.id, response: 'support' });
+  assert.equal(state.records.majority_morality_law.policyChoiceResponses[scenario.id], undefined, 'Scenario conditions must never receive support/oppose answers.');
 }
 
 {
@@ -189,20 +210,30 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
     low: 'sufficient',
     high: 'sufficient',
   });
-  assert.equal(getSelectedChain(state).defeaterReview.impact, 'none_accepted');
+  assert.equal(getSelectedChain(state).defeaterReview.effect, 'none_accepted');
+  assert.equal(getSelectedChain(state).matchingStatus, 'active');
+  assert.equal(getSelectedChain(state).argumentClosure, 'closed');
   assert.equal(state.currentChain, null, 'Completed chains must only live in records.');
 }
 
 {
-  const state = completeSpeechChain({ defeaterImpact: 'weakened' });
+  const state = completeSpeechChain({ defeaterEffect: 'offset' });
   assert.equal(state.records.speech_restriction.stance, 'undecided');
   assert.equal(getSelectedChain(state).defeaterReview.argumentId, 'speech_choice_oppose');
   assert(sessionSummary(state).tensions.some((item) => item.kind === 'defeater_changed_stance'));
 }
 
 {
-  const state = completeSpeechChain({ initialStance: 'undecided', direction: 'support', defeaterImpact: 'reversed' });
+  const state = completeSpeechChain({ initialStance: 'undecided', direction: 'support', defeaterEffect: 'outweigh' });
   assert.equal(state.records.speech_restriction.stance, 'oppose', 'Reversal must follow the tested chain direction, not the undecided package stance.');
+  const retried = act(state, { type: 'RETRY_POLICY' });
+  assert.equal(retried.currentTargetClaimId, 'speech_oppose', 'Retry must follow the post-defeater stance.');
+}
+
+{
+  const state = completeSpeechChain({ defeaterEffect: 'offset' });
+  const retried = act(state, { type: 'RETRY_POLICY' });
+  assert.equal(retried.phase, PHASES.DIRECTION, 'An offset result must ask for a direction instead of silently reusing the old one.');
 }
 
 {
@@ -316,6 +347,22 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   let state = completeSpeechChain();
   state = act(state, { type: 'RETRY_POLICY' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
+  state = answerAllFacts(state, 'speech_harm_support');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'severe_harm_to_security' });
+  state = answerAllFacts(state, 'severe_harm_to_security');
+  state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
+  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
+  state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
+  state = finishDefeater(state);
+  assert.equal(state.records.speech_restriction.activeChainIds.length, 2, 'Multiple valid reasons for one policy must remain active.');
+}
+
+{
+  let state = completeSpeechChain();
+  state = act(state, { type: 'RETRY_POLICY' });
+  state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_harm_support' });
   state = act(state, { type: 'ANSWER_FACT', response: 'false' });
   assert.equal(state.phase, PHASES.CONFLICT, 'Opposite answer to the same fact should pause the chain.');
   assert.equal(state.pendingConflict.kind, 'fact');
@@ -342,7 +389,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
 }
 
 {
-  let state = createInitialState();
+  let state = createRealWorldState();
   state = startFirstPolicy(state);
   state = act(state, { type: 'SET_STANCE', stance: 'support' });
   state = act(state, { type: 'NO_ARGUMENT', summary: '缺少基于宗教良心的反对理由。' });
@@ -411,7 +458,7 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
 
 
 {
-  let state = createInitialState();
+  let state = createRealWorldState();
   state = startFirstPolicy(state);
   state = act(state, { type: 'SET_STANCE', stance: 'oppose' });
   state = act(state, { type: 'SELECT_ARGUMENT', argumentId: 'speech_choice_oppose' });
@@ -419,11 +466,19 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   state = act(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
   assert.equal(state.phase, PHASES.DEPTH);
   state = act(state, { type: 'SET_DEPTH', decision: 'fixed_point' });
-  assert.equal(state.phase, PHASES.DEPTH, 'A bridge without a structured stress test cannot become a stopping point.');
-  assert.equal(state.currentChain.terminal, null);
-  state = act(state, { type: 'SET_DEPTH', decision: 'deeper' });
-  assert.equal(state.phase, PHASES.ARGUMENT);
-  assert.equal(state.currentTargetClaimId, 'protect_nonharmful_choice');
+  assert.equal(state.phase, PHASES.TERMINAL_CONFIRM, 'Any accepted normative bridge can be nominated.');
+  state = act(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
+  assert.equal(state.phase, PHASES.STRESS_REQUIRED, 'A missing stress test must be supplied before the chain can contribute.');
+  state = act(state, {
+    type: 'SET_CUSTOM_STRESS_TEST',
+    scenario: '结构相同但政治对象不同的表达限制案例。',
+    question: '这条判断仍然适用吗？',
+  });
+  assert.equal(state.phase, PHASES.STRESS);
+  state = act(state, { type: 'ANSWER_STRESS', response: 'apply' });
+  state = finishDefeater(state);
+  assert.equal(getSelectedChain(state).status, 'complete');
+  assert.equal(getSelectedChain(state).stress.test.source, 'user');
 }
 
 {
@@ -494,7 +549,35 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
     dilemmaQueue: ['agency_vs_security'],
     dilemmaResponses: { agency_vs_security: { response: 'undecided' } },
   };
-  assert.equal(calculatePriority(state).unanswered, 0, 'An explicit undecided response is answered, not missing.');
+  const priority = calculatePriority(state);
+  assert.equal(priority.unanswered, 0, 'An explicit undecided response is answered, not missing.');
+  assert.equal(priority.undecided.length, 1);
+  assert.equal(priority.incomparables.length, 0);
+}
+
+{
+  const contextual = calculatePriority({
+    ...createInitialState(),
+    dilemmaQueue: ['agency_vs_security'],
+    dilemmaResponses: { agency_vs_security: { response: 'depends_on_context' } },
+  });
+  const incomparable = calculatePriority({
+    ...createInitialState(),
+    dilemmaQueue: ['agency_vs_security'],
+    dilemmaResponses: { agency_vs_security: { response: 'incomparable' } },
+  });
+  assert.equal(contextual.contextual.length, 1);
+  assert.equal(incomparable.incomparables.length, 1);
+  const exported = exportSession({
+    ...createInitialState(),
+    dilemmaQueue: ['agency_vs_security', 'democracy_vs_agency', 'security_vs_democracy'],
+    dilemmaResponses: {
+      agency_vs_security: { response: 'depends_on_context' },
+      democracy_vs_agency: { response: 'incomparable' },
+      security_vs_democracy: { response: 'undecided' },
+    },
+  });
+  assert.deepEqual(exported.analysis.priority.relations.map((relation) => relation.type), ['contextual', 'incomparable', 'undecided']);
 }
 
 {

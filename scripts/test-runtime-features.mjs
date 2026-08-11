@@ -6,6 +6,7 @@ import {
   claims,
   configureFormalModel,
   facts,
+  getPolicyElements,
   normalizeSessionOverlay,
   policies,
 } from '../src/data/model.js';
@@ -35,6 +36,10 @@ import { loadCurrentFormalModel } from './lib/load-formal-model.mjs';
 
 const { manifest, model } = await loadCurrentFormalModel();
 assert.equal(validateBankManifest(manifest).version, manifest.current);
+configureFormalModel(model);
+const invalidElementModel = structuredClone(model);
+invalidElementModel.policies[0].policyChoices[0].kind = 'scenario_condition';
+assert.throws(() => configureFormalModel(invalidElementModel), /kind/);
 configureFormalModel(model);
 
 const config = {
@@ -165,8 +170,12 @@ assert.equal(candidateRequestMatchesState({ ...state, phase: PHASES.RESULTS }, s
 
 configureFormalModel(model);
 let recursiveState = reducer(createInitialState(), { type: 'START' });
-for (const component of policies[recursiveState.policyIndex].components) {
-  recursiveState = reducer(recursiveState, { type: 'SET_COMPONENT_POSITION', componentId: component.id, position: 'undecided' });
+for (const element of getPolicyElements(policies[recursiveState.policyIndex], ['policy_choice', 'safeguard', 'parameter'])) {
+  recursiveState = reducer(recursiveState, {
+    type: 'SET_POLICY_ELEMENT_RESPONSE',
+    elementId: element.id,
+    response: element.kind === 'policy_choice' ? 'undecided' : 'uncertain',
+  });
 }
 recursiveState = reducer(recursiveState, { type: 'COMPLETE_COMPONENTS' });
 recursiveState = reducer(recursiveState, { type: 'SET_STANCE', stance: 'support' });
@@ -243,11 +252,21 @@ const extension = communityBankToExtension({
   entries: [{ contentHash, contribution: fixture }],
 });
 assert.equal(extension.policies.length, 1);
+assert.equal(getPolicyElements(extension.policies[0]).length, 0, 'Community policies may omit policy-element decomposition.');
 assert.equal(Object.keys(extension.arguments).length, fixture.argument.steps.length);
 const communityArguments = Object.values(extension.arguments);
 for (let index = 1; index < communityArguments.length; index += 1) {
   assert.equal(communityArguments[index].targetClaimId, communityArguments[index - 1].bridgeClaimId);
 }
+configureFormalModel({
+  ...model,
+  facts: { ...model.facts, ...extension.facts },
+  claims: { ...model.claims, ...extension.claims },
+  arguments: { ...model.arguments, ...extension.arguments },
+  policies: [...model.policies, ...extension.policies],
+});
+const communityState = reducer(createInitialState(), { type: 'START_AT_POLICY', policyId: extension.policies[0].id });
+assert.equal(communityState.phase, PHASES.STANCE, 'A community policy without typed elements must open directly instead of crashing.');
 
 const hostedRuntimeConfig = await sitesWorker.fetch(new Request('https://argument-chain.example/runtime-config.js'), {
   ASSETS: { fetch: async () => { throw new Error('runtime config must not use hosted persistence'); } },

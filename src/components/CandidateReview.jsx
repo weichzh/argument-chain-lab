@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, CircleAlert, X } from 'lucide-react';
+import useDialogFocus from '../hooks/useDialogFocus.js';
 
 export default function CandidateReview({ review, onConfirm, onClose }) {
   const [candidate, setCandidate] = useState(null);
@@ -7,6 +8,8 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
   useEffect(() => {
     setCandidate(review?.candidate ? structuredClone(review.candidate) : null);
   }, [review]);
+
+  const dialogRef = useDialogFocus(Boolean(review && candidate), onClose);
 
   if (!review || !candidate) return null;
 
@@ -22,7 +25,7 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
 
   return (
     <div className="modal-backdrop candidate-backdrop" role="presentation">
-      <section className="modal-sheet candidate-sheet" role="dialog" aria-modal="true" aria-labelledby="candidate-title">
+      <section ref={dialogRef} className="modal-sheet candidate-sheet" role="dialog" aria-modal="true" aria-labelledby="candidate-title">
         <header className="panel-header">
           <div><h2 id="candidate-title">检查结构化候选</h2><p>AI 只提出候选。确认前，它不会改变已确认论证。</p></div>
           <button className="icon-button" type="button" onClick={onClose} title="关闭"><X /></button>

@@ -1,7 +1,7 @@
 {
   "schema": "argument-chain-bank-manifest",
   "version": 1,
-  "current": "0.8.0",
+  "current": "0.8.1",
   "models": [
     {
       "version": "0.5.0",
@@ -23,6 +23,11 @@
       "version": "0.8.0",
       "path": "model-0.8.0.json",
       "benchmarks": "ideology-benchmarks-0.8.0.json"
+    },
+    {
+      "version": "0.8.1",
+      "path": "model-0.8.1.json",
+      "benchmarks": "ideology-benchmarks-0.8.1.json"
     }
   ],
   "extensions": [

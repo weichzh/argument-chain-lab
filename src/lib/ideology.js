@@ -2,6 +2,7 @@ import {
   adaptiveAssessment,
   argumentsById,
   claims,
+  getPolicyElements,
   ideologyBenchmarks,
   policies,
 } from '../data/model.js';
@@ -24,7 +25,6 @@ const defaultWeights = {
   dilemmaRelation: 10,
 };
 
-const latestChain = (record) => record?.chains?.at(-1) || null;
 const valueFamily = (claimId) => claims[claimId]?.valueFamilyId || claimId || null;
 const relationFamily = (response) => {
   if (response?.startsWith('left_')) return 'left';
@@ -32,32 +32,68 @@ const relationFamily = (response) => {
   return response || null;
 };
 
+const activeChains = (record) => (record?.chains || []).filter((chain) => (
+  chain.matchingStatus === 'active'
+  || (!chain.matchingStatus && ['complete', 'conditional'].includes(chain.status) && chain.defeaterReview)
+));
+
+const normalizeElementResponse = (response) => ({
+  required: 'support',
+  preferred: 'conditional',
+  not_required: 'oppose',
+  accept: 'support',
+  adjust: 'conditional',
+  reject: 'oppose',
+  uncertain: null,
+  undecided: null,
+}[response] ?? response);
+
 const userFeatures = (state) => {
   const policiesById = {};
   Object.entries(state.records || {}).forEach(([policyId, record]) => {
-    const chain = latestChain(record);
-    if (!chain) return;
-    const firstArgument = argumentsById[chain?.steps?.[0]?.argumentId];
+    const chains = activeChains(record);
+    if (!chains.length) return;
+    const policy = policies.find((item) => item.id === policyId);
+    if (!policy || policy.origin === 'community' || policy.origin === 'session_overlay') return;
+    const components = {};
+    getPolicyElements(policy, ['policy_choice', 'safeguard', 'parameter']).forEach((element) => {
+      const field = element.kind === 'policy_choice'
+        ? 'policyChoiceResponses'
+        : element.kind === 'safeguard' ? 'safeguardResponses' : 'parameterResponses';
+      const response = normalizeElementResponse(record[field]?.[element.id]);
+      if (response) components[element.id] = response;
+    });
     policiesById[policyId] = {
-      stance: record.stance || record.direction || chain?.direction || null,
-      components: record.componentPositions || {},
-      reason: firstArgument?.reasonFamilyId || firstArgument?.bridgeClaimId || null,
-      fixedPoint: valueFamily(chain?.terminal?.claimId),
-      stress: chain?.stress?.response || null,
+      stance: record.packageStanceAfterDefeater || record.stance || chains.at(-1)?.direction || null,
+      components,
+      reasons: [...new Set(chains.map((chain) => {
+        const firstArgument = argumentsById[chain.steps?.[0]?.argumentId];
+        return firstArgument?.reasonFamilyId || firstArgument?.bridgeClaimId || null;
+      }).filter(Boolean))],
+      fixedPoints: [...new Set(chains.map((chain) => valueFamily(chain.terminal?.claimId)).filter(Boolean))],
+      stress: [...new Set(chains.map((chain) => chain.stress?.response).filter(Boolean))],
     };
   });
   return { policies: policiesById, dilemmas: state.dilemmaResponses || {} };
 };
 
-export const profilePositionForPolicy = (profile, variant, policy) => {
+export const profilePositionForPolicy = (profile, variant, policy, { allowHeuristic = false } = {}) => {
   const exact = variant.policyPositions?.[policy.id];
-  if (exact) return exact;
+  if (exact) return typeof exact === 'string'
+    ? { stance: exact, basis: 'reconstruction', confidence: 'low', sourceLocation: null, rationale: '旧版基准项，尚待补充审计元数据。' }
+    : exact;
+  if (!allowHeuristic) return null;
   const tags = new Set(profile.tags || []);
   const signals = policy.selection?.prototypeSignals || {};
   const support = (signals.supportTags || []).filter((tag) => tags.has(tag)).length;
   const oppose = (signals.opposeTags || []).filter((tag) => tags.has(tag)).length;
-  if (support === oppose) return 'conditional';
-  return support > oppose ? 'support' : 'oppose';
+  return {
+    stance: support === oppose ? 'conditional' : support > oppose ? 'support' : 'oppose',
+    basis: 'tag_heuristic',
+    confidence: 'low',
+    sourceLocation: null,
+    rationale: '只用于选择下一道区分题，不进入最终相似度或覆盖度。',
+  };
 };
 
 const stanceSimilarity = (left, right) => {
@@ -78,62 +114,81 @@ const reasonSimilarity = (left, right) => {
   return valueFamily(left) === valueFamily(right) ? 0.65 : 0;
 };
 
-const averageComparable = (pairs, compare = exactSimilarity) => {
-  const scores = pairs.map(([left, right]) => compare(left, right)).filter((value) => value !== null);
-  return scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null;
+const bestComparable = (values, expected, compare = exactSimilarity) => {
+  const scores = values.map((value) => compare(value, expected)).filter((score) => score !== null);
+  return scores.length ? Math.max(...scores) : null;
 };
 
 const scoreVariant = (state, profile, variant) => {
   const features = userFeatures(state);
-  const categoryScores = { stance: [], components: [], reason: [], fixedPoint: [], stress: [], dilemmas: [] };
+  const evidence = Object.fromEntries(['stance', 'components', 'reason', 'fixedPoint', 'stress', 'dilemmas'].map((key) => [key, {
+    earned: 0,
+    compared: 0,
+    possible: 0,
+  }]));
+  const add = (category, score, possible = true) => {
+    if (possible) evidence[category].possible += 1;
+    if (score === null) return;
+    evidence[category].earned += score;
+    evidence[category].compared += 1;
+  };
 
   Object.entries(features.policies).forEach(([policyId, user]) => {
     const policy = policies.find((item) => item.id === policyId);
     if (!policy) return;
-    categoryScores.stance.push([user.stance, profilePositionForPolicy(profile, variant, policy)]);
+    const benchmarkPosition = profilePositionForPolicy(profile, variant, policy);
+    add('stance', stanceSimilarity(user.stance, benchmarkPosition?.stance));
     Object.entries(user.components).forEach(([componentId, response]) => {
-      categoryScores.components.push([response, variant.componentPositions?.[componentId]]);
+      add('components', stanceSimilarity(response, variant.componentPositions?.[componentId]));
     });
-    categoryScores.reason.push([user.reason, variant.primaryReasons?.[policyId]]);
-    categoryScores.fixedPoint.push([user.fixedPoint, valueFamily(variant.fixedPoints?.[policyId])]);
-    categoryScores.stress.push([user.stress, variant.stressBoundaries?.[policyId]]);
-  });
-  Object.entries(features.dilemmas).forEach(([dilemmaId, response]) => {
-    categoryScores.dilemmas.push([
-      relationFamily(response?.response),
-      relationFamily(variant.dilemmas?.[dilemmaId]),
-    ]);
-  });
-
-  const scores = {
-    stance: averageComparable(categoryScores.stance, stanceSimilarity),
-    components: averageComparable(categoryScores.components, stanceSimilarity),
-    reason: averageComparable(categoryScores.reason, reasonSimilarity),
-    fixedPoint: averageComparable(categoryScores.fixedPoint),
-    stress: averageComparable(categoryScores.stress, (left, right) => {
+    add('reason', bestComparable(user.reasons, variant.primaryReasons?.[policyId], reasonSimilarity));
+    add('fixedPoint', bestComparable(user.fixedPoints, valueFamily(variant.fixedPoints?.[policyId])));
+    add('stress', bestComparable(user.stress, variant.stressBoundaries?.[policyId], (left, right) => {
       if (!left || !right) return null;
       if (left === right) return 1;
       const qualified = new Set(['qualified', 'qualified_exception', 'unexplained_exception']);
       return qualified.has(left) && qualified.has(right) ? 0.5 : 0;
-    }),
-    dilemmas: averageComparable(categoryScores.dilemmas),
-  };
+    }));
+  });
+  if ((adaptiveAssessment.matchingWeights?.dilemmaRelation ?? defaultWeights.dilemmaRelation) > 0) {
+    Object.entries(features.dilemmas).forEach(([dilemmaId, response]) => {
+      add('dilemmas', exactSimilarity(
+        relationFamily(response?.response),
+        relationFamily(variant.dilemmas?.[dilemmaId]),
+      ));
+    });
+  }
+
+  const scores = Object.fromEntries(Object.entries(evidence).map(([category, item]) => [
+    category,
+    item.compared ? item.earned / item.compared : null,
+  ]));
   const weights = { ...defaultWeights, ...(adaptiveAssessment.matchingWeights || {}) };
   let earned = 0;
   let compared = 0;
+  let covered = 0;
+  let available = 0;
   Object.entries(scores).forEach(([category, score]) => {
-    if (score === null) return;
     const weight = weights[WEIGHT_KEYS[category]];
-    earned += score * weight;
-    compared += weight;
+    if (!weight) return;
+    available += weight;
+    const categoryCoverage = evidence[category].possible
+      ? evidence[category].compared / evidence[category].possible
+      : 0;
+    covered += weight * categoryCoverage;
+    if (score !== null) {
+      earned += score * weight * categoryCoverage;
+      compared += weight * categoryCoverage;
+    }
   });
   const coreTotal = policies.filter((policy) => policy.selection?.tier === 'core').length;
   const targetPolicyCount = coreTotal + (adaptiveAssessment.adaptiveMin || 2);
   const breadth = Math.min(1, Object.keys(features.policies).length / targetPolicyCount);
   return {
     similarity: compared ? Math.round((earned / compared) * 100) : 0,
-    coverage: Math.round(compared * breadth),
+    coverage: available ? Math.round((covered / available) * breadth * 100) : 0,
     breakdown: scores,
+    evidence,
   };
 };
 
@@ -150,7 +205,8 @@ export const matchIdeologyProfiles = (state) => {
   const gap = Math.max(0, (matches[0]?.similarity || 0) - (matches[1]?.similarity || 0));
   const coverage = matches[0]?.coverage || 0;
   const stability = coverage < 35 ? '低' : gap >= 12 && coverage >= 65 ? '高' : gap >= 6 ? '中高' : gap >= 3 ? '中' : '低';
-  return { matches, gap, coverage, stability };
+  const presentation = coverage < 35 ? 'insufficient' : coverage >= 65 && gap >= 8 ? 'unique' : 'family';
+  return { matches, gap, coverage, stability, presentation };
 };
 
 const entropy = (values) => {
@@ -196,7 +252,9 @@ export const selectNextAdaptivePolicy = (state) => {
   const answeredDomains = new Set([...progress.finished].map((id) => policies.find((policy) => policy.id === id)?.selection?.domain));
   return candidates.sort((left, right) => {
     const score = (policy) => {
-      const split = topProfiles.map(({ profile, variant }) => profilePositionForPolicy(profile, variant || {}, policy));
+      const split = topProfiles.map(({ profile, variant }) => (
+        profilePositionForPolicy(profile, variant || {}, policy, { allowHeuristic: true })?.stance
+      ));
       const domainBonus = answeredDomains.has(policy.selection.domain) ? 0 : 0.2;
       return entropy(split) + domainBonus - (policy.selection.priority || 0) / 1000;
     };
@@ -220,27 +278,27 @@ const mostCommon = (values) => {
 };
 
 export const buildArgumentType = (state, matching = matchIdeologyProfiles(state)) => {
-  const chains = Object.values(state.records || {}).flatMap((record) => record.chains || []);
+  const chains = Object.values(state.records || {}).flatMap(activeChains);
   const terminalId = mostCommon(chains.map((chain) => chain.terminal?.claimId));
   const reasonId = mostCommon(chains.map((chain) => argumentsById[chain.steps?.[0]?.argumentId]?.reasonFamilyId));
+  const domain = mostCommon(chains.map((chain) => policies.find((policy) => policy.id === chain.policyId)?.selection?.domain));
   const qualified = chains.filter((chain) => ['qualified_exception', 'unexplained_exception'].includes(chain.stress?.response)).length;
   const scope = qualified ? '条件修订型' : chains.length && chains.every((chain) => chain.stress?.response === 'apply') ? '普遍检验型' : '开放边界型';
-  const profile = matching.matches[0]?.profile;
   const canonical = JSON.stringify({
-    records: Object.entries(state.records || {}).sort(([left], [right]) => left.localeCompare(right)).map(([policyId, record]) => ({
-      policyId,
-      stance: record.stance,
-      components: Object.entries(record.componentPositions || {}).sort(),
-      reason: argumentsById[latestChain(record)?.steps?.[0]?.argumentId]?.reasonFamilyId || null,
-      fixedPoint: latestChain(record)?.terminal?.claimId || null,
-      stress: latestChain(record)?.stress?.response || null,
+    chains: chains.sort((left, right) => left.id.localeCompare(right.id)).map((chain) => ({
+      policyId: chain.policyId,
+      direction: chain.direction,
+      reasons: chain.steps.map((step) => argumentsById[step.argumentId]?.reasonFamilyId || step.bridgeClaimId),
+      fixedPoint: chain.terminal?.claimId || null,
+      stress: chain.stress?.response || null,
+      defeater: chain.defeaterReview?.effect || null,
     })),
     dilemmas: Object.entries(state.dilemmaResponses || {}).sort().map(([id, response]) => [id, response.response]),
   });
   const valueLabel = claims[terminalId]?.shortLabel || '多重价值';
   const reasonLabel = claims[reasonId]?.shortLabel || '多路径论证';
   return {
-    label: `${profile?.displayName || '开放谱系'}·${valueLabel}·${reasonLabel}·${scope}`,
-    code: `${profile?.id?.replace('prototype_', 'P') || 'PX'}-${stableHash(canonical).slice(0, 4)}`,
+    label: `${valueLabel}·${reasonLabel}·${domain || '跨领域'}·${scope}`,
+    code: `ARG-${stableHash(canonical)}`,
   };
 };
