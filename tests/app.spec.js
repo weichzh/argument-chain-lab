@@ -81,6 +81,105 @@ test('跳过、题目列表和中止查看结果保持单一问卷', async ({ pa
   await expect(page.getByText('当前题停在中途，回答仍保存在这个浏览器中。')).toBeVisible();
 });
 
+test('娱乐基准只在主动启用后加载，并且一次只追加一道精度题', async ({ page }) => {
+  const benchmarkRequests = [];
+  page.on('request', (request) => {
+    if (request.url().includes('ideology-benchmark-1.1.0.json')) benchmarkRequests.push(request.url());
+  });
+  await page.addInitScript(() => {
+    const policyIds = [
+      'speech_restriction',
+      'metadata_surveillance',
+      'education_opportunity_fund',
+      'carbon_fee',
+      'workplace_cogovernance',
+      'income_floor',
+      'emergency_powers',
+      'expert_referendum_delay',
+    ];
+    const policyResults = Object.fromEntries(policyIds.map((policyId) => [policyId, {
+      policyId,
+      rootAnswer: 'uncertain',
+      finalRootAnswer: 'uncertain',
+      acceptedRevisionFrameId: null,
+      diagnosisClaimId: null,
+      mainPaths: [],
+      counterPath: null,
+      counterImpact: null,
+    }]));
+    localStorage.setItem('argument-chain-lab:progress:v10', JSON.stringify({
+      storageVersion: 10,
+      modelVersion: '1.1.0',
+      policyIds,
+      policyPosition: 7,
+      currentPolicyId: policyIds[7],
+      policyResults,
+      phase: 'results',
+      history: [],
+      answerLog: [],
+      notes: [],
+      startedAt: '2026-08-12T00:00:00.000Z',
+      updatedAt: '2026-08-12T00:00:00.000Z',
+      entertainmentEnabled: false,
+      view: 'results',
+    }));
+  });
+
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '生成娱乐匹配', exact: true })).toBeVisible();
+  expect(benchmarkRequests).toHaveLength(0);
+  await page.getByRole('button', { name: '生成娱乐匹配', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '只看目前的信息，你位于以下几个论证原型之间。' })).toBeVisible();
+  await expect(page.locator('.entertainment-profile code')).toHaveText(/^[0-9A-F]{16}$/);
+  await expect(page.getByText(/主要理由方向接近/)).toHaveCount(0);
+  expect(benchmarkRequests).toHaveLength(1);
+
+  await page.getByRole('button', { name: '再答一题：公民资格', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '国家应当采用原方案，把历史民族血缘作为完整公民资格的必要条件吗？' })).toBeVisible();
+  await expect(page.getByText('公民资格 · 9 / 9')).toBeVisible();
+  await page.getByRole('button', { name: '题目列表', exact: true }).click();
+  await page.getByRole('button', { name: '继续精度题', exact: true }).click();
+  await expect(page.getByText('公民资格 · 9 / 9')).toBeVisible();
+});
+
+test('1.0 结构化进度原样进入兼容的 1.1 模型', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('argument-chain-lab:progress:v10', JSON.stringify({
+      storageVersion: 10,
+      modelVersion: '1.0.0',
+      policyIds: ['speech_restriction'],
+      policyPosition: 0,
+      currentPolicyId: 'speech_restriction',
+      policyResults: {
+        speech_restriction: {
+          policyId: 'speech_restriction',
+          rootAnswer: 'uncertain',
+          finalRootAnswer: 'uncertain',
+          acceptedRevisionFrameId: null,
+          diagnosisClaimId: null,
+          mainPaths: [],
+          counterPath: null,
+          counterImpact: null,
+        },
+      },
+      phase: 'results',
+      history: [],
+      answerLog: [],
+      notes: [],
+      startedAt: '2026-08-11T00:00:00.000Z',
+      updatedAt: '2026-08-11T00:00:00.000Z',
+      view: 'results',
+    }));
+  });
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')));
+  expect(state.modelVersion).toBe('1.1.0');
+  expect(state.policyResults.speech_restriction.rootAnswer).toBe('uncertain');
+  expect(state.policyIds).toHaveLength(8);
+});
+
 test('0.9 会话只读归档，不会提升为新版结果', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('argument-chain-lab:progress:v8', JSON.stringify({

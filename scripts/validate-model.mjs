@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { validateBankManifest } from '../src/data/bank.js';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
-const modelUrl = new URL('../public/bank/model-1.0.0.json', import.meta.url);
+const modelUrl = new URL('../public/bank/model-1.1.0.json', import.meta.url);
 const schemaUrl = new URL('../public/bank/model-v4.schema.json', import.meta.url);
 const manifestUrl = new URL('../public/bank/manifest.json', import.meta.url);
 const bytes = fs.readFileSync(modelUrl);
@@ -20,8 +21,9 @@ if (!schemaValid) {
 
 const semantic = validateModel(model);
 if (!semantic.ok) throw new Error(`Semantic validation failed:\n${semantic.errors.join('\n')}`);
-if (manifest.default !== model.meta.version || manifest.models.length !== 1) {
-  throw new Error('Manifest must load only the 1.0 current model.');
+const selected = validateBankManifest(manifest);
+if (manifest.default !== model.meta.version || selected.path !== 'model-1.1.0.json') {
+  throw new Error('Manifest must load the 1.1 current model.');
 }
 if (!manifest.legacy?.every((item) => item.loadInProduct === false && item.status === 'archive_only')) {
   throw new Error('Legacy models must remain archive-only.');
@@ -36,9 +38,14 @@ const counts = {
   reasons: Object.keys(model.reasons).length,
   argumentSchemes: Object.keys(model.argumentSchemes).length,
 };
-const expected = { policies: 8, dimensions: 33, frames: 39, diagnostics: 31, claims: 117, reasons: 173, argumentSchemes: 11 };
+const expected = { policies: 13, dimensions: 53, frames: 63, diagnostics: 50, claims: 197, reasons: 302, argumentSchemes: 11 };
 if (JSON.stringify(counts) !== JSON.stringify(expected)) {
   throw new Error(`Unexpected model counts: ${JSON.stringify(counts)}`);
+}
+if (model.product.defaultPolicyIds.length !== 8
+  || model.product.entertainmentTieBreakerPolicyIds.length !== 5
+  || new Set([...model.product.defaultPolicyIds, ...model.product.entertainmentTieBreakerPolicyIds]).size !== 13) {
+  throw new Error('The 1.1 policy split must remain 8 core plus 5 optional precision questions.');
 }
 
 console.log(JSON.stringify({

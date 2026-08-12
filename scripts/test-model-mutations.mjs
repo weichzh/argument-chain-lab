@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
-const source = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.0.0.json', import.meta.url), 'utf8'));
+const source = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.1.0.json', import.meta.url), 'utf8'));
 const mutate = (change) => {
   const model = structuredClone(source);
   change(model);
@@ -38,6 +38,9 @@ const mutations = [
     model.reasons = Object.fromEntries(Object.entries(model.reasons)
       .filter(([, reason]) => reason.targetClaimId !== 'n_proportionate_burden'));
   }, /Non-terminal bridge n_proportionate_burden has no deeper reasons/],
+  [(model) => {
+    model.product.entertainmentTieBreakerPolicyIds.push('speech_restriction');
+  }, /both default and precision-only/],
 ];
 
 for (const [change, expected] of mutations) {

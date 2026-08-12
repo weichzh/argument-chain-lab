@@ -1,8 +1,8 @@
 # 论证链实验室
 
-一个不要求注册的中文政策论证工具。1.0 先让用户判断一个完整政策方案，再用顺序修改找出真正改变判断的条件；前台始终是一屏一问。
+一个不要求注册的中文政策论证工具。1.1 先让用户判断一个完整政策方案，再用顺序修改找出真正改变判断的条件；前台始终是一屏一问。
 
-## 1.0 问卷
+## 1.1 问卷
 
 每项政策只有三个初始答案：
 
@@ -18,7 +18,9 @@
 - 理由依次经过题设假设、判断依据、更深理由、相似案例和一条相反理由。
 - 题库没有覆盖时，可以写下自己的理由、交给用户配置的 AI 整理，或保留为未解决。
 
-正式核心题库包含 8 项政策、33 个政策维度、39 个完整框架、31 个顺序诊断节点、117 个命题和 173 条策展理由。
+正式题库包含 13 项政策、53 个政策维度、63 个完整框架、50 个顺序诊断节点、197 个命题和 302 条策展理由。默认问卷仍只有 8 项核心政策；另外 5 项只会在用户主动提高娱乐匹配精度时逐题加入。
+
+娱乐结果首先描述用户自己的论证型和 16 位分享指纹。独立的 52 原型 benchmark 默认不加载；用户主动生成娱乐匹配后，结果才会根据政策覆盖和论证深度显示候选组或暂定最近邻。相似度只比较当前 benchmark 中的论证路径，不是政治身份概率。
 
 ## 数据边界
 
@@ -28,15 +30,16 @@
 | 未确认的自定义理由草稿 | 当前标签页 `sessionStorage` | 否 |
 | AI 配置、密钥与完整 AI 消息 | 当前页面内存 | 否 |
 | 正式题库 | 同源静态 JSON | 只读下载 |
+| 娱乐 benchmark | 用户主动启用后从同源静态 JSON 读取 | 否 |
 | 0.9 旧进度 | 新进度内的只读 `legacyArchive` | 否 |
 
 调用 AI 时，浏览器只把当前自定义理由、正在说明的命题和必要政策上下文发送给用户选择的模型服务商。候选必须由用户检查确认；原始输入和 AI 对话不会写入持久进度。
 
-0.9 的 `conditional`、组件回答和旧理由链没有明确记录一个被接受的完整政策框架，因此不会自动升级为 1.0 结果。旧内容可以在“本地数据”中查看和导出，但不参与新版问卷、结果或匹配。
+1.0 的 8 项核心政策、框架和理由 ID 与 1.1 兼容，现有结构化进度会直接续答。0.9 的 `conditional`、组件回答和旧理由链没有明确记录一个被接受的完整政策框架，因此不会自动升级为 1.1 结果。旧内容可以在“本地数据”中查看和导出，但不参与新版问卷、结果或匹配。
 
 ## 模型与运行时
 
-`public/bank/manifest.json` 只加载 `model-1.0.0.json`。旧 0.9 模型保存在 `public/bank/legacy/`，不进入产品运行时。
+`public/bank/manifest.json` 启动时只加载 `model-1.1.0.json`。`ideology-benchmark-1.1.0.json` 只有在用户打开娱乐结果后才延迟加载；1.0 和 0.9 模型保存在 `public/bank/legacy/`，不进入产品运行时。
 
 核心结构是：
 
@@ -50,7 +53,7 @@
 
 `src/lib/decisionEngine.js` 是无框架依赖的纯函数状态机。`src/lib/formalValidator.js` 检查运行时理由路径是否仍指向当前命题；构建期校验另外覆盖 JSON Schema、完整框架、修改差异、理由角色、引用、循环和理由覆盖。
 
-意识形态最近邻不属于 1.0 核心问卷。旧贡献 Worker 和审核脚本仍作为兼容归档边界保留并接受独立测试，但当前 v4 manifest 不加载旧社区扩展；相关内容必须按完整框架模型重新设计后才能进入新版正式题库。
+正式模型不含 benchmark 的意识形态标签。`src/lib/entertainmentMatcher.js` 只比较已回答特征，未回答和跳过项目降低覆盖度而不计为分歧；低覆盖度不会强行给出单一历史标签。旧贡献 Worker 和审核脚本仍作为兼容归档边界保留并接受独立测试，但当前 v4 manifest 不加载旧社区扩展。
 
 ## 本地开发
 
@@ -58,6 +61,8 @@
 npm install
 npm test
 npm run build
+npm run validate:benchmark
+npm run simulate:benchmark
 npx playwright install chromium
 npm run test:e2e
 npm run dev
@@ -65,12 +70,13 @@ npm run dev
 
 ## 主要目录
 
-- `public/bank/`：v4 清单、正式模型、JSON Schema 和只读旧版归档。
+- `public/bank/`：v4 清单、正式模型、延迟加载 benchmark、JSON Schema 和只读旧版归档。
 - `src/lib/decisionEngine.js`：完整方案判断、顺序诊断、理由递归、回退和摘要。
+- `src/lib/entertainmentMatcher.js`：论证型、覆盖度、候选组、最近邻和单道精度题推荐。
 - `src/lib/modelV4.js`：v4 模型校验与只读索引。
 - `src/hooks/useSession.js`：本地续答与 0.9 保守迁移。
 - `src/components/Questionnaire.jsx`：只按当前问题种类渲染的一屏一问流程。
-- `src/components/ResultSummary.jsx`：普通语言结果与按需详细记录。
+- `src/components/ResultSummary.jsx`、`EntertainmentResult.jsx`：普通语言结果、按需详细记录和可选娱乐结果。
 - `shared/`、`worker/`：旧贡献契约与私有候选区兼容边界。
 - `tests/`：正式 Playwright 浏览器回归测试。
 

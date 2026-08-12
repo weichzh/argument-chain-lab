@@ -79,6 +79,17 @@ export const validateModel = (model) => {
   const predicates = model?.formalLanguage?.predicates || {};
   const byTarget = reasonsByTarget(model);
   const policiesById = indexPolicies({ policies: model?.policies || [] });
+  const configuredDefaultPolicyIds = model?.product?.defaultPolicyIds || [];
+  const defaultPolicyIds = new Set(configuredDefaultPolicyIds);
+  const configuredPrecisionPolicyIds = model?.product?.entertainmentTieBreakerPolicyIds || [];
+  const precisionPolicyIds = new Set(configuredPrecisionPolicyIds.filter((policyId) => !defaultPolicyIds.has(policyId)));
+  if (defaultPolicyIds.size !== configuredDefaultPolicyIds.length
+    || new Set(configuredPrecisionPolicyIds).size !== configuredPrecisionPolicyIds.length) {
+    errors.push('Configured policy lists must not contain duplicates.');
+  }
+  configuredPrecisionPolicyIds.forEach((policyId) => {
+    if (defaultPolicyIds.has(policyId)) errors.push(`${policyId}: policy cannot be both default and precision-only.`);
+  });
 
   Object.entries(reasons).forEach(([reasonId, reason]) => {
     if (reason.id !== reasonId) errors.push(`Reason key/id mismatch: ${reasonId}`);
@@ -246,7 +257,8 @@ export const validateModel = (model) => {
       if (JSON.stringify(actualDiff) !== JSON.stringify(declaredDiff)) {
         errors.push(`${policy.id}/${diagnostic.id}: changedDimensionIds do not match the frame delta.`);
       }
-      if ((byTarget.get(diagnostic.acceptedClaimId) || []).length < 2) {
+      if (!precisionPolicyIds.has(policy.id)
+        && (byTarget.get(diagnostic.acceptedClaimId) || []).length < 2) {
         errors.push(`${policy.id}/${diagnostic.acceptedClaimId}: diagnostic claim needs at least two reasons.`);
       }
     });
@@ -256,6 +268,14 @@ export const validateModel = (model) => {
         errors.push(`${policy.id}/${claimId}: decision claim needs at least two reasons.`);
       }
     });
+  }
+
+  const configuredPolicyIds = [...defaultPolicyIds, ...precisionPolicyIds];
+  configuredPolicyIds.forEach((policyId) => {
+    if (!policyIds.has(policyId)) errors.push(`Unknown configured policy ${policyId}.`);
+  });
+  if (configuredPolicyIds.length && new Set(configuredPolicyIds).size !== policyIds.size) {
+    errors.push('Default and precision policy lists must cover the formal model exactly.');
   }
 
   const bridgeClaims = unique(Object.values(reasons).map((reason) => reason.bridgeClaimId));
@@ -310,7 +330,13 @@ export const createSession = (model, options = {}) => {
   const report = validateModel(model);
   if (!report.ok) throw new Error(`Invalid model:\n${report.errors.join('\n')}`);
   const policies = [...model.policies].sort((left, right) => left.order - right.order);
-  const policyIds = options.policyIds?.length ? options.policyIds : policies.map((policy) => policy.id);
+  const policyIds = options.policyIds?.length
+    ? options.policyIds
+    : model.product.defaultPolicyIds?.length
+      ? model.product.defaultPolicyIds
+      : policies.map((policy) => policy.id);
+  const unknownPolicyId = policyIds.find((policyId) => !policies.some((policy) => policy.id === policyId));
+  if (unknownPolicyId) throw new Error(`Unknown selected policy ${unknownPolicyId}`);
   return {
     modelVersion: model.meta.version,
     policyIds,
@@ -896,12 +922,14 @@ export const backToAnswer = (state, answerId) => {
 };
 
 export const openPolicy = (model, state, policyId) => {
-  const position = state.policyIds.indexOf(policyId);
-  if (position < 0) throw new Error(`Unknown selected policy ${policyId}`);
+  if (!indexPolicies(model)[policyId]) throw new Error(`Unknown selected policy ${policyId}`);
+  const policyIds = state.policyIds.includes(policyId) ? state.policyIds : [...state.policyIds, policyId];
+  const position = policyIds.indexOf(policyId);
   const policyResults = { ...state.policyResults };
   delete policyResults[policyId];
   return startSession(model, {
     ...state,
+    policyIds,
     policyPosition: position,
     policyResults,
     history: [],

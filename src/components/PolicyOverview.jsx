@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, BarChart3, House } from 'lucide-react';
-import { getPoliciesV4 } from '../lib/modelV4.js';
+import { getModelV4, getPoliciesV4, getPolicyV4 } from '../lib/modelV4.js';
 
 const answerCopy = {
   yes: '应当',
@@ -10,8 +10,9 @@ const answerCopy = {
 };
 
 export default function PolicyOverview({ state, dispatch, sessionControls }) {
-  const policies = getPoliciesV4();
-  const next = policies.find((policy) => policy.id === sessionControls.nextPolicyId);
+  const defaultPolicyIds = new Set(getModelV4().product.defaultPolicyIds);
+  const policies = getPoliciesV4().filter((policy) => defaultPolicyIds.has(policy.id));
+  const next = getPolicyV4(sessionControls.nextPolicyId);
   return (
     <main className="policy-overview v4-policy-overview">
       <header className="overview-header">
@@ -23,7 +24,7 @@ export default function PolicyOverview({ state, dispatch, sessionControls }) {
         <div className="overview-actions">
           {next ? (
             <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_POLICY', policyId: next.id })}>
-              开始下一题<ArrowRight size={17} />
+              {defaultPolicyIds.has(next.id) ? '开始下一题' : '继续精度题'}<ArrowRight size={17} />
             </button>
           ) : null}
           {sessionControls.answeredCount ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><BarChart3 size={17} />查看结果</button> : null}

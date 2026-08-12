@@ -1,5 +1,5 @@
 /**
- * Conservative migration from 0.9 sessions to the 1.0 decision model.
+ * Conservative migration from 0.9 sessions to the current v4 decision model.
  *
  * The old session cannot be reinterpreted as an active v4 result because:
  * - "conditional" was a primitive stance rather than a derived frame comparison;

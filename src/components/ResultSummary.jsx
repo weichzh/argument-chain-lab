@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight, Download, House, ListChecks, RotateCcw } from 'lucide-react';
 import { getClaimV4, getModelV4, getPolicyV4, getReasonV4 } from '../lib/modelV4.js';
 import { summarizePolicyResult } from '../lib/decisionEngine.js';
+import EntertainmentResult from './EntertainmentResult.jsx';
 
 const rootAnswerCopy = {
   yes: '应当',
@@ -29,7 +30,7 @@ const downloadResults = (state) => {
   const url = URL.createObjectURL(new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json;charset=utf-8' }));
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = 'argument-chain-results-1.0.json';
+  anchor.download = `argument-chain-results-${state.modelVersion}.json`;
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
@@ -58,7 +59,7 @@ function DetailedPath({ path, title }) {
   );
 }
 
-export default function ResultSummary({ state, dispatch, sessionControls }) {
+export default function ResultSummary({ state, dispatch, sessionControls, bankManifest }) {
   const model = getModelV4();
   const results = Object.values(state.policyResults)
     .sort((left, right) => getPolicyV4(left.policyId).order - getPolicyV4(right.policyId).order);
@@ -81,6 +82,17 @@ export default function ResultSummary({ state, dispatch, sessionControls }) {
           <button className="icon-button" type="button" title="回到主页" aria-label="回到主页" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><House size={19} /></button>
         </div>
       </header>
+
+      {results.length ? (
+        <EntertainmentResult
+          enabled={state.entertainmentEnabled}
+          manifest={bankManifest}
+          model={model}
+          policyResults={state.policyResults}
+          onEnable={() => dispatch({ type: 'ENABLE_ENTERTAINMENT' })}
+          onTieBreaker={inProgress ? null : (policyId) => dispatch({ type: 'OPEN_POLICY', policyId })}
+        />
+      ) : null}
 
       {results.length ? (
         <div className="v4-result-list">

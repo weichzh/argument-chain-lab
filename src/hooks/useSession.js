@@ -34,26 +34,44 @@ const freshState = (model, retained = {}) => ({
   view: VIEWS.LANDING,
   migrationNotice: null,
   legacyArchive: null,
+  entertainmentEnabled: false,
   ...retained,
 });
 
 const normalizeCurrentState = (value, model) => {
-  if (value?.storageVersion !== STORAGE_VERSION || value?.modelVersion !== model.meta.version) return null;
-  const policyIds = [...model.policies]
+  const compatibleModel = value?.modelVersion === model.meta.version
+    || (value?.modelVersion === '1.0.0' && model.meta.version === '1.1.0');
+  if (value?.storageVersion !== STORAGE_VERSION || !compatibleModel) return null;
+  const allPolicyIds = [...model.policies]
     .sort((left, right) => left.order - right.order)
     .map((policy) => policy.id);
+  const defaultPolicyIds = model.product.defaultPolicyIds?.length
+    ? model.product.defaultPolicyIds
+    : allPolicyIds;
+  const savedPolicyIds = Array.isArray(value.policyIds) ? value.policyIds : [];
+  const extraPolicyIds = [...savedPolicyIds, ...Object.keys(value.policyResults || {}), value.currentPolicyId]
+    .filter((policyId, index, items) => (
+      allPolicyIds.includes(policyId)
+      && !defaultPolicyIds.includes(policyId)
+      && items.indexOf(policyId) === index
+    ));
+  const policyIds = [...defaultPolicyIds, ...extraPolicyIds];
   const currentPolicyId = policyIds.includes(value.currentPolicyId) ? value.currentPolicyId : policyIds[0];
   const policyPosition = Math.max(0, policyIds.indexOf(currentPolicyId));
   return {
     ...freshState(model),
     ...value,
+    modelVersion: model.meta.version,
     policyIds,
     policyPosition,
     currentPolicyId,
     policyResults: value.policyResults && typeof value.policyResults === 'object' ? value.policyResults : {},
-    history: Array.isArray(value.history) ? value.history : [],
+    history: Array.isArray(value.history)
+      ? value.history.map((snapshot) => ({ ...snapshot, modelVersion: model.meta.version }))
+      : [],
     answerLog: Array.isArray(value.answerLog) ? value.answerLog : [],
     notes: Array.isArray(value.notes) ? value.notes : [],
+    entertainmentEnabled: value.entertainmentEnabled === true,
     view: Object.values(VIEWS).includes(value.view) ? value.view : VIEWS.LANDING,
   };
 };
@@ -92,9 +110,9 @@ const clearDrafts = () => {
 export const sessionDraftKey = (claimId) => `${DRAFT_PREFIX}${claimId || 'unknown'}`;
 
 const nextUnansweredPolicy = (model, state) => (
-  [...model.policies]
-    .sort((left, right) => left.order - right.order)
-    .find((policy) => !state.policyResults[policy.id])?.id || null
+  state.policyIds
+    .map((policyId) => model.policies.find((policy) => policy.id === policyId))
+    .find((policy) => policy && !state.policyResults[policy.id])?.id || null
 );
 
 export function useSession() {
@@ -144,6 +162,8 @@ export function useSession() {
           return { ...current, view: VIEWS.OVERVIEW };
         case 'SHOW_RESULTS':
           return { ...current, view: VIEWS.RESULTS };
+        case 'ENABLE_ENTERTAINMENT':
+          return { ...current, entertainmentEnabled: true };
         case 'EXIT_TO_LANDING':
           return { ...current, view: VIEWS.LANDING };
         case 'DISMISS_MIGRATION':

@@ -1,6 +1,6 @@
 # 题库候选服务
 
-> 1.0 兼容说明：当前 v4 前端不提交本 Worker 的旧贡献包，正式 manifest 也不加载旧社区扩展。本目录只保留既有私有候选区的数据边界和独立验证；旧候选必须按完整政策框架重新设计并审核后，才能进入 1.0 正式题库。
+> 1.1 兼容说明：当前 v4 前端不提交本 Worker 的旧贡献包，正式 manifest 也不加载旧社区扩展。本目录只保留既有私有候选区的数据边界和独立验证；旧候选必须按完整政策框架重新设计并审核后，才能进入 1.1 正式题库。
 
 这个 Worker 只有一个写入职责：接收用户已经在浏览器中预览并明确同意公开的完整论证，执行严格白名单校验、文本规范化和内容哈希，然后写入私有 R2 候选区。它不代理 AI，不接收账号、会话、AI 配置、原始自由输入、时间、设备或行为数据。
 
@@ -33,7 +33,7 @@ npx wrangler --config worker/wrangler.jsonc deploy
 
 ## GitHub Actions
 
-`.github/workflows/review-candidates.yml` 从 `candidates/v1/` 最多拉取 25 个旧契约候选，重新执行 Schema 校验、哈希验证、去重和敏感信息扫描。通过的内容写入 `public/bank/community-contributions-v1.json` 供兼容审核；该文件不在 v4 manifest 中，人工合并也不会自动使内容进入 1.0 正式题库。
+`.github/workflows/review-candidates.yml` 从 `candidates/v1/` 最多拉取 25 个旧契约候选，重新执行 Schema 校验、哈希验证、去重和敏感信息扫描。通过的内容写入 `public/bank/community-contributions-v1.json` 供兼容审核；该文件不在 v4 manifest 中，人工合并也不会自动使内容进入 1.1 正式题库。
 
 仓库需要配置以下 GitHub Actions Secrets：
 

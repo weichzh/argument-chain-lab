@@ -16,10 +16,11 @@ import {
   validateModel,
 } from '../src/lib/decisionEngine.js';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.0.0.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.1.0.json', import.meta.url), 'utf8'));
 const validation = validateModel(model);
 assert.equal(validation.ok, true, validation.errors.join('\n'));
-assert.equal(model.policies.length, 8);
+assert.equal(model.policies.length, 13);
+assert.deepEqual(createSession(model).policyIds, model.product.defaultPolicyIds);
 assert.deepEqual(model.product.entryAnswers.map((item) => item.id), ['yes', 'no', 'uncertain']);
 assert.equal(JSON.stringify(model).includes('"conditional"'), false);
 
@@ -113,6 +114,12 @@ const newSpeechSession = () => startSession(model, createSession(model, { policy
 {
   const state = openPolicy(model, { ...createSession(model), startedAt: null }, 'speech_restriction');
   assert.match(state.startedAt, /^\d{4}-\d{2}-\d{2}T/);
+}
+
+{
+  const state = openPolicy(model, createSession(model), 'citizenship_membership');
+  assert.equal(state.currentPolicyId, 'citizenship_membership');
+  assert.equal(state.policyIds.length, 9);
 }
 
 console.log(`Decision engine tests passed: ${model.policies.length} policies, ${Object.keys(model.reasons).length} reasons.`);

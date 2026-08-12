@@ -117,7 +117,7 @@ function ReadyApp({ bankManifest }) {
       {state.view === VIEWS.LANDING ? <Landing hasSavedProgress={sessionControls.hasSavedProgress} onStart={() => dispatch({ type: 'START' })} onBrowse={() => dispatch({ type: 'OPEN_OVERVIEW' })} onReset={sessionControls.clearLocalData} /> : null}
       {state.view === VIEWS.QUESTIONNAIRE ? <Questionnaire state={state} dispatch={dispatch} sessionControls={sessionControls} onAskAi={runAiRequest} aiLoading={aiStatus.loading} /> : null}
       {state.view === VIEWS.OVERVIEW ? <PolicyOverview state={state} dispatch={dispatch} sessionControls={sessionControls} /> : null}
-      {state.view === VIEWS.RESULTS ? <ResultSummary state={state} dispatch={dispatch} sessionControls={sessionControls} /> : null}
+      {state.view === VIEWS.RESULTS ? <ResultSummary state={state} dispatch={dispatch} sessionControls={sessionControls} bankManifest={bankManifest} /> : null}
       <AIConfigPanel open={configOpen} value={aiConfig} onApply={applyAiConfig} onClear={() => setAiConfig(null)} onClose={() => { setPendingAiRequest(null); setConfigOpen(false); }} />
       <LocalDataPanel open={localDataOpen} state={state} aiConfigured={Boolean(aiConfig)} bankVersion={bankManifest.default} onClear={() => { setAiConfig(null); sessionControls.clearLocalData(); setLocalDataOpen(false); }} onClose={() => setLocalDataOpen(false)} />
       <CandidateReview review={candidateReview} onConfirm={confirmCandidate} onClose={() => setCandidateReview(null)} />

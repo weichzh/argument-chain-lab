@@ -1,17 +1,19 @@
 {
   "name": "argument-chain-lab",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/validate-model.mjs && vite build",
+    "build": "node scripts/validate-model.mjs && node scripts/validate-ideology-benchmark.mjs && vite build",
     "preview": "vite preview",
-    "test": "node scripts/test-engine.mjs && node scripts/test-model-mutations.mjs && node scripts/test-formal-validator.mjs && node scripts/test-session-migration.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs && node scripts/validate-model.mjs",
+    "test": "node scripts/test-engine.mjs && node scripts/test-model-mutations.mjs && node scripts/test-formal-validator.mjs && node scripts/test-session-migration.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs && node scripts/validate-model.mjs && node scripts/validate-ideology-benchmark.mjs && node scripts/test-entertainment-matcher.mjs",
     "test:e2e": "playwright test",
     "export:model": "node scripts/export-model.mjs",
     "dev:worker": "wrangler -c worker/wrangler.jsonc dev",
-    "normalize:community": "node scripts/normalize-community-bank.mjs"
+    "normalize:community": "node scripts/normalize-community-bank.mjs",
+    "validate:benchmark": "node scripts/validate-ideology-benchmark.mjs",
+    "simulate:benchmark": "node scripts/simulate-ideology-benchmark.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.80.6",
