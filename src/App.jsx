@@ -269,7 +269,9 @@ function ReadyApp({ bankManifest }) {
       {state.phase === PHASES.LANDING ? (
         <Landing
           hasSavedProgress={sessionControls.hasSavedProgress}
-          onStart={() => dispatch({ type: sessionControls.hasSavedProgress ? 'OPEN_OVERVIEW' : 'START_OVERVIEW' })}
+          onStart={() => dispatch({ type: 'START_QUESTIONNAIRE' })}
+          onBrowse={() => dispatch({ type: 'OPEN_OVERVIEW' })}
+          onReset={sessionControls.clearLocalData}
         />
       ) : null}
 

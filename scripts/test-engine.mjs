@@ -42,10 +42,11 @@ const startFirstPolicy = (state) => answerComponents(act(state, { type: 'START' 
 
 {
   let state = act(createInitialState(), { type: 'START_OVERVIEW' });
-  state = act(state, { type: 'START_SELECTED', policyIds: ['speech_restriction', 'metadata_surveillance'] });
+  state = act(state, { type: 'START_QUESTIONNAIRE' });
   assert.equal(state.simpleFlow, true);
   assert.equal(state.phase, PHASES.STANCE);
   assert.equal(policies[state.policyIndex].id, 'speech_restriction');
+  assert.equal(state.selectedPolicyIds.length, policies.length);
 
   state = act(state, { type: 'SET_SIMPLE_STANCE', stance: 'conditional' });
   assert.equal(state.phase, PHASES.COMPONENTS);
@@ -56,7 +57,7 @@ const startFirstPolicy = (state) => answerComponents(act(state, { type: 'START' 
   assert.equal(state.records.speech_restriction.policyChoiceResponses.penalty_power, 'civil_only');
 
   let rejecting = act(createInitialState(), { type: 'START_OVERVIEW' });
-  rejecting = act(rejecting, { type: 'START_SELECTED', policyIds: ['speech_restriction'] });
+  rejecting = act(rejecting, { type: 'START_QUESTIONNAIRE', policyId: 'speech_restriction' });
   rejecting = act(rejecting, { type: 'SET_SIMPLE_STANCE', stance: 'conditional' });
   rejecting = act(rejecting, { type: 'ANSWER_SIMPLE_ELEMENT', response: 'none' });
   assert.equal(rejecting.phase, PHASES.ARGUMENT);
@@ -66,16 +67,20 @@ const startFirstPolicy = (state) => answerComponents(act(state, { type: 'START' 
 
 {
   let state = act(createInitialState(), { type: 'START_OVERVIEW' });
-  state = act(state, { type: 'START_SELECTED', policyIds: ['speech_restriction', 'metadata_surveillance'] });
-  state = act(state, { type: 'SET_SIMPLE_STANCE', stance: 'undecided' });
-  assert.equal(state.phase, PHASES.POLICY_COMPLETE);
-  state = act(state, { type: 'NEXT_SELECTED' });
+  state = act(state, { type: 'START_QUESTIONNAIRE' });
+  state = act(state, { type: 'SKIP_SIMPLE_POLICY' });
+  assert.equal(state.records.speech_restriction.status, 'skipped');
+  assert.equal(state.records.speech_restriction.chains.length, 0, 'Skipping must not invent an unresolved answer.');
+  state = migrateSavedState(state);
+  assert.equal(state.records.speech_restriction.status, 'skipped', 'A skipped question must stay skipped after reload.');
+  const retry = act(state, { type: 'START_QUESTIONNAIRE', policyId: 'speech_restriction' });
+  assert.equal(retry.records.speech_restriction.status, 'in_progress', 'Opening a skipped question must make it answerable again.');
   assert.equal(policies[state.policyIndex].id, 'metadata_surveillance');
   assert.equal(state.phase, PHASES.STANCE);
   state = act(state, { type: 'SET_SIMPLE_STANCE', stance: 'oppose' });
   state = act(state, { type: 'OPEN_OVERVIEW' });
   assert.equal(state.records.metadata_surveillance.draft.phase, PHASES.ARGUMENT);
-  state = act(state, { type: 'OPEN_POLICY_SIMPLE', policyId: 'metadata_surveillance' });
+  state = act(state, { type: 'START_QUESTIONNAIRE', policyId: 'metadata_surveillance' });
   assert.equal(state.phase, PHASES.ARGUMENT);
   assert.equal(state.currentChain.direction, 'oppose');
 }
@@ -939,4 +944,4 @@ function completeSpeechChain({ firstFact = 'true', stress = 'apply', assessmentM
   assert.equal(sessionSummary(state).unresolvedChains.length, 0);
 }
 
-console.log('Engine tests passed: recursion, fixed points, conflict handling, resumable free-order questions, partial results, dilemmas, and cycles.');
+console.log('Engine tests passed: recursion, fixed points, conflict handling, sequential skipping, partial results, dilemmas, and cycles.');

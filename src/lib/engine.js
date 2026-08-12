@@ -299,7 +299,9 @@ const recordStatusFlags = (chains) => {
 const summarizeRecord = (record, chains = record.chains || []) => ({
   ...record,
   chains,
-  status: record.draft ? 'in_progress' : classifyRecordStatus(chains),
+  status: record.status === 'skipped' && !record.draft && !chains.length
+    ? 'skipped'
+    : record.draft ? 'in_progress' : classifyRecordStatus(chains),
   ...recordStatusFlags(chains),
   activeChainIds: chains.filter((chain) => chain.matchingStatus === 'active').map((chain) => chain.id),
 });
@@ -738,7 +740,9 @@ const startSimplePolicy = (state, index) => {
     };
   }
   const record = ensurePolicyRecord(state, policy.id, {
-    status: state.records[policy.id]?.status || 'in_progress',
+    status: state.records[policy.id]?.status === 'skipped'
+      ? 'in_progress'
+      : state.records[policy.id]?.status || 'in_progress',
   });
   return {
     ...state,
@@ -873,6 +877,14 @@ const openSimplePolicy = (state, policyIndex) => {
   return startSimplePolicy(stashed, policyIndex);
 };
 
+const advanceQuestionnaire = (state) => {
+  const selectedPolicyPosition = state.selectedPolicyPosition + 1;
+  const policyId = state.selectedPolicyIds[selectedPolicyPosition];
+  if (!policyId) return { ...state, phase: PHASES.RESULTS, updatedAt: now() };
+  const policyIndex = policies.findIndex((policy) => policy.id === policyId);
+  return openSimplePolicy({ ...state, selectedPolicyPosition }, policyIndex);
+};
+
 const startDirection = (state, direction) => {
   const policy = policies[state.policyIndex];
   const targetClaimId = direction === 'support' ? policy.supportClaimId : policy.opposeClaimId;
@@ -934,10 +946,22 @@ export const reducer = (state, action) => {
         updatedAt: now(),
       };
 
-    case 'START_SELECTED': {
-      const selectedPolicyIds = [...new Set(action.policyIds || [])]
-        .filter((policyId) => policies.some((policy) => policy.id === policyId));
-      if (!selectedPolicyIds.length) return state;
+    case 'START_QUESTIONNAIRE': {
+      const requestedIndex = action.policyId
+        ? policies.findIndex((policy) => policy.id === action.policyId)
+        : -1;
+      if (action.policyId && requestedIndex < 0) return state;
+      const draftIndex = policies.findIndex((policy) => state.records[policy.id]?.draft);
+      const unansweredIndex = policies.findIndex((policy) => (
+        !state.records[policy.id]?.chains?.length && state.records[policy.id]?.status !== 'skipped'
+      ));
+      const startIndex = requestedIndex >= 0 ? requestedIndex : draftIndex >= 0 ? draftIndex : unansweredIndex;
+      if (startIndex < 0) return { ...state, phase: PHASES.RESULTS, updatedAt: now() };
+      const selectedPolicyIds = policies.slice(startIndex)
+        .filter((policy, index) => index === 0 || (
+          !state.records[policy.id]?.chains?.length && state.records[policy.id]?.status !== 'skipped'
+        ))
+        .map((policy) => policy.id);
       const policyIndex = policies.findIndex((policy) => policy.id === selectedPolicyIds[0]);
       return openSimplePolicy({
         ...state,
@@ -950,12 +974,27 @@ export const reducer = (state, action) => {
       }, policyIndex);
     }
 
-    case 'NEXT_SELECTED': {
-      const selectedPolicyPosition = state.selectedPolicyPosition + 1;
-      const policyId = state.selectedPolicyIds[selectedPolicyPosition];
-      if (!policyId) return { ...state, phase: PHASES.RESULTS, updatedAt: now() };
-      const policyIndex = policies.findIndex((policy) => policy.id === policyId);
-      return openSimplePolicy({ ...state, selectedPolicyPosition }, policyIndex);
+    case 'NEXT_QUESTIONNAIRE':
+      return advanceQuestionnaire(state);
+
+    case 'SKIP_SIMPLE_POLICY': {
+      const policy = policies[state.policyIndex];
+      if (!policy || !state.simpleFlow || state.phase !== PHASES.STANCE) return state;
+      const record = ensurePolicyRecord(state, policy.id);
+      return advanceQuestionnaire({
+        ...state,
+        records: {
+          ...state.records,
+          [policy.id]: {
+            ...record,
+            draft: null,
+            status: record.chains.length ? record.status : 'skipped',
+          },
+        },
+        currentChain: null,
+        selectedChainId: null,
+        phase: PHASES.POLICY_COMPLETE,
+      });
     }
 
     case 'START_ADAPTIVE': {
@@ -994,18 +1033,6 @@ export const reducer = (state, action) => {
       const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
       if (policyIndex < 0) return state;
       return openPolicy({ ...state, migrationNotice: null }, policyIndex);
-    }
-
-    case 'OPEN_POLICY_SIMPLE': {
-      const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
-      if (policyIndex < 0) return state;
-      return openSimplePolicy({
-        ...state,
-        migrationNotice: null,
-        selectedPolicyIds: [action.policyId],
-        selectedPolicyPosition: 0,
-        startedAt: state.startedAt || now(),
-      }, policyIndex);
     }
 
     case 'REVISE_POLICY_SIMPLE': {

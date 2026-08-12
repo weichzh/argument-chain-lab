@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Check,
   Download,
+  House,
   Info,
   ListChecks,
   Send,
@@ -609,6 +610,7 @@ export default function ResultsV2({ state, dispatch, bankClient }) {
 
       <div className="result-primary-actions">
         <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />修改回答</button>
+        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><House size={17} />回到主页</button>
       </div>
 
       <details className="results-disclosure detailed-reasoning">

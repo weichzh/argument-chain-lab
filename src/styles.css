@@ -3431,65 +3431,31 @@ details > summary {
   font-size: 44px;
 }
 
-.landing-start {
+.landing-actions {
   margin-top: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.landing-reset {
+  margin-top: 18px;
+}
+
+.landing-reset > p {
+  margin: 0 0 8px;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.landing-reset > div {
+  display: flex;
+  gap: 8px;
 }
 
 .simple-landing .privacy-boundary {
   max-width: 720px;
   margin: 54px 0 0;
-}
-
-.selection-bar {
-  min-height: 76px;
-  padding: 14px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  border-bottom: 1px solid var(--line-strong);
-}
-
-.selection-bar > div:first-child {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-}
-
-.selection-bar strong {
-  font-size: 24px;
-}
-
-.selection-bar span {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.selection-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.policy-row {
-  grid-template-columns: 58px minmax(0, 1fr) 140px 130px;
-}
-
-.policy-select {
-  height: 48px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.policy-select input {
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  accent-color: var(--blue);
 }
 
 .policy-row-title small + .direction-badge {
@@ -3507,6 +3473,13 @@ details > summary {
 .workspace-toolbar .stop-answering {
   margin-left: auto;
   color: var(--red);
+}
+
+.stance-actions {
+  max-width: 820px;
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .question-surface {
@@ -3666,6 +3639,9 @@ details > summary {
 
 .result-primary-actions {
   margin: 22px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .detailed-reasoning {
@@ -3730,16 +3706,6 @@ details > summary {
     flex-wrap: wrap;
   }
 
-  .selection-bar {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .selection-actions .button.primary {
-    flex: 1;
-  }
-
   .policy-row {
     min-height: 104px;
     grid-template-columns: 46px minmax(0, 1fr) auto;
@@ -3776,11 +3742,11 @@ details > summary {
     padding: 0 10px;
   }
 
-  .workspace-toolbar .button:nth-child(2) {
+  .workspace-toolbar .question-list-link {
     font-size: 0;
   }
 
-  .workspace-toolbar .button:nth-child(2) svg {
+  .workspace-toolbar .question-list-link svg {
     width: 18px;
     height: 18px;
   }

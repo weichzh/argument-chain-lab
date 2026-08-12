@@ -93,6 +93,7 @@ const responseCopy = {
 const describeAction = (state, action) => {
   if (action.historyLabel) return action.historyLabel;
   const policy = policies[state.policyIndex];
+  if (action.type === 'SKIP_SIMPLE_POLICY') return '跳过这道题';
   if (action.type === 'SET_SIMPLE_STANCE') {
     return `你的判断：${policy?.stanceOptions?.[action.stance] || responseCopy[action.stance]}`;
   }
@@ -124,10 +125,9 @@ const describeAction = (state, action) => {
 };
 
 const navigationStartActions = new Set([
-  'START_SELECTED',
-  'OPEN_POLICY_SIMPLE',
+  'START_QUESTIONNAIRE',
   'REVISE_POLICY_SIMPLE',
-  'NEXT_SELECTED',
+  'NEXT_QUESTIONNAIRE',
 ]);
 
 const reversibleActions = new Set([
@@ -179,8 +179,10 @@ export function useSession() {
       setHistoryVersion((value) => value + 1);
     }
     const current = stateRef.current;
-    const openingPolicyId = action.type === 'START_SELECTED' ? action.policyIds?.[0] : action.policyId;
-    const resumingCurrentPolicy = ['START_SELECTED', 'OPEN_POLICY_SIMPLE'].includes(action.type)
+    const openingPolicyId = action.type === 'START_QUESTIONNAIRE'
+      ? action.policyId || policies.find((policy) => current.records[policy.id]?.draft)?.id
+      : action.policyId;
+    const resumingCurrentPolicy = action.type === 'START_QUESTIONNAIRE'
       && openingPolicyId === policies[current.policyIndex]?.id
       && Boolean(current.records[openingPolicyId]?.draft);
     if (navigationStartActions.has(action.type) && !resumingCurrentPolicy) {
@@ -189,7 +191,7 @@ export function useSession() {
     }
     const label = describeAction(current, action);
     const captureNavigationStart = navigationStartActions.has(action.type)
-      && action.type !== 'NEXT_SELECTED'
+      && action.type !== 'NEXT_QUESTIONNAIRE'
       && !resumingCurrentPolicy;
     if (label || action.type.startsWith('ANSWER_') || reversibleActions.has(action.type) || captureNavigationStart) {
       historyId.current += 1;

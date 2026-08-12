@@ -6,9 +6,10 @@ import {
   BarChart3,
   Check,
   CircleHelp,
+  House,
   ListChecks,
-  LogOut,
   Search,
+  SkipForward,
   Sparkles,
 } from 'lucide-react';
 import {
@@ -370,8 +371,8 @@ function StanceQuestion({ state, dispatch }) {
           },
           {
             id: 'skip',
-            label: '暂不使用这份公开论证',
-            onSelect: () => dispatch({ type: 'SKIP_POLICY', reason: '用户跳过了这份公开论证。' }),
+            label: '跳过这题',
+            onSelect: () => dispatch({ type: state.simpleFlow ? 'SKIP_SIMPLE_POLICY' : 'SKIP_POLICY' }),
           },
         ]} />
       </>
@@ -393,6 +394,13 @@ function StanceQuestion({ state, dispatch }) {
         { id: 'conditional', label: labels.conditional, onSelect: () => dispatch({ type: 'SET_SIMPLE_STANCE', stance: 'conditional' }) },
         { id: 'undecided', label: labels.undecided, onSelect: () => dispatch({ type: 'SET_SIMPLE_STANCE', stance: 'undecided' }) },
       ]} />
+      {state.simpleFlow ? (
+        <div className="stance-actions">
+          <button className="button quiet" type="button" onClick={() => dispatch({ type: 'SKIP_SIMPLE_POLICY' })}>
+            <SkipForward size={17} />跳过这题
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -740,7 +748,7 @@ function PolicyComplete({ state, dispatch }) {
 
   useEffect(() => {
     if (!state.simpleFlow) return undefined;
-    const timer = window.setTimeout(() => dispatch({ type: 'NEXT_SELECTED' }), 650);
+    const timer = window.setTimeout(() => dispatch({ type: 'NEXT_QUESTIONNAIRE' }), 650);
     return () => window.clearTimeout(timer);
   }, [dispatch, state.selectedChainId, state.simpleFlow]);
 
@@ -832,67 +840,52 @@ const recordStatusCopy = {
 };
 
 function PolicyOverview({ state, dispatch }) {
-  const remainingSelected = state.selectedPolicyIds.slice(state.selectedPolicyPosition)
-    .filter((policyId) => !state.records[policyId]?.chains?.length);
-  const initialSelection = remainingSelected.length
-    ? remainingSelected
-    : policies.filter((policy) => !state.records[policy.id]?.chains?.length).slice(0, 1).map((policy) => policy.id);
-  const [selected, setSelected] = useState(() => new Set(initialSelection));
   const finished = policies.filter((policy) => state.records[policy.id]?.chains?.length).length;
-  const inProgress = policies.filter((policy) => state.records[policy.id]?.draft).length;
-  const selectedIds = policies.filter((policy) => selected.has(policy.id)).map((policy) => policy.id);
-  const toggle = (policyId) => setSelected((current) => {
-    const next = new Set(current);
-    if (next.has(policyId)) next.delete(policyId);
-    else next.add(policyId);
-    return next;
-  });
+  const nextPolicy = policies.find((policy) => state.records[policy.id]?.draft)
+    || policies.find((policy) => (
+      !state.records[policy.id]?.chains?.length && state.records[policy.id]?.status !== 'skipped'
+    ));
+  const nextAction = !nextPolicy
+    ? '查看结果'
+    : state.records[nextPolicy.id]?.draft ? '继续答题' : state.startedAt ? '开始下一题' : '从第一题开始';
   return (
     <main className="policy-overview">
       <header className="overview-header">
         <div>
           <span>题目列表</span>
-          <h1>这次想回答哪些题目？</h1>
-          <p>选择一道或多道题。回答完一题后，会自动进入下一道已选题目。</p>
+          <h1>从哪一道开始？</h1>
+          <p>系统会从你选中的题目开始，之后按顺序继续；不想回答时可以直接跳过。</p>
         </div>
         <div className="overview-actions">
+          <button className="button primary" type="button" onClick={() => dispatch({ type: nextPolicy ? 'START_QUESTIONNAIRE' : 'SHOW_RESULTS', policyId: nextPolicy?.id })}>
+            {nextAction}<ArrowRight size={17} />
+          </button>
           {finished ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><BarChart3 size={17} />查看结果</button> : null}
-          <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><LogOut size={17} />退出</button>
+          <button className="icon-button" type="button" title="回到主页" aria-label="回到主页" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><House size={19} /></button>
         </div>
       </header>
-
-      <div className="selection-bar">
-        <div><strong>{selected.size}</strong><span>道已选{finished ? ` · ${finished} 道已答` : ''}{inProgress ? ` · ${inProgress} 道进行中` : ''}</span></div>
-        <div className="selection-actions">
-          <button className="button quiet" type="button" onClick={() => setSelected(new Set())}>清空</button>
-          <button className="button primary" type="button" disabled={!selected.size} onClick={() => dispatch({ type: 'START_SELECTED', policyIds: selectedIds })}>
-            开始回答<ArrowRight size={17} />
-          </button>
-        </div>
-      </div>
 
       <ol className="policy-list">
         {policies.map((policy, index) => {
           const record = state.records[policy.id];
           const hasDraft = Boolean(record?.draft);
           const hasChains = Boolean(record?.chains?.length);
+          const skipped = !hasDraft && !hasChains && record?.status === 'skipped';
           const direction = record?.draft?.currentChain?.direction || record?.packageStanceAfterDefeater || record?.stance;
-          const status = hasDraft ? '进行中' : hasChains ? record.mixed ? '已结束，状态混合' : recordStatusCopy[record.status] || '已结束' : '未开始';
-          const statusClass = hasDraft ? 'active' : hasChains ? record.status : 'not-started';
+          const status = hasDraft ? '进行中' : hasChains ? record.mixed ? '已结束，状态混合' : recordStatusCopy[record.status] || '已结束' : skipped ? '已跳过' : '未开始';
+          const statusClass = hasDraft ? 'active' : hasChains ? record.status : skipped ? 'skipped' : 'not-started';
+          const action = hasDraft ? '继续' : hasChains ? '重新回答' : '从这里开始';
           return (
             <li className="policy-row" data-policy-id={policy.id} key={policy.id}>
-              <label className="policy-select" aria-label={`选择：${policy.shortTitle || policy.title}`}>
-                <input type="checkbox" checked={selected.has(policy.id)} onChange={() => toggle(policy.id)} />
-                <span>{String(index + 1).padStart(2, '0')}</span>
-              </label>
+              <span className="policy-number">{String(index + 1).padStart(2, '0')}</span>
               <div className="policy-row-title">
                 <h2>{policy.shortTitle || policy.title}</h2>
                 <small>{policy.selection?.domain || '自选题目'}</small>
                 {direction ? <span className="direction-badge">{directionCopy[direction] || '已回答'}</span> : null}
               </div>
               <span className={`policy-status ${statusClass}`}>{status}</span>
-              <button className="button quiet" type="button" aria-label={`${hasDraft ? '继续' : '只答这题'}：${policy.shortTitle || policy.title}`} onClick={() => dispatch({ type: 'OPEN_POLICY_SIMPLE', policyId: policy.id })}>
-                <span>{hasDraft ? '继续' : '只答这题'}</span><ArrowRight size={17} />
+              <button className="button quiet" type="button" aria-label={`${action}：${policy.shortTitle || policy.title}`} onClick={() => dispatch({ type: 'START_QUESTIONNAIRE', policyId: policy.id })}>
+                <span>{action}</span><ArrowRight size={17} />
               </button>
             </li>
           );
@@ -939,8 +932,9 @@ export default function Assessment({ state, dispatch, sessionControls, onAskAi, 
   return (
     <main className="workspace">
       <nav className="workspace-toolbar" aria-label="答题导航">
-        <button className="button quiet" type="button" disabled={!sessionControls.canGoBack} onClick={() => dispatch({ type: 'GO_BACK' })}><ArrowLeft size={17} />上一题</button>
-        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />题目列表</button>
+        <button className="icon-button workspace-home" type="button" title="回到主页" aria-label="回到主页" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><House size={19} /></button>
+        <button className="button quiet previous-answer" type="button" disabled={!sessionControls.canGoBack} onClick={() => dispatch({ type: 'GO_BACK' })}><ArrowLeft size={17} />上一题</button>
+        <button className="button quiet question-list-link" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />题目列表</button>
         <button className="button quiet stop-answering" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>中止并看结果</button>
       </nav>
       <section className="question-surface">
