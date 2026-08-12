@@ -1,51 +1,27 @@
 import React, { useState } from 'react';
-import { ChevronUp, ListTree } from 'lucide-react';
-import { argumentsById, claims, facts } from '../data/model.js';
-import { getSelectedChain } from '../lib/engine.js';
+import { ChevronUp, ListChecks } from 'lucide-react';
 
-const responseCopy = {
-  true: '成立',
-  false: '不成立',
-  unknown: '不能判断',
-  accept: '接受',
-  reject: '不接受',
-  uncertain: '不能判断',
-};
-
-export default function ProofView({ state }) {
+export default function ProofView({ entries, onRevisit }) {
   const [open, setOpen] = useState(false);
-  const chain = state.currentChain || getSelectedChain(state);
-  const steps = chain?.steps || [];
-  const defeaterEffect = chain?.defeaterReview?.effect || chain?.defeaterReview?.impact;
-  const status = chain?.status === 'complete'
-    ? ['offset', 'outweigh'].includes(defeaterEffect) ? '理由链闭合，整包已修订' : '本条理由链已闭合'
-    : '仅保存在本地';
   return (
-    <aside className={`argument-ledger${open ? ' open' : ''}`} aria-label="论证记录">
-      <button className="ledger-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-        <ListTree size={20} />
-        <strong>当前论证 · 已确认 {steps.length} 步</strong>
-        <span>{status}</span>
-        <ChevronUp className={open ? '' : 'collapsed'} />
+    <aside className={`answer-history${open ? ' open' : ''}`} aria-label="已答内容">
+      <button className="history-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <ListChecks size={19} aria-hidden="true" />
+        <strong>查看已答</strong>
+        <span>{entries.length ? `${entries.length} 条` : '暂无'}</span>
+        <ChevronUp className={open ? '' : 'collapsed'} size={18} aria-hidden="true" />
       </button>
       {open ? (
-        <div className="ledger-body">
-          {steps.length ? steps.map((step, index) => {
-            const argument = argumentsById[step.argumentId];
-            return (
-              <section className="ledger-step" key={step.id}>
-                <div className="ledger-index">{String(index + 1).padStart(2, '0')}</div>
-                <div className="ledger-chain">
-                  <div className="ledger-node target"><span>V</span><p>{claims[step.targetClaimId]?.text}</p></div>
-                  {(argument?.factIds || []).map((factId) => (
-                    <div className="ledger-node fact" key={factId}><span>F</span><p>{facts[factId]?.statement}</p><em>{responseCopy[step.factResponses?.[factId]]}</em></div>
-                  ))}
-                  <div className="ledger-node bridge"><span>B</span><p>{claims[step.bridgeClaimId]?.text}</p><em>{responseCopy[step.bridgeResponse]}</em></div>
-                </div>
-              </section>
-            );
-          }) : <p className="ledger-empty">完成一次事实和原则确认后，这里会出现论证结构。</p>}
-        </div>
+        <ol className="answer-history-list">
+          {entries.length ? entries.map((entry) => (
+            <li key={entry.id}>
+              <button type="button" onClick={() => onRevisit(entry.id)} aria-label={`修改：${entry.label}`}>
+                <span>{entry.label}</span>
+                <strong>修改</strong>
+              </button>
+            </li>
+          )) : <li className="history-empty">还没有已答内容</li>}
+        </ol>
       ) : null}
     </aside>
   );

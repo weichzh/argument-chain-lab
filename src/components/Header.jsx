@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Database, Settings } from 'lucide-react';
+import { Database, Settings } from 'lucide-react';
 import { getCurrentPolicy, PHASES } from '../lib/engine.js';
 
 const utilityButton = (label, Icon, onClick, active = false) => (
@@ -17,7 +17,6 @@ const utilityButton = (label, Icon, onClick, active = false) => (
 export default function Header({
   state,
   aiConfigured,
-  onMethod,
   onConfig,
   onLocalData,
 }) {
@@ -30,7 +29,6 @@ export default function Header({
         {inProgress && policy ? <small title={policy.title}>{policy.shortTitle || policy.title}</small> : null}
       </div>
       <nav className="header-tools" aria-label="辅助工具">
-        {utilityButton('方法', BookOpen, onMethod)}
         {utilityButton(aiConfigured ? 'AI 已配置' : 'AI 配置', Settings, onConfig, aiConfigured)}
         {utilityButton('本地数据', Database, onLocalData)}
       </nav>

@@ -6,6 +6,7 @@ import {
   collectTerminalCommitments,
   createInitialState,
   exportSession,
+  getConditionalFollowUps,
   getSelectedChain,
   migrateSavedState,
   reducer,
@@ -38,6 +39,46 @@ function answerComponents(state, position = 'undecided') {
 }
 
 const startFirstPolicy = (state) => answerComponents(act(state, { type: 'START' }));
+
+{
+  let state = act(createInitialState(), { type: 'START_OVERVIEW' });
+  state = act(state, { type: 'START_SELECTED', policyIds: ['speech_restriction', 'metadata_surveillance'] });
+  assert.equal(state.simpleFlow, true);
+  assert.equal(state.phase, PHASES.STANCE);
+  assert.equal(policies[state.policyIndex].id, 'speech_restriction');
+
+  state = act(state, { type: 'SET_SIMPLE_STANCE', stance: 'conditional' });
+  assert.equal(state.phase, PHASES.COMPONENTS);
+  assert.deepEqual(getConditionalFollowUps(policies[state.policyIndex]).map((element) => element.id), ['penalty_power']);
+  state = act(state, { type: 'ANSWER_SIMPLE_ELEMENT', response: 'civil_only' });
+  assert.equal(state.phase, PHASES.ARGUMENT);
+  assert.equal(state.records.speech_restriction.stance, 'conditional');
+  assert.equal(state.records.speech_restriction.policyChoiceResponses.penalty_power, 'civil_only');
+
+  let rejecting = act(createInitialState(), { type: 'START_OVERVIEW' });
+  rejecting = act(rejecting, { type: 'START_SELECTED', policyIds: ['speech_restriction'] });
+  rejecting = act(rejecting, { type: 'SET_SIMPLE_STANCE', stance: 'conditional' });
+  rejecting = act(rejecting, { type: 'ANSWER_SIMPLE_ELEMENT', response: 'none' });
+  assert.equal(rejecting.phase, PHASES.ARGUMENT);
+  assert.equal(rejecting.currentChain.direction, 'oppose');
+  assert.equal(rejecting.records.speech_restriction.stance, 'oppose');
+}
+
+{
+  let state = act(createInitialState(), { type: 'START_OVERVIEW' });
+  state = act(state, { type: 'START_SELECTED', policyIds: ['speech_restriction', 'metadata_surveillance'] });
+  state = act(state, { type: 'SET_SIMPLE_STANCE', stance: 'undecided' });
+  assert.equal(state.phase, PHASES.POLICY_COMPLETE);
+  state = act(state, { type: 'NEXT_SELECTED' });
+  assert.equal(policies[state.policyIndex].id, 'metadata_surveillance');
+  assert.equal(state.phase, PHASES.STANCE);
+  state = act(state, { type: 'SET_SIMPLE_STANCE', stance: 'oppose' });
+  state = act(state, { type: 'OPEN_OVERVIEW' });
+  assert.equal(state.records.metadata_surveillance.draft.phase, PHASES.ARGUMENT);
+  state = act(state, { type: 'OPEN_POLICY_SIMPLE', policyId: 'metadata_surveillance' });
+  assert.equal(state.phase, PHASES.ARGUMENT);
+  assert.equal(state.currentChain.direction, 'oppose');
+}
 
 function answerFact(state, response = 'true') {
   let next = act(state, { type: 'ANSWER_FACT', response });

@@ -53,9 +53,13 @@ export const PHASES = Object.freeze({
 
 export const createInitialState = () => ({
   modelVersion: MODEL_META.version,
-  storageVersion: 7,
+  storageVersion: 8,
   assessmentMode: assessmentModes.default || 'real_world_belief',
   adaptiveMode: false,
+  simpleFlow: false,
+  selectedPolicyIds: [],
+  selectedPolicyPosition: 0,
+  currentElementIndex: 0,
   migrationNotice: null,
   phase: PHASES.LANDING,
   entryPath: null,
@@ -662,6 +666,15 @@ const interactivePolicyElements = (policy) => getPolicyElements(policy, [
   'parameter',
 ]);
 
+export const getConditionalFollowUps = (policy) => {
+  if (!policy) return [];
+  const [, ...subordinateChoices] = getPolicyElements(policy, ['policy_choice']);
+  return [
+    ...subordinateChoices,
+    ...getPolicyElements(policy, ['safeguard', 'parameter']),
+  ].filter((element) => element.askWhenConditional !== false);
+};
+
 const policyElementsComplete = (policy, record) => interactivePolicyElements(policy).every((element) => (
   record[responseFieldForKind[element.kind]]?.[element.id]
 ));
@@ -686,6 +699,54 @@ const startPolicy = (state, index) => {
     ...state,
     policyIndex: index,
     phase: elements.length && !policyElementsComplete(policy, record) ? PHASES.COMPONENTS : PHASES.STANCE,
+    currentChain: null,
+    selectedChainId: null,
+    currentTargetClaimId: null,
+    currentArgumentId: null,
+    currentFactIndex: 0,
+    pendingFactResponses: {},
+    pendingFactSensitivity: {},
+    pendingSensitivity: null,
+    pendingCustomStressTest: null,
+    pendingFormalQuestion: null,
+    pendingDefeaterArgumentId: null,
+    pendingDefeaterFactIndex: 0,
+    pendingDefeaterFactResponses: {},
+    pendingDefeaterBridgeResponse: null,
+    pendingDefeaterFormalResponses: {},
+    pendingDefeaterFormalStatus: null,
+    pendingConflict: null,
+    breakReason: null,
+    records: {
+      ...state.records,
+      [policy.id]: record,
+    },
+    updatedAt: now(),
+  };
+};
+
+const startSimplePolicy = (state, index) => {
+  const policy = policies[index];
+  if (!policy) {
+    return {
+      ...state,
+      phase: PHASES.RESULTS,
+      currentChain: null,
+      currentTargetClaimId: null,
+      currentArgumentId: null,
+      updatedAt: now(),
+    };
+  }
+  const record = ensurePolicyRecord(state, policy.id, {
+    status: state.records[policy.id]?.status || 'in_progress',
+  });
+  return {
+    ...state,
+    simpleFlow: true,
+    assessmentMode: 'conditional_scenario',
+    policyIndex: index,
+    phase: PHASES.STANCE,
+    currentElementIndex: 0,
     currentChain: null,
     selectedChainId: null,
     currentTargetClaimId: null,
@@ -746,6 +807,8 @@ const stashCurrentDraft = (state) => {
         ...record,
         draft: {
           phase: state.phase,
+          simpleFlow: state.simpleFlow,
+          currentElementIndex: state.currentElementIndex,
           currentChain: state.currentChain,
           selectedChainId: state.selectedChainId,
           currentTargetClaimId: state.currentTargetClaimId,
@@ -792,6 +855,24 @@ const openPolicy = (state, policyIndex) => {
   return startPolicy({ ...stashed, records }, policyIndex);
 };
 
+const openSimplePolicy = (state, policyIndex) => {
+  const stashed = stashCurrentDraft(state);
+  const policy = policies[policyIndex];
+  const record = stashed.records[policy.id];
+  if (record?.draft) {
+    return {
+      ...stashed,
+      policyIndex,
+      ...record.draft,
+      simpleFlow: true,
+      assessmentMode: 'conditional_scenario',
+      currentElementIndex: record.draft.currentElementIndex || 0,
+      updatedAt: now(),
+    };
+  }
+  return startSimplePolicy(stashed, policyIndex);
+};
+
 const startDirection = (state, direction) => {
   const policy = policies[state.policyIndex];
   const targetClaimId = direction === 'support' ? policy.supportClaimId : policy.opposeClaimId;
@@ -827,6 +908,9 @@ const isAssessmentMode = (mode) => typeof assessmentModes[mode] === 'object';
 
 export const reducer = (state, action) => {
   switch (action.type) {
+    case 'RESTORE_NAVIGATION':
+      return action.state?.modelVersion === MODEL_META.version ? action.state : state;
+
     case 'SET_ASSESSMENT_MODE':
       if (Object.keys(state.records).length || !isAssessmentMode(action.mode)) return state;
       return { ...state, assessmentMode: action.mode, updatedAt: now() };
@@ -849,6 +933,30 @@ export const reducer = (state, action) => {
         startedAt: now(),
         updatedAt: now(),
       };
+
+    case 'START_SELECTED': {
+      const selectedPolicyIds = [...new Set(action.policyIds || [])]
+        .filter((policyId) => policies.some((policy) => policy.id === policyId));
+      if (!selectedPolicyIds.length) return state;
+      const policyIndex = policies.findIndex((policy) => policy.id === selectedPolicyIds[0]);
+      return openSimplePolicy({
+        ...state,
+        simpleFlow: true,
+        adaptiveMode: false,
+        entryPath: 'bank',
+        selectedPolicyIds,
+        selectedPolicyPosition: 0,
+        startedAt: state.startedAt || now(),
+      }, policyIndex);
+    }
+
+    case 'NEXT_SELECTED': {
+      const selectedPolicyPosition = state.selectedPolicyPosition + 1;
+      const policyId = state.selectedPolicyIds[selectedPolicyPosition];
+      if (!policyId) return { ...state, phase: PHASES.RESULTS, updatedAt: now() };
+      const policyIndex = policies.findIndex((policy) => policy.id === policyId);
+      return openSimplePolicy({ ...state, selectedPolicyPosition }, policyIndex);
+    }
 
     case 'START_ADAPTIVE': {
       const base = {
@@ -886,6 +994,31 @@ export const reducer = (state, action) => {
       const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
       if (policyIndex < 0) return state;
       return openPolicy({ ...state, migrationNotice: null }, policyIndex);
+    }
+
+    case 'OPEN_POLICY_SIMPLE': {
+      const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
+      if (policyIndex < 0) return state;
+      return openSimplePolicy({
+        ...state,
+        migrationNotice: null,
+        selectedPolicyIds: [action.policyId],
+        selectedPolicyPosition: 0,
+        startedAt: state.startedAt || now(),
+      }, policyIndex);
+    }
+
+    case 'REVISE_POLICY_SIMPLE': {
+      const policyIndex = policies.findIndex((policy) => policy.id === action.policyId);
+      if (policyIndex < 0) return state;
+      const { [action.policyId]: _removed, ...records } = state.records;
+      return startSimplePolicy({
+        ...state,
+        records,
+        selectedPolicyIds: [action.policyId],
+        selectedPolicyPosition: 0,
+        startedAt: state.startedAt || now(),
+      }, policyIndex);
     }
 
     case 'EXIT_TO_LANDING': {
@@ -1034,6 +1167,82 @@ export const reducer = (state, action) => {
       if (stance === 'support' || stance === 'oppose') return startDirection(next, stance);
       if (stance === 'undecided') return { ...next, phase: PHASES.DIRECTION };
       return next;
+    }
+
+    case 'SET_SIMPLE_STANCE': {
+      const policy = policies[state.policyIndex];
+      if (!policy || !['support', 'oppose', 'conditional', 'undecided'].includes(action.stance)) return state;
+      const primaryChoice = getPolicyElements(policy, ['policy_choice'])[0];
+      const record = ensurePolicyRecord(state, policy.id, {
+        stance: action.stance,
+        packageStanceBeforeDefeater: action.stance,
+        packageStanceAfterDefeater: null,
+        policyChoiceResponses: primaryChoice ? {
+          ...state.records[policy.id]?.policyChoiceResponses,
+          [primaryChoice.id]: action.stance,
+        } : state.records[policy.id]?.policyChoiceResponses || {},
+        status: 'in_progress',
+      });
+      const next = {
+        ...state,
+        records: { ...state.records, [policy.id]: record },
+        currentElementIndex: 0,
+        updatedAt: now(),
+      };
+      if (action.stance === 'undecided') {
+        return finalizeAsUnresolved(next, '你暂时不能判断这项政策。');
+      }
+      if (action.stance === 'conditional') {
+        return getConditionalFollowUps(policy).length
+          ? { ...next, phase: PHASES.COMPONENTS }
+          : startDirection(next, 'support');
+      }
+      return startDirection(next, action.stance);
+    }
+
+    case 'ANSWER_SIMPLE_ELEMENT': {
+      const policy = policies[state.policyIndex];
+      const element = getConditionalFollowUps(policy)[state.currentElementIndex];
+      if (!policy || !element) return state;
+      const defaults = {
+        policy_choice: ['support', 'oppose', 'conditional', 'undecided'],
+        safeguard: ['required', 'preferred', 'not_required', 'uncertain'],
+        parameter: ['accept', 'adjust', 'reject', 'uncertain'],
+      }[element.kind] || [];
+      const allowed = element.simpleOptions?.map((option) => option.value) || defaults;
+      if (!allowed.includes(action.response)) return state;
+      const field = responseFieldForKind[element.kind];
+      const record = ensurePolicyRecord(state, policy.id);
+      const nextIndex = state.currentElementIndex + 1;
+      const rejectsPolicy = element.kind === 'policy_choice' && action.response === 'none';
+      const primaryChoice = getPolicyElements(policy, ['policy_choice'])[0];
+      const updatedRecord = {
+        ...record,
+        [field]: { ...record[field], [element.id]: action.response },
+        ...(rejectsPolicy ? {
+          stance: 'oppose',
+          packageStanceBeforeDefeater: 'oppose',
+          packageStanceAfterDefeater: null,
+          policyChoiceResponses: {
+            ...record.policyChoiceResponses,
+            [element.id]: action.response,
+            ...(primaryChoice ? { [primaryChoice.id]: 'oppose' } : {}),
+          },
+        } : {}),
+      };
+      const next = {
+        ...state,
+        records: {
+          ...state.records,
+          [policy.id]: updatedRecord,
+        },
+        currentElementIndex: nextIndex,
+        updatedAt: now(),
+      };
+      if (rejectsPolicy) return startDirection(next, 'oppose');
+      return nextIndex < getConditionalFollowUps(policy).length
+        ? next
+        : startDirection(next, 'support');
     }
 
     case 'SET_COMPONENT_TRADEOFF': {
@@ -1368,6 +1577,34 @@ export const reducer = (state, action) => {
       return finalizeAsUnresolved(state, '你暂时无法判断这条价值原则是否可以直接作为基础，也没有选择继续追问。');
     }
 
+    case 'ACCEPT_CURRENT_REASON_AS_TERMINAL': {
+      const lastStep = state.currentChain?.steps.at(-1);
+      const claimId = lastStep?.bridgeClaimId;
+      if (!lastStep || !claimId || !canNominateClaim(claims[claimId])) return state;
+      const recorded = recordFixedPoint(state, claimId, 'confirmed');
+      const hasStressTest = Boolean(claims[claimId]?.stressTest);
+      const exampleStressTest = !hasStressTest && state.simpleFlow && claims[claimId]?.example ? {
+        scenario: claims[claimId].example,
+        question: '换成这个对象后，你仍会使用同一个判断标准吗？',
+        source: 'bank_example',
+      } : null;
+      return {
+        ...recorded,
+        currentChain: {
+          ...recorded.currentChain,
+          terminal: {
+            claimId,
+            status: 'provisional_fixed_point',
+            nominatedAt: now(),
+            confirmedAt: now(),
+          },
+        },
+        pendingCustomStressTest: exampleStressTest,
+        phase: hasStressTest || exampleStressTest ? PHASES.STRESS : PHASES.STRESS_REQUIRED,
+        updatedAt: now(),
+      };
+    }
+
     case 'CONFIRM_TERMINAL': {
       const lastStep = state.currentChain?.steps.at(-1);
       const candidateClaimId = state.currentChain?.terminal?.claimId || lastStep?.bridgeClaimId;
@@ -1375,6 +1612,11 @@ export const reducer = (state, action) => {
       if (action.response === 'accept') {
         const recorded = recordFixedPoint(state, candidateClaimId, 'confirmed');
         const hasStressTest = Boolean(claims[candidateClaimId]?.stressTest);
+        const exampleStressTest = !hasStressTest && state.simpleFlow && claims[candidateClaimId]?.example ? {
+          scenario: claims[candidateClaimId].example,
+          question: '换成这个对象后，你仍会使用同一个判断标准吗？',
+          source: 'bank_example',
+        } : null;
         return {
           ...recorded,
           currentChain: {
@@ -1386,8 +1628,8 @@ export const reducer = (state, action) => {
               confirmedAt: now(),
             },
           },
-          pendingCustomStressTest: null,
-          phase: hasStressTest ? PHASES.STRESS : PHASES.STRESS_REQUIRED,
+          pendingCustomStressTest: exampleStressTest,
+          phase: hasStressTest || exampleStressTest ? PHASES.STRESS : PHASES.STRESS_REQUIRED,
           updatedAt: now(),
         };
       }
@@ -1875,9 +2117,11 @@ export const reducer = (state, action) => {
 };
 
 export const migrateSavedState = (state) => {
-  if (![4, 5, 6, 7].includes(state?.storageVersion)) return null;
+  if (![4, 5, 6, 7, 8].includes(state?.storageVersion)) return null;
   if (!['0.7.0', '0.7.1', '0.8.0', '0.8.1', '0.8.2', MODEL_META.version].includes(state.modelVersion)) return null;
   const legacyRealWorld = state.modelVersion === '0.7.0';
+  const legacyActiveFlow = state.storageVersion < 8
+    && ![PHASES.LANDING, PHASES.POLICY_OVERVIEW, PHASES.RESULTS].includes(state.phase);
   const upgrading = state.modelVersion !== MODEL_META.version;
   const revisedIds = new Set([
     'speech_no_equal_alternative',
@@ -2027,7 +2271,9 @@ export const migrateSavedState = (state) => {
     });
     const { componentPositions: _componentPositions, postDefeaterStance, ...recordWithoutLegacy } = record;
     const migratedDraftChain = migrateChain(record.draft?.currentChain);
-    const keepDraft = record.draft && flowCompatible(record.draft, migratedDraftChain);
+    const keepDraft = state.storageVersion >= 8
+      && record.draft
+      && flowCompatible(record.draft, migratedDraftChain);
     if (record.draft && !keepDraft) invalidatedProgress = true;
     const reviewInvalidated = [...(record.chains || []), record.draft?.currentChain]
       .some((chain) => invalidatedDefeaterChainIds.has(chain?.id));
@@ -2073,7 +2319,7 @@ export const migrateSavedState = (state) => {
   };
 
   const migratedCurrent = migrateChain(state.currentChain);
-  const keepCurrentFlow = flowCompatible(state, migratedCurrent);
+  const keepCurrentFlow = !legacyActiveFlow && flowCompatible(state, migratedCurrent);
   if (!keepCurrentFlow && (state.currentChain || state.currentArgumentId || state.pendingDefeaterArgumentId)) {
     invalidatedProgress = true;
   }
@@ -2084,8 +2330,12 @@ export const migrateSavedState = (state) => {
   return {
     ...createInitialState(),
     ...state,
-    storageVersion: 7,
+    storageVersion: 8,
     modelVersion: MODEL_META.version,
+    simpleFlow: true,
+    selectedPolicyIds: Array.isArray(state.selectedPolicyIds) ? state.selectedPolicyIds : [],
+    selectedPolicyPosition: state.selectedPolicyPosition || 0,
+    currentElementIndex: state.currentElementIndex || 0,
     assessmentMode: legacyRealWorld
       ? 'real_world_belief'
       : isAssessmentMode(state.assessmentMode) ? state.assessmentMode : assessmentModes.default || 'real_world_belief',

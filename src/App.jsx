@@ -5,7 +5,6 @@ import CandidateReview from './components/CandidateReview.jsx';
 import Header from './components/Header.jsx';
 import Landing from './components/Landing.jsx';
 import LocalDataPanel from './components/LocalDataPanel.jsx';
-import MethodModal from './components/MethodModal.jsx';
 import ResultsV2 from './components/ResultsV2.jsx';
 import { loadFormalBank } from './data/bank.js';
 import {
@@ -108,7 +107,6 @@ function LoadingScreen({ error, onRetry }) {
 
 function ReadyApp({ bankManifest }) {
   const [state, dispatch, sessionControls] = useSession();
-  const [methodOpen, setMethodOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [localDataOpen, setLocalDataOpen] = useState(false);
   const [aiConfig, setAiConfig] = useState(null);
@@ -255,7 +253,6 @@ function ReadyApp({ bankManifest }) {
       <Header
         state={state}
         aiConfigured={Boolean(aiConfig)}
-        onMethod={() => setMethodOpen(true)}
         onConfig={() => setConfigOpen(true)}
         onLocalData={() => setLocalDataOpen(true)}
       />
@@ -271,10 +268,8 @@ function ReadyApp({ bankManifest }) {
 
       {state.phase === PHASES.LANDING ? (
         <Landing
-          aiLoading={aiStatus.loading}
           hasSavedProgress={sessionControls.hasSavedProgress}
-          onStartBank={() => dispatch({ type: sessionControls.hasSavedProgress ? 'OPEN_OVERVIEW' : 'START_OVERVIEW' })}
-          onStartCustom={(request) => runAiRequest(request)}
+          onStart={() => dispatch({ type: sessionControls.hasSavedProgress ? 'OPEN_OVERVIEW' : 'START_OVERVIEW' })}
         />
       ) : null}
 
@@ -282,6 +277,7 @@ function ReadyApp({ bankManifest }) {
         <Assessment
           state={state}
           dispatch={dispatch}
+          sessionControls={sessionControls}
           aiLoading={aiStatus.loading}
           onAskAi={(request) => runAiRequest(request)}
         />
@@ -295,7 +291,6 @@ function ReadyApp({ bankManifest }) {
         />
       ) : null}
 
-      <MethodModal open={methodOpen} onClose={() => setMethodOpen(false)} />
       <AIConfigPanel
         open={configOpen}
         value={aiConfig}

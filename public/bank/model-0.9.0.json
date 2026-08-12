@@ -23888,7 +23888,13 @@
       "scope": "本题明确排除四类内容：直接威胁、针对个人的骚扰、能够核实为假的事实陈述，以及指挥组织暴力的内容。请只判断剩下的严重贬低或侮辱性表达。",
       "supportClaimId": "speech_support",
       "opposeClaimId": "speech_oppose",
-      "question": "在这些边界都固定的情况下，你目前倾向支持还是反对这项法律？",
+      "question": "本题不讨论威胁、骚扰、造谣或煽动暴力。只讨论剩余的严重贬低或侮辱性公开表达。国家是否应当用法律处罚这类表达？",
+      "stanceOptions": {
+        "support": "应当处罚",
+        "oppose": "不应处罚",
+        "conditional": "只在某些条件下处罚",
+        "undecided": "暂时不能判断"
+      },
       "selection": {
         "tier": "core",
         "domain": "表达与伤害",
@@ -23917,10 +23923,28 @@
         },
         {
           "id": "penalty_power",
-          "label": "允许罚款或拘留",
+          "label": "哪些处罚方式可以接受？",
           "kind": "policy_choice",
           "plainExplanation": "“允许罚款或拘留”是政策包中可以独立接受、拒绝或要求调整的决定。",
-          "whyItMatters": "把它单独回答，可以区分政策目标与具体实施手段。"
+          "whyItMatters": "把它单独回答，可以区分政策目标与具体实施手段。",
+          "simpleOptions": [
+            {
+              "value": "civil_only",
+              "label": "只允许民事责任"
+            },
+            {
+              "value": "fine",
+              "label": "可以罚款"
+            },
+            {
+              "value": "detention",
+              "label": "可以拘留"
+            },
+            {
+              "value": "none",
+              "label": "都不能接受"
+            }
+          ]
         }
       ],
       "safeguards": [
@@ -23929,7 +23953,8 @@
           "label": "明确排除威胁、骚扰、可核实虚假事实和组织暴力",
           "kind": "safeguard",
           "plainExplanation": "“明确排除威胁、骚扰、可核实虚假事实和组织暴力”是限制权力、风险或适用范围的保障条件。",
-          "whyItMatters": "是否要求这项保障，会改变你对整个政策包的接受程度。"
+          "whyItMatters": "是否要求这项保障，会改变你对整个政策包的接受程度。",
+          "askWhenConditional": false
         }
       ],
       "parameters": [],

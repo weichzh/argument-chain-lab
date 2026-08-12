@@ -1,31 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BarChart3,
   Check,
   CircleHelp,
-  GitBranch,
   ListChecks,
   LogOut,
   Search,
   Sparkles,
 } from 'lucide-react';
 import {
-  assessmentModes,
   argumentsById,
   claims,
   dilemmas,
   facts,
   getArgumentsForClaim,
   getPolicyElements,
-  getRelevantDilemmas,
   policies,
 } from '../data/model.js';
 import { sessionDraftKey } from '../hooks/useSession.js';
 import {
   canNominateClaim,
   collectTerminalCommitments,
+  getConditionalFollowUps,
   getCurrentArgument,
   getCurrentBridge,
   getCurrentFact,
@@ -34,48 +33,7 @@ import {
   getSelectedChain,
   PHASES,
 } from '../lib/engine.js';
-import { adaptiveProgress, selectNextAdaptivePolicy } from '../lib/ideology.js';
 import ProofView from './ProofView.jsx';
-
-const STAGES = [
-  ['判断', [PHASES.COMPONENTS, PHASES.STANCE, PHASES.PACKAGE_TRADEOFF, PHASES.DIRECTION, PHASES.ARGUMENT]],
-  ['事实', [PHASES.FACT, PHASES.FACT_SENSITIVITY]],
-  ['原则', [PHASES.BRIDGE, PHASES.FORMAL_QUESTION, PHASES.DEPTH]],
-  ['价值', [PHASES.TERMINAL_CONFIRM]],
-  ['检验', [
-    PHASES.STRESS_REQUIRED,
-    PHASES.STRESS,
-    PHASES.DEFEATER,
-    PHASES.DEFEATER_FACT,
-    PHASES.DEFEATER_BRIDGE,
-    PHASES.DEFEATER_IMPACT,
-    PHASES.CONFLICT,
-    PHASES.BROKEN,
-    PHASES.POLICY_COMPLETE,
-    PHASES.DILEMMA_INTRO,
-    PHASES.DILEMMA,
-    PHASES.DILEMMA_SENSITIVITY,
-  ]],
-];
-
-const stageFor = (phase) => STAGES.findIndex(([, phases]) => phases.includes(phase));
-
-function StageRail({ phase }) {
-  const active = stageFor(phase);
-  return (
-    <aside className="stage-rail" aria-label="当前题目进度">
-      <strong>本题进度</strong>
-      <ol>
-        {STAGES.map(([label], index) => (
-          <li key={label} className={index === active ? 'active' : index < active ? 'done' : ''}>
-            <span>{index < active ? <Check size={14} /> : index + 1}</span>
-            <strong>{label}</strong>
-          </li>
-        ))}
-      </ol>
-    </aside>
-  );
-}
 
 function ChoiceList({ options }) {
   return (
@@ -178,57 +136,27 @@ function FreeInput({ state, dispatch, onAskAi, aiLoading, scope = 'current_targe
 }
 
 const directionCopy = {
-  support: '支持题设',
-  oppose: '反对题设',
-  undecided: '方向未定',
+  support: '支持',
+  oppose: '反对',
+  conditional: '只在某些条件下支持',
+  undecided: '暂时不能判断',
 };
-
-const modeAwareDirection = (direction, mode) => {
-  if (!['support', 'oppose'].includes(direction)) return directionCopy[direction] || '尚未作答';
-  const prefix = mode === 'conditional_scenario' ? '题设内' : '现实判断';
-  return `${prefix}：${direction === 'support' ? '支持' : '反对'}`;
-};
-
-function ModeBadge({ state }) {
-  return <span className="mode-badge">回答方式：{assessmentModes[state.assessmentMode]?.label || state.assessmentMode}</span>;
-}
-
-function PolicyFrame({ state }) {
-  const policy = getCurrentPolicy(state);
-  if (!policy || [PHASES.DILEMMA, PHASES.DILEMMA_SENSITIVITY, PHASES.DILEMMA_INTRO].includes(state.phase)) return null;
-  const record = state.records[policy.id];
-  const direction = state.currentChain?.direction || record?.direction || record?.stance;
-  const tone = direction === 'support' || direction === 'oppose' ? direction : 'neutral';
-  const scenarioConditions = getPolicyElements(policy, ['scenario_condition']);
-  return (
-    <section className={`policy-frame ${tone}`} aria-label="本题题设">
-      <header>
-        <span>题设</span>
-        <strong className={`direction-badge ${tone}`}>{modeAwareDirection(direction, state.assessmentMode)}</strong>
-      </header>
-      <h2>{policy.shortTitle || policy.title}</h2>
-      <p>{policy.proposition}</p>
-      {policy.scope ? <p className="policy-scope"><strong>题设边界：</strong>{policy.scope}</p> : null}
-      {scenarioConditions.length ? <ul className="scenario-condition-list">{scenarioConditions.map((item) => <li key={item.id}><strong>固定条件</strong><span>{item.label}</span></li>)}</ul> : null}
-    </section>
-  );
-}
 
 function QuestionHeader({ state, label, title, statement }) {
   const policy = getCurrentPolicy(state);
   const argument = getCurrentArgument(state);
   const progress = state.phase === PHASES.FACT && argument
-    ? `事实 ${state.currentFactIndex + 1} / ${argument.factIds.length}`
+    ? `假设 ${state.currentFactIndex + 1} / ${argument.factIds.length}`
     : label;
   return (
     <>
-      <PolicyFrame state={state} />
       <div className="question-context">
-        <strong>{progress}</strong>
+        <strong>{policy?.shortTitle || policy?.title || progress}</strong>
+        {state.phase === PHASES.FACT && argument ? <span>{progress}</span> : null}
       </div>
       <header className="question-heading">
         <h1>{title}</h1>
-        {statement && statement !== policy?.proposition ? <p>{statement}</p> : null}
+        {statement ? <p>{statement}</p> : null}
       </header>
     </>
   );
@@ -268,6 +196,55 @@ const elementGroupLabel = {
   safeguard: '保障条件',
   parameter: '参数设置',
 };
+
+const simpleElementOptions = {
+  policy_choice: [
+    ['support', '可以接受'],
+    ['conditional', '需要调整后才可以接受'],
+    ['oppose', '不能接受'],
+    ['undecided', '暂时不能判断'],
+  ],
+  safeguard: [
+    ['required', '必须保留'],
+    ['preferred', '最好保留'],
+    ['not_required', '不需要'],
+    ['uncertain', '暂时不能判断'],
+  ],
+  parameter: [
+    ['accept', '可以接受'],
+    ['adjust', '需要调整'],
+    ['reject', '不能接受'],
+    ['uncertain', '暂时不能判断'],
+  ],
+};
+
+function SimpleComponentQuestion({ state, dispatch }) {
+  const policy = getCurrentPolicy(state);
+  const followUps = getConditionalFollowUps(policy);
+  const element = followUps[state.currentElementIndex];
+  if (!element) return null;
+  const options = element.simpleOptions?.map(({ value, label }) => [value, label])
+    || simpleElementOptions[element.kind]
+    || [];
+  const title = element.label.endsWith('？')
+    ? element.label
+    : `关于“${element.label}”，你的判断是？`;
+  return (
+    <>
+      <QuestionHeader
+        state={state}
+        label={`补充问题 ${state.currentElementIndex + 1} / ${followUps.length}`}
+        title={title}
+        statement={element.simpleOptions ? null : element.plainExplanation}
+      />
+      <ChoiceList options={options.map(([response, label]) => ({
+        id: response,
+        label,
+        onSelect: () => dispatch({ type: 'ANSWER_SIMPLE_ELEMENT', response }),
+      }))} />
+    </>
+  );
+}
 
 function ComponentQuestion({ state, dispatch }) {
   const policy = getCurrentPolicy(state);
@@ -376,7 +353,7 @@ function PackageTradeoffQuestion({ state, dispatch }) {
   );
 }
 
-function StanceQuestion({ state, dispatch, onAskAi, aiLoading }) {
+function StanceQuestion({ state, dispatch }) {
   const policy = getCurrentPolicy(state);
   if (policy?.origin === 'community') {
     return (
@@ -397,19 +374,25 @@ function StanceQuestion({ state, dispatch, onAskAi, aiLoading }) {
             onSelect: () => dispatch({ type: 'SKIP_POLICY', reason: '用户跳过了这份公开论证。' }),
           },
         ]} />
-        <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
       </>
     );
   }
+  const labels = {
+    support: '支持这项政策',
+    oppose: '不支持这项政策',
+    conditional: '只在某些条件下支持',
+    undecided: '暂时不能判断',
+    ...policy?.stanceOptions,
+  };
   return (
     <>
       <QuestionHeader state={state} label="当前判断" title={policy.question} statement={policy.proposition} />
       <ChoiceList options={[
-        { id: 'support', label: modeAwareDirection('support', state.assessmentMode), tone: 'support', onSelect: () => dispatch({ type: 'SET_STANCE', stance: 'support' }) },
-        { id: 'oppose', label: modeAwareDirection('oppose', state.assessmentMode), tone: 'oppose', onSelect: () => dispatch({ type: 'SET_STANCE', stance: 'oppose' }) },
-        { id: 'undecided', label: '暂时没有立场', onSelect: () => dispatch({ type: 'SET_STANCE', stance: 'undecided' }) },
+        { id: 'support', label: labels.support, tone: 'support', onSelect: () => dispatch({ type: 'SET_SIMPLE_STANCE', stance: 'support' }) },
+        { id: 'oppose', label: labels.oppose, tone: 'oppose', onSelect: () => dispatch({ type: 'SET_SIMPLE_STANCE', stance: 'oppose' }) },
+        { id: 'conditional', label: labels.conditional, onSelect: () => dispatch({ type: 'SET_SIMPLE_STANCE', stance: 'conditional' }) },
+        { id: 'undecided', label: labels.undecided, onSelect: () => dispatch({ type: 'SET_SIMPLE_STANCE', stance: 'undecided' }) },
       ]} />
-      <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} scope="new_root" />
     </>
   );
 }
@@ -430,6 +413,8 @@ function DirectionQuestion({ state, dispatch, onAskAi, aiLoading }) {
 
 function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const target = getCurrentTargetClaim(state);
+  const policy = getCurrentPolicy(state);
+  const stance = state.records[policy?.id]?.stance || state.currentChain?.direction;
   const allArguments = getArgumentsForClaim(state.currentTargetClaimId);
   const [query, setQuery] = useState('');
   const argumentsForDisplay = useMemo(() => {
@@ -439,7 +424,12 @@ function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
   }, [allArguments, query]);
   return (
     <>
-      <QuestionHeader state={state} label="选择理由" title="哪一条最接近你实际采用的理由？" statement={target?.text} />
+      <QuestionHeader
+        state={state}
+        label="主要原因"
+        title={`${stance === 'oppose' ? '你反对' : stance === 'conditional' ? '你只在某些条件下支持' : '你支持'}这项决定的最主要原因是什么？`}
+        statement={target?.text}
+      />
       {allArguments.length > 6 ? (
         <label className="argument-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索题库理由" /></label>
       ) : null}
@@ -448,7 +438,6 @@ function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
           <button className="argument-row" type="button" key={argument.id} onClick={() => dispatch({ type: 'SELECT_ARGUMENT', argumentId: argument.id })}>
             <span className="argument-copy">
               <strong>{argument.title}</strong>
-              <small>{argument.summary}</small>
             </span>
             <ArrowRight size={18} />
           </button>
@@ -462,40 +451,14 @@ function ArgumentQuestion({ state, dispatch, onAskAi, aiLoading }) {
 
 function FactQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const fact = getCurrentFact(state);
-  const conditional = state.assessmentMode === 'conditional_scenario';
-  const stipulated = fact?.evaluationMode === 'scenario_assumption';
-  const title = conditional
-    ? stipulated ? '这项条件与当前题设一致吗？' : '把这项经验描述作为本轮题设条件吗？'
-    : '根据你掌握的现实证据，这个事实成立吗？';
-  const options = conditional
-    ? stipulated
-      ? [
-          ['true', '与题设一致', 'support'],
-          ['false', '与题设不一致', 'oppose'],
-          ['unknown', '暂时无法确认', null],
-        ]
-      : [
-          ['true', '作为题设条件采用', 'support'],
-          ['false', '不采用这项题设条件', 'oppose'],
-          ['unknown', '暂不采用', null],
-        ]
-    : [
-        ['true', '成立', 'support'],
-        ['false', '不成立', 'oppose'],
-        ['unknown', '我还不能判断', null],
-      ];
+  const options = [
+    ['true', '接受这个假设，继续判断', 'support'],
+    ['false', '我不接受这个假设', 'oppose'],
+    ['unknown', '我不确定这个假设是否成立', null],
+  ];
   return (
     <>
-      <QuestionHeader state={state} label="事实" title={title} statement={fact?.statement} />
-      <details className="evidence-details">
-        <summary>查看判断说明与条件</summary>
-        <div>
-          {fact?.plainExplanation ? <p>{fact.plainExplanation}</p> : null}
-          <strong>支持条件</strong><p>{fact?.plainTruthConditions || fact?.truthConditions}</p>
-          <strong>否定条件</strong><p>{fact?.plainFalsifier || fact?.falsifier}</p>
-        </div>
-      </details>
-      {!conditional && !fact?.sourceIds?.length ? <p className="evidence-warning" role="note"><AlertTriangle size={17} />题库没有为这项现实描述附来源；请把它视为尚未核实，选择“我还不能判断”是有效回答。</p> : null}
+      <QuestionHeader state={state} label="核对一个假设" title="下面先假设这件事确实发生。你愿意在这个假设下继续判断吗？" statement={fact?.statement} />
       <ChoiceList options={options.map(([id, label, tone]) => ({
         id,
         label,
@@ -526,20 +489,12 @@ function FactSensitivityQuestion({ state, dispatch }) {
 
 function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const bridge = getCurrentBridge(state);
-  const target = getCurrentTargetClaim(state);
   return (
     <>
-      <QuestionHeader state={state} label="判断依据" title="即使这些事实都成立，这条判断能支持结论吗？" statement={bridge?.text} />
-      <details className="evidence-details">
-        <summary>查看这条原则如何连接结论</summary>
-        <div>
-          <div className="inference-line"><span>已核对的事实</span><b>＋</b><span>{bridge?.shortLabel || '原则'}</span><b>⇝</b><span>{target?.shortLabel || '结论'}</span></div>
-          {bridge?.explanation ? <p>{bridge.explanation}</p> : null}
-        </div>
-      </details>
+      <QuestionHeader state={state} label="判断理由" title="即使刚才的假设成立，这一点也足以成为支持你判断的理由吗？" statement={bridge?.text} />
       <ChoiceList options={[
-        { id: 'accept', label: '接受这条原则', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'accept' }) },
-        { id: 'reject', label: '不接受这条原则', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'reject' }) },
+        { id: 'accept', label: '是，这足以成为理由', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'accept' }) },
+        { id: 'reject', label: '不是，这还不足以成为理由', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'reject' }) },
         { id: 'uncertain', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_BRIDGE', response: 'uncertain' }) },
       ]} />
       <FreeInput state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
@@ -550,18 +505,25 @@ function BridgeQuestion({ state, dispatch, onAskAi, aiLoading }) {
 function FormalQuestion({ state, dispatch }) {
   const pending = state.pendingFormalQuestion;
   if (!pending) return null;
+  const plainPrompts = {
+    '这些事实是否真的与这个具体政策元素相关？': '这些情况与当前判断确实有关吗？',
+    '这条原则在当前对象和范围内适用吗？': '这个理由也适用于当前对象和范围吗？',
+    '这项事实是否真的支持该原则的完整适用范围？': '刚才的情况足以支持这个理由在这里适用吗？',
+    '是否有未处理的竞争价值限制这项原则？': '有没有其他同样重要的考虑，会限制这个理由在这里适用？',
+  };
+  const prompt = plainPrompts[pending.prompt] || pending.prompt
+    .replaceAll('这个具体政策元素', '你当前的判断')
+    .replaceAll('规范结论', '判断')
+    .replaceAll('这条原则', '这个理由')
+    .replaceAll('该原则', '这个理由');
   return (
     <>
-      <QuestionHeader state={state} label="反例检查" title="再核对一个可能改变推理的问题" statement={pending.prompt} />
+      <QuestionHeader state={state} label="再确认一点" title={prompt} />
       <ChoiceList options={[
-        { id: 'satisfied', label: '这项条件已满足，继续', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'satisfied' }) },
-        { id: 'defeated', label: '存在反例或例外，当前理由不能成立', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'defeated' }) },
+        { id: 'satisfied', label: '是，继续', tone: 'support', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'satisfied' }) },
+        { id: 'defeated', label: '不是，这会改变我的理由', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'defeated' }) },
         { id: 'unknown', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_FORMAL_QUESTION', response: 'unknown' }) },
       ]} />
-      <details className="evidence-details">
-        <summary>形式检查详情</summary>
-        <div><p>检查类型：{({ undermine: '前提削弱', rebut: '结论反驳', undercut: '规则例外' })[pending.attackKind] || '可撤销条件'}</p></div>
-      </details>
     </>
   );
 }
@@ -575,12 +537,12 @@ function DepthQuestion({ state, dispatch }) {
       <ChoiceList options={[
         {
           id: 'fixed',
-          label: canNominate ? '把它作为本轮暂定出发点' : '这条原则目前不能在这里停止',
+          label: canNominate ? '这就是我目前最根本的理由' : '这里还不能停止追问',
           disabled: !canNominate,
-          onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'fixed_point' }),
+          onSelect: () => dispatch({ type: 'ACCEPT_CURRENT_REASON_AS_TERMINAL' }),
         },
         { id: 'deeper', label: '继续追问为什么', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'deeper' }) },
-        { id: 'uncertain', label: '暂时无法判断', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'uncertain' }) },
+        { id: 'uncertain', label: '我暂时说不清', onSelect: () => dispatch({ type: 'SET_DEPTH', decision: 'uncertain' }) },
       ]} />
     </>
   );
@@ -591,13 +553,11 @@ function TerminalQuestion({ state, dispatch }) {
   const claim = claims[claimId];
   return (
     <>
-      <QuestionHeader state={state} label="独立确认" title="你愿意暂时把追问停在这里吗？" statement={claim?.text} />
-      <p className="explanation-line">这不是客观公理声明，只记录本轮追问暂时停在哪里。</p>
+      <QuestionHeader state={state} label="继续追问" title="这是你目前愿意停下来的理由吗？" statement={claim?.text} />
       <ChoiceList options={[
-        { id: 'accept', label: '是，我现在直接接受它', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'accept' }) },
-        { id: 'continue', label: '不是，继续追问更深理由', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'continue' }) },
-        { id: 'reject', label: '我不愿把它作为本轮暂定出发点', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'reject' }) },
-        { id: 'uncertain', label: '暂时不能确认', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'uncertain' }) },
+        { id: 'accept', label: '这就是我目前最根本的理由', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'accept' }) },
+        { id: 'continue', label: '继续追问为什么', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'continue' }) },
+        { id: 'uncertain', label: '我暂时说不清', onSelect: () => dispatch({ type: 'CONFIRM_TERMINAL', response: 'uncertain' }) },
       ]} />
     </>
   );
@@ -634,10 +594,10 @@ function StressQuestion({ state, dispatch }) {
       {stress.distinctions?.length ? <ul className="distinction-list">{stress.distinctions.map((item) => <li key={item}>{item}</li>)}</ul> : null}
       <ChoiceList options={[
         { id: 'apply', label: '仍然适用', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'apply' }) },
-        { id: 'qualified', label: '有一个相关区别需要写清楚（将记录为仍有张力）', onSelect: () => setDistinctionOpen(true) },
-        { id: 'unexplained', label: '只在原案例适用，但我说不清区别', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'unexplained_exception' }) },
-        { id: 'retract', label: '我撤回这条原则', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'retract' }) },
-        { id: 'uncertain', label: '暂时无法判断', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'uncertain' }) },
+        { id: 'qualified', label: '有一个重要区别需要补充', onSelect: () => setDistinctionOpen(true) },
+        { id: 'unexplained', label: '只在原情况适用，但我说不清区别', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'unexplained_exception' }) },
+        { id: 'retract', label: '这让我撤回刚才的理由', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'retract' }) },
+        { id: 'uncertain', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_STRESS', response: 'uncertain' }) },
       ]} />
       {distinctionOpen ? (
         <div className="inline-form">
@@ -657,16 +617,16 @@ function DefeaterQuestion({ state, dispatch }) {
   const candidates = getArgumentsForClaim(oppositeClaimId);
   return (
     <>
-      <QuestionHeader state={state} label="最强反方" title="哪一条是你认为最值得认真对待的反方理由？" statement="先选题库里最强的一条，再记录它是否改变整包立场。" />
+      <QuestionHeader state={state} label="换一个角度" title="下面哪条相反理由最可能让你重新考虑？" />
       <div className="argument-options">
         {candidates.map((argument) => (
           <button className="argument-row" type="button" key={argument.id} onClick={() => dispatch({ type: 'SELECT_DEFEATER', argumentId: argument.id })}>
-            <span className="argument-copy"><strong>{argument.title}</strong><small>{argument.summary}</small></span>
+            <span className="argument-copy"><strong>{argument.title}</strong></span>
             <ArrowRight size={18} />
           </button>
         ))}
       </div>
-      <button className="button quiet full-width" type="button" onClick={() => dispatch({ type: 'NO_DEFEATER_ACCEPTED' })}>题库中没有我认为成立的反方理由</button>
+      <button className="button quiet full-width" type="button" onClick={() => dispatch({ type: 'NO_DEFEATER_ACCEPTED' })}>这些理由都不会改变我的判断</button>
     </>
   );
 }
@@ -678,11 +638,10 @@ function DefeaterFactQuestion({ state, dispatch }) {
   if (!fact) return null;
   return (
     <>
-      <QuestionHeader state={state} label={`反方事实 ${state.pendingDefeaterFactIndex + 1} / ${argument.factIds.length}`} title="这条反方理由依赖的事实成立吗？" statement={fact.statement} />
-      {!fact.sourceIds?.length && state.assessmentMode === 'real_world_belief' ? <p className="evidence-warning" role="note"><AlertTriangle size={17} />题库未附现实来源；不能判断不会被当成反对。</p> : null}
+      <QuestionHeader state={state} label={`换一个角度 ${state.pendingDefeaterFactIndex + 1} / ${argument.factIds.length}`} title="先假设下面这件事确实发生。它会让你重新考虑吗？" statement={fact.statement} />
       <ChoiceList options={[
-        { id: 'true', label: state.assessmentMode === 'conditional_scenario' ? '作为题设采用' : '成立', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_FACT', response: 'true' }) },
-        { id: 'false', label: state.assessmentMode === 'conditional_scenario' ? '不采用这项题设' : '不成立', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_FACT', response: 'false' }) },
+        { id: 'true', label: '接受这个假设，继续判断', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_FACT', response: 'true' }) },
+        { id: 'false', label: '我不接受这个假设', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_FACT', response: 'false' }) },
         { id: 'unknown', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_FACT', response: 'unknown' }) },
       ]} />
     </>
@@ -695,10 +654,10 @@ function DefeaterBridgeQuestion({ state, dispatch }) {
   if (!argument || !bridge) return null;
   return (
     <>
-      <QuestionHeader state={state} label="反方判断依据" title="即使这些反方事实都成立，你接受这条判断依据吗？" statement={bridge.text} />
+      <QuestionHeader state={state} label="换一个角度" title="即使这些情况都是真的，这也足以成为与你原判断相反的理由吗？" statement={bridge.text} />
       <ChoiceList options={[
-        { id: 'accept', label: '接受这条判断依据', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' }) },
-        { id: 'reject', label: '不接受这条判断依据', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_BRIDGE', response: 'reject' }) },
+        { id: 'accept', label: '是，这足以成为理由', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_BRIDGE', response: 'accept' }) },
+        { id: 'reject', label: '不是，这还不足以成为理由', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_BRIDGE', response: 'reject' }) },
         { id: 'uncertain', label: '暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER_BRIDGE', response: 'uncertain' }) },
       ]} />
     </>
@@ -713,20 +672,19 @@ function DefeaterImpactQuestion({ state, dispatch }) {
   const formalReady = !argument.formalization || state.pendingDefeaterFormalStatus === 'qualified';
   return (
     <>
-      <QuestionHeader state={state} label="反方影响" title="核对这些前提后，它怎样改变你的整包判断？" statement={argument.title} />
+      <QuestionHeader state={state} label="它带来的影响" title="这个相反理由会怎样改变你的判断？" statement={argument.title} />
       <section className="defeater-preview">
-        <strong>反方路径</strong>
         <ul>{(argument.plainSteps?.facts || []).map((statement) => <li key={statement}>{statement}</li>)}</ul>
-        <p><b>B</b>{bridge?.text}</p>
+        <p>{bridge?.text}</p>
       </section>
-      {!formalReady && argument.formalization ? <p className="evidence-warning" role="note"><AlertTriangle size={17} />这条反方理由仍有未解决的反例检查，只能记录为尚未建立。</p> : null}
+      {!formalReady && argument.formalization ? <p className="evidence-warning" role="note"><AlertTriangle size={17} />这条理由还有一个问题没有确认，因此暂时不会改变你的判断。</p> : null}
       <ChoiceList options={state.pendingDefeaterBridgeResponse === 'accept' && acceptedPremises && formalReady ? [
-        { id: 'supplement', label: '它补充了限制条件，但没有削弱原理由', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'supplement' }) },
-        { id: 'weaken', label: '它削弱了原理由，但我仍维持原立场', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'weaken' }) },
-        { id: 'offset', label: '正反理由暂时抵消，整包立场变为未定', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'offset' }) },
-        { id: 'outweigh', label: '它压过原理由，我改为相反立场', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'outweigh' }) },
+        { id: 'supplement', label: '不会改变', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'supplement' }) },
+        { id: 'weaken', label: '会让我有所犹豫，但仍维持原判断', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'weaken' }) },
+        { id: 'offset', label: '现在暂时不能判断', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'offset' }) },
+        { id: 'outweigh', label: '会使我改为相反判断', tone: 'oppose', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'outweigh' }) },
       ] : [
-        { id: 'reject', label: '记录为未接受，不改变整包立场', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'reject' }) },
+        { id: 'reject', label: '暂时不会改变我的判断', onSelect: () => dispatch({ type: 'ANSWER_DEFEATER', effect: 'reject' }) },
       ]} />
     </>
   );
@@ -769,39 +727,33 @@ function PolicyComplete({ state, dispatch }) {
   const record = state.records[policy?.id] || {};
   const status = chain?.status || 'unresolved';
   const effect = chain?.defeaterReview?.effect || chain?.defeaterReview?.impact;
-  const conditionalScenario = chain?.steps?.some((step) => step.assessmentMode === 'conditional_scenario');
-  const nextAdaptive = state.adaptiveMode ? selectNextAdaptivePolicy(state) : null;
-  const copy = {
-    complete: ['本条理由链已闭合', ['supplement', 'weaken'].includes(effect)
-      ? '你接受了所选反方理由；它已记录为补充或削弱，但没有改变整包立场。'
-      : ['reject', 'none_accepted'].includes(effect)
-        ? '题库中的反方理由没有改变你的整包立场。'
-        : effect === 'outweigh'
-          ? '原理由链仍然闭合，但最强反方理由压过了它，整包立场已经反转。'
-          : effect === 'offset'
-            ? '原理由链仍然闭合，但正反理由暂时抵消，整包立场变为未定。'
-            : '事实、判断依据、本轮暂定出发点和反方复核都已记录。'],
-    conditional: conditionalScenario
-      ? ['这条理由链只在题设条件下闭合', '规范结构已经记录，但经验前提没有在现实中得到确认，不能进入公开候选区。']
-      : ['这条论证依赖尚未确认的事实', '结构已经记录，但不能进入公开候选区。'],
-    tension: ['这条论证仍有适用范围张力', '结构已经记录，但需要先说明例外或区别。'],
-    unresolved: ['这条论证仍未解决', '未完成内容继续只保存在本地。'],
-  }[status];
+  const hasNext = state.selectedPolicyPosition + 1 < state.selectedPolicyIds.length;
+  const copy = effect === 'outweigh'
+    ? '相反理由改变了你的最终判断。'
+    : effect === 'offset'
+      ? '正反理由让你暂时不能作出最终判断。'
+      : effect === 'weaken'
+        ? '相反理由让你有所犹豫，但没有改变最终判断。'
+        : status === 'unresolved'
+          ? '这道题暂时没有形成完整判断。'
+          : '这道题已经回答完毕。';
+
+  useEffect(() => {
+    if (!state.simpleFlow) return undefined;
+    const timer = window.setTimeout(() => dispatch({ type: 'NEXT_SELECTED' }), 650);
+    return () => window.clearTimeout(timer);
+  }, [dispatch, state.selectedChainId, state.simpleFlow]);
+
   return (
     <section className="completion-screen">
       <span className={`completion-icon ${status}`}>{status === 'complete' ? <Check /> : <CircleHelp />}</span>
-      <h1>{copy[0]}</h1>
-      <p>{copy[1]}</p>
+      <h1>{hasNext ? '继续下一题' : '本次答题完成'}</h1>
+      <p>{copy}</p>
       <strong>{policy?.title}</strong>
-      <p className="stance-change-summary">整包判断：{modeAwareDirection(record.packageStanceBeforeDefeater || record.direction || record.stance, state.assessmentMode)} → {modeAwareDirection(record.packageStanceAfterDefeater || record.stance, state.assessmentMode)}</p>
+      <p className="stance-change-summary">你的判断：{directionCopy[record.packageStanceAfterDefeater || record.stance] || '暂时不能判断'}</p>
       <div className="completion-actions">
-        {state.adaptiveMode ? (
-          <button className="button primary" type="button" onClick={() => dispatch({ type: 'NEXT_ADAPTIVE' })}>
-            {nextAdaptive ? `下一道推荐题：${nextAdaptive.shortTitle}` : '进入价值冲突检验'}
-          </button>
-        ) : <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}>返回题目列表</button>}
-        <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>查看阶段结果</button>
-        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'RETRY_POLICY' })}>为这项判断换一条理由</button>
+        {!state.simpleFlow ? <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}>返回题目列表</button> : null}
+        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>现在查看结果</button>
       </div>
     </section>
   );
@@ -879,72 +831,44 @@ const recordStatusCopy = {
   unresolved: '已结束，未解决',
 };
 
-function AssessmentModeSelector({ state, dispatch }) {
-  const modes = Object.entries(assessmentModes).filter(([, value]) => value && typeof value === 'object');
-  const current = assessmentModes[state.assessmentMode];
-  const locked = Object.keys(state.records).length > 0;
-  return (
-    <fieldset className="assessment-mode" disabled={locked}>
-      <legend>事实回答方式</legend>
-      <div className="assessment-mode-options">
-        {modes.map(([id, mode]) => (
-          <label key={id}>
-            <input
-              type="radio"
-              name="assessment-mode"
-              value={id}
-              checked={state.assessmentMode === id}
-              onChange={() => dispatch({ type: 'SET_ASSESSMENT_MODE', mode: id })}
-            />
-            <span>{mode.label}</span>
-          </label>
-        ))}
-      </div>
-      <p>{current?.instruction}{locked ? ' 本轮已有答题进度，回答方式已锁定。' : ''}</p>
-    </fieldset>
-  );
-}
-
 function PolicyOverview({ state, dispatch }) {
+  const remainingSelected = state.selectedPolicyIds.slice(state.selectedPolicyPosition)
+    .filter((policyId) => !state.records[policyId]?.chains?.length);
+  const initialSelection = remainingSelected.length
+    ? remainingSelected
+    : policies.filter((policy) => !state.records[policy.id]?.chains?.length).slice(0, 1).map((policy) => policy.id);
+  const [selected, setSelected] = useState(() => new Set(initialSelection));
   const finished = policies.filter((policy) => state.records[policy.id]?.chains?.length).length;
   const inProgress = policies.filter((policy) => state.records[policy.id]?.draft).length;
-  const commitments = collectTerminalCommitments(state);
-  const canStartDilemmas = getRelevantDilemmas(commitments.map((item) => item.claimId)).length > 0;
-  const canResumeDilemmas = Boolean(state.dilemmaQueue[state.dilemmaIndex]);
-  const progress = adaptiveProgress(state);
-  const recommended = selectNextAdaptivePolicy(state);
+  const selectedIds = policies.filter((policy) => selected.has(policy.id)).map((policy) => policy.id);
+  const toggle = (policyId) => setSelected((current) => {
+    const next = new Set(current);
+    if (next.has(policyId)) next.delete(policyId);
+    else next.add(policyId);
+    return next;
+  });
   return (
     <main className="policy-overview">
       <header className="overview-header">
         <div>
           <span>题目列表</span>
-          <h1>走推荐路径，或自由选择题目</h1>
-          <p>候选库有 {policies.length} 个场景；推荐路径只选 8 个核心场景和 2—4 个当前最有区分力的场景。</p>
+          <h1>这次想回答哪些题目？</h1>
+          <p>选择一道或多道题。回答完一题后，会自动进入下一道已选题目。</p>
         </div>
         <div className="overview-actions">
-          {finished ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><BarChart3 size={17} />查看阶段结果</button> : null}
+          {finished ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><BarChart3 size={17} />查看结果</button> : null}
           <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><LogOut size={17} />退出</button>
         </div>
       </header>
 
-      <AssessmentModeSelector state={state} dispatch={dispatch} />
-
-      <section className="adaptive-entry" aria-label="自适应测评">
-        <GitBranch size={26} aria-hidden="true" />
-        <div>
-          <strong>{recommended ? `下一道推荐：${recommended.shortTitle || recommended.title}` : '推荐路径已经取得足够区分信息'}</strong>
-          <p>核心 {progress.coreDone} / {progress.coreTotal} · 自适应区分 {progress.adaptiveDone} / {progress.adaptiveMin}—{progress.adaptiveMax}</p>
-        </div>
-        {recommended ? (
-          <button className="button primary" type="button" onClick={() => dispatch({ type: 'START_ADAPTIVE' })}>
-            {progress.coreDone + progress.adaptiveDone ? '继续推荐路径' : '开始推荐路径'}<ArrowRight size={17} />
+      <div className="selection-bar">
+        <div><strong>{selected.size}</strong><span>道已选{finished ? ` · ${finished} 道已答` : ''}{inProgress ? ` · ${inProgress} 道进行中` : ''}</span></div>
+        <div className="selection-actions">
+          <button className="button quiet" type="button" onClick={() => setSelected(new Set())}>清空</button>
+          <button className="button primary" type="button" disabled={!selected.size} onClick={() => dispatch({ type: 'START_SELECTED', policyIds: selectedIds })}>
+            开始回答<ArrowRight size={17} />
           </button>
-        ) : <button className="button secondary" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>查看结果</button>}
-      </section>
-
-      <div className="overview-progress" aria-label="答题进度">
-        <strong>{finished}</strong>
-        <span>道题已结束{inProgress ? ` · ${inProgress} 道进行中` : ''} · 不需要回答整个候选库</span>
+        </div>
       </div>
 
       <ol className="policy-list">
@@ -952,37 +876,28 @@ function PolicyOverview({ state, dispatch }) {
           const record = state.records[policy.id];
           const hasDraft = Boolean(record?.draft);
           const hasChains = Boolean(record?.chains?.length);
-          const direction = record?.draft?.currentChain?.direction || record?.direction || record?.stance;
-          const tone = direction === 'support' || direction === 'oppose' ? direction : 'neutral';
-          const actionLabel = hasDraft ? '继续' : hasChains ? '再做一次' : '开始';
+          const direction = record?.draft?.currentChain?.direction || record?.packageStanceAfterDefeater || record?.stance;
           const status = hasDraft ? '进行中' : hasChains ? record.mixed ? '已结束，状态混合' : recordStatusCopy[record.status] || '已结束' : '未开始';
           const statusClass = hasDraft ? 'active' : hasChains ? record.status : 'not-started';
           return (
             <li className="policy-row" data-policy-id={policy.id} key={policy.id}>
-              <span className="policy-number">{String(index + 1).padStart(2, '0')}</span>
+              <label className="policy-select" aria-label={`选择：${policy.shortTitle || policy.title}`}>
+                <input type="checkbox" checked={selected.has(policy.id)} onChange={() => toggle(policy.id)} />
+                <span>{String(index + 1).padStart(2, '0')}</span>
+              </label>
               <div className="policy-row-title">
                 <h2>{policy.shortTitle || policy.title}</h2>
-                <small>{policy.selection?.domain}{policy.selection?.tier === 'core' ? ' · 核心场景' : ' · 自适应场景'}</small>
-                {recommended?.id === policy.id ? <span className="recommended-badge">当前推荐</span> : null}
-                {direction ? <span className={`direction-badge ${tone}`}>{modeAwareDirection(direction, state.assessmentMode)}</span> : null}
+                <small>{policy.selection?.domain || '自选题目'}</small>
+                {direction ? <span className="direction-badge">{directionCopy[direction] || '已回答'}</span> : null}
               </div>
               <span className={`policy-status ${statusClass}`}>{status}</span>
-              <button className={`button ${hasDraft ? 'primary' : 'quiet'}`} type="button" aria-label={`${actionLabel}：${policy.shortTitle || policy.title}`} onClick={() => dispatch({ type: 'OPEN_POLICY', policyId: policy.id })}>
-                {actionLabel}<ArrowRight size={17} />
+              <button className="button quiet" type="button" aria-label={`${hasDraft ? '继续' : '只答这题'}：${policy.shortTitle || policy.title}`} onClick={() => dispatch({ type: 'OPEN_POLICY_SIMPLE', policyId: policy.id })}>
+                <span>{hasDraft ? '继续' : '只答这题'}</span><ArrowRight size={17} />
               </button>
             </li>
           );
         })}
       </ol>
-
-      {canResumeDilemmas || canStartDilemmas ? (
-        <div className="dilemma-entry">
-          <div><strong>价值冲突检验</strong><p>只比较你已经确认的价值，不影响题目完成状态。</p></div>
-          <button className="button quiet" type="button" onClick={() => dispatch({ type: canResumeDilemmas ? 'RESUME_DILEMMAS' : 'START_DILEMMAS' })}>
-            {canResumeDilemmas ? '继续检验' : '开始检验'}<ArrowRight size={17} />
-          </button>
-        </div>
-      ) : null}
     </main>
   );
 }
@@ -990,7 +905,9 @@ function PolicyOverview({ state, dispatch }) {
 function PhaseQuestion({ state, dispatch, onAskAi, aiLoading }) {
   const props = { state, dispatch, onAskAi, aiLoading };
   switch (state.phase) {
-    case PHASES.COMPONENTS: return <ComponentQuestion state={state} dispatch={dispatch} />;
+    case PHASES.COMPONENTS: return state.simpleFlow
+      ? <SimpleComponentQuestion state={state} dispatch={dispatch} />
+      : <ComponentQuestion state={state} dispatch={dispatch} />;
     case PHASES.STANCE: return <StanceQuestion {...props} />;
     case PHASES.PACKAGE_TRADEOFF: return <PackageTradeoffQuestion state={state} dispatch={dispatch} />;
     case PHASES.DIRECTION: return <DirectionQuestion {...props} />;
@@ -1017,22 +934,22 @@ function PhaseQuestion({ state, dispatch, onAskAi, aiLoading }) {
   }
 }
 
-export default function Assessment({ state, dispatch, onAskAi, aiLoading }) {
+export default function Assessment({ state, dispatch, sessionControls, onAskAi, aiLoading }) {
   if (state.phase === PHASES.POLICY_OVERVIEW) return <PolicyOverview state={state} dispatch={dispatch} />;
-  const hasResults = Object.values(state.records).some((record) => record.chains?.length);
   return (
     <main className="workspace">
       <nav className="workspace-toolbar" aria-label="答题导航">
-        <ModeBadge state={state} />
+        <button className="button quiet" type="button" disabled={!sessionControls.canGoBack} onClick={() => dispatch({ type: 'GO_BACK' })}><ArrowLeft size={17} />上一题</button>
         <button className="button quiet" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />题目列表</button>
-        <button className="button quiet" type="button" disabled={!hasResults} onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><BarChart3 size={17} />阶段结果</button>
-        <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><LogOut size={17} />退出</button>
+        <button className="button quiet stop-answering" type="button" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}>中止并看结果</button>
       </nav>
-      <StageRail phase={state.phase} />
       <section className="question-surface">
         <PhaseQuestion state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
       </section>
-      <ProofView state={state} />
+      <ProofView
+        entries={sessionControls.answerHistory}
+        onRevisit={sessionControls.goBackTo}
+      />
     </main>
   );
 }

@@ -4,13 +4,11 @@ import {
   Download,
   Info,
   ListChecks,
-  LogOut,
   Send,
   ShieldCheck,
 } from 'lucide-react';
 import {
   argumentsById,
-  assessmentModes,
   claims,
   dilemmas,
   facts,
@@ -111,9 +109,11 @@ const stanceCopy = { support: '支持', oppose: '反对', undecided: '未定', c
 const componentCopy = { support: '赞成', oppose: '反对', conditional: '需调整', undecided: '未判断' };
 const safeguardCopy = { required: '必须有', preferred: '最好有', not_required: '不需要', uncertain: '未判断' };
 const parameterCopy = { accept: '接受', adjust: '需调整', reject: '不接受', uncertain: '未判断' };
-const modeStanceCopy = (stance, mode) => `${mode === 'conditional_scenario' ? '题设内' : '现实判断'}：${stanceCopy[stance] || '未定'}`;
 const policyElementResponse = (record, element) => {
-  if (element.kind === 'policy_choice') return componentCopy[record.policyChoiceResponses?.[element.id]];
+  if (element.kind === 'policy_choice') {
+    const response = record.policyChoiceResponses?.[element.id];
+    return element.simpleOptions?.find((option) => option.value === response)?.label || componentCopy[response];
+  }
   if (element.kind === 'safeguard') return safeguardCopy[record.safeguardResponses?.[element.id]];
   if (element.kind === 'parameter') return parameterCopy[record.parameterResponses?.[element.id]];
   return '题设固定条件';
@@ -524,6 +524,22 @@ function MechanicalReport({ state, chains }) {
   );
 }
 
+const plainStanceCopy = {
+  support: '支持',
+  oppose: '反对',
+  conditional: '只在某些条件下支持',
+  undecided: '暂时不能判断',
+};
+
+const defeaterResultCopy = {
+  supplement: '你考虑了相反理由，但它没有改变最终判断。',
+  weaken: '相反理由让你有所犹豫，但没有改变最终判断。',
+  offset: '正反理由暂时抵消，因此你目前不能作出最终判断。',
+  outweigh: '相反理由改变了你的最终判断。',
+  reject: '相反理由的条件没有成立，因此没有改变最终判断。',
+  none_accepted: '列出的相反理由都没有改变最终判断。',
+};
+
 export default function ResultsV2({ state, dispatch, bankClient }) {
   const chains = useMemo(() => Object.values(state.records).flatMap((record) => record.chains || []), [state.records]);
   const [selectedId, setSelectedId] = useState(() => (
@@ -534,9 +550,17 @@ export default function ResultsV2({ state, dispatch, bankClient }) {
   const selected = chains.find((chain) => chain.id === selectedId) || chains[0] || null;
   const eligibility = contributionEligibility(state, selected);
   const contribution = buildContributionPackage(state, selected);
-  const selectedPolicy = policies.find((policy) => policy.id === selected?.policyId);
   const finishedPolicies = policies.filter((policy) => state.records[policy.id]?.chains?.length).length;
   const inProgressPolicies = policies.filter((policy) => state.records[policy.id]?.draft).length;
+  const summaries = policies.flatMap((policy) => {
+    const record = state.records[policy.id];
+    const chain = record?.chains?.at(-1);
+    if (!chain) return [];
+    const reason = argumentsById[chain.steps?.[0]?.argumentId];
+    const stance = record.packageStanceAfterDefeater || record.stance || chain.direction;
+    const effect = chain.defeaterReview?.effect || chain.defeaterReview?.impact;
+    return [{ policy, record, chain, reason, stance, effect }];
+  });
 
   const submit = async () => {
     if (!consent || !contribution.ok || !bankClient.configured) return;
@@ -556,117 +580,103 @@ export default function ResultsV2({ state, dispatch, bankClient }) {
 
   return (
     <main className="results-page">
-      <header className="results-header">
+      <header className="results-header simple-results-header">
         <div>
-          <span>阶段结果</span>
-          <h1>只看已经结束的部分</h1>
-          <p>未开始和进行中的题目不会计入；你可以随时返回题目列表继续。</p>
-          <span className="mode-badge">回答方式：{assessmentModes[state.assessmentMode]?.label || state.assessmentMode}</span>
-        </div>
-        <div className="results-header-actions">
-          <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />返回题目列表</button>
-          <button className="button secondary" type="button" onClick={() => downloadJson('argument-chain-session.json', exportSession(state))}><Download size={17} />导出正式报告</button>
-          <button className="button quiet" type="button" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><LogOut size={17} />退出</button>
+          <span>你的回答</span>
+          <h1>{finishedPolicies ? `已完成 ${finishedPolicies} 道题` : '这次还没有完成题目'}</h1>
+          <p>{inProgressPolicies ? `${inProgressPolicies} 道题停在中途，回答仍保存在这个浏览器中。` : '这里只总结你已经作出的判断。'}</p>
         </div>
       </header>
 
-      <div className="results-progress">
-        <strong>{finishedPolicies}</strong>
-        <span>道题已结束 · 候选库共 {policies.length} 道，不要求全部完成{inProgressPolicies ? ` · ${inProgressPolicies} 道进行中未计入` : ''}</span>
-      </div>
-
-      {state.assessmentMode === 'conditional_scenario' ? <p className="mode-result-warning" role="note"><Info size={17} />本报告记录的是题设条件下的规范判断，不表示你确认这些经验描述在现实中成立；娱乐层也只比较这组条件性路径。</p> : null}
-
-      <LineageGraph state={state} chains={chains} selectedId={selected?.id} onSelect={(chainId) => {
-        setSelectedId(chainId);
-        setConsent(false);
-        setSubmitState({ loading: false, success: null, error: null });
-      }} />
-
-      {chains.length > 1 ? (
-        <label className="chain-selector">
-          <span>选择论证</span>
-          <select value={selected?.id || ''} onChange={(event) => {
-            setSelectedId(event.target.value);
-            setConsent(false);
-            setSubmitState({ loading: false, success: null, error: null });
-          }}>
-            {chains.map((chain, index) => (
-              <option key={chain.id} value={chain.id}>论证 {index + 1} · {statusCopy[chain.status] || chain.status}</option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-
-      <div className="preview-status">
-        <span className={`status-dot ${selected?.status || 'unresolved'}`} />
-        <strong>{statusCopy[selected?.status] || '没有完整论证'}</strong>
-        <p>{selectedPolicy?.title}</p>
-      </div>
-
-      {selected ? (
-        <section className="policy-result-summary" aria-labelledby="policy-result-summary-title">
-          <span>当前所选政策</span>
-          <h2 id="policy-result-summary-title">{selectedPolicy?.shortTitle || selectedPolicy?.title}</h2>
-          <p>这条路径从“{argumentsById[selected.steps?.[0]?.argumentId]?.title || '尚未命名的理由'}”出发，暂时停在“{claims[selected.terminal?.claimId]?.shortLabel || '未形成暂定出发点'}”。</p>
-          <strong>理由链方向：{stanceCopy[selected.direction] || '未定'}；反方复核后的整包判断：{modeStanceCopy(state.records[selected.policyId]?.packageStanceAfterDefeater || state.records[selected.policyId]?.stance, state.assessmentMode)}</strong>
-        </section>
-      ) : null}
-
-      <details className="results-disclosure">
-        <summary>查看所选论证结构</summary>
-        <ArgumentPreview chain={selected} />
-      </details>
-
-      <details className="results-disclosure">
-        <summary>查看详细报告</summary>
-        <MechanicalReport state={state} chains={chains} />
-      </details>
-
-      <PrototypeOverlay state={state} />
-
-      <details className="results-disclosure">
-        <summary>导出或贡献所选论证</summary>
-        <section className="contribution-zone">
-        <header>
-          <ShieldCheck size={27} />
-          <div><h2>贡献到公开题库</h2><p>这是独立于本地保存的公开动作。</p></div>
-        </header>
-
-        {eligibility.eligible ? (
-          <>
-            <p className="contribution-disclosure">
-              确认后，这份<strong>规范化结构论证</strong>会离开浏览器，进入私有候选区；定期审核会把它放入公开 GitHub PR。
-              人工合并后，它会成为公开正式题库的一部分。不会上传原始输入、AI 对话、API 配置、时间、设备或会话标识。
-            </p>
-            <label className="consent-check">
-              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              <span>我已检查完整预览，并明确同意这份结构化论证进入公开审核记录和正式题库。</span>
-            </label>
-            <div className="contribution-actions">
-              <button className="button primary" type="button" disabled={!consent || submitState.loading || !bankClient.configured} onClick={submit}>
-                <Send size={17} /> {submitState.loading ? '正在提交…' : '贡献到公开题库'}
-              </button>
-              {contribution.ok ? <button className="button secondary" type="button" onClick={() => downloadJson('argument-chain-contribution.json', contribution.value)}><Download size={17} />下载贡献包</button> : null}
+      <section className="plain-results" aria-label="回答摘要">
+        {summaries.length ? summaries.map(({ policy, chain, reason, stance, effect }) => (
+          <article className="plain-result" key={chain.id}>
+            <div>
+              <span>{policy.selection?.domain || '政策判断'}</span>
+              <h2>{policy.shortTitle || policy.title}</h2>
+              <p>你的判断：<strong>{policy.stanceOptions?.[stance] || plainStanceCopy[stance] || '暂时不能判断'}</strong>。</p>
+              {reason
+                ? <p>主要原因是：{reason.title}。</p>
+                : <p>{stance === 'undecided' ? '你选择暂时不作判断。' : '这道题目前没有记录主要原因。'}</p>}
+              {defeaterResultCopy[effect] ? <p>{defeaterResultCopy[effect]}</p> : null}
             </div>
-            {!bankClient.configured ? <p className="service-note">这个部署尚未配置候选区服务地址，因此当前只能下载贡献包，不会上传。</p> : null}
-            {submitState.success ? <p className="submit-success" role="status"><Check size={17} />{submitState.success}</p> : null}
-            {submitState.error ? <p className="field-error" role="alert">{submitState.error}</p> : null}
-            {contribution.ok ? (
-              <details className="contribution-json">
-                <summary>查看将要公开的全部结构化数据</summary>
-                <pre>{JSON.stringify(contribution.value, null, 2)}</pre>
-              </details>
-            ) : null}
-          </>
-        ) : (
-          <div className="ineligible-message">
-            <h3>这条论证不会进入候选区</h3>
-            <ul>{eligibility.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
-          </div>
-        )}
-        </section>
+            <button className="button quiet" type="button" onClick={() => dispatch({ type: 'REVISE_POLICY_SIMPLE', policyId: policy.id })}>修改这道题</button>
+          </article>
+        )) : <p className="empty-state">你可以返回题目列表继续回答。</p>}
+      </section>
+
+      {summaries.length ? <p className="assumption-note"><Info size={17} />这些结果建立在题目中采用的效果假设上，不表示这些效果已经在现实中得到证实。</p> : null}
+
+      <div className="result-primary-actions">
+        <button className="button primary" type="button" onClick={() => dispatch({ type: 'OPEN_OVERVIEW' })}><ListChecks size={17} />修改回答</button>
+      </div>
+
+      <details className="results-disclosure detailed-reasoning">
+        <summary>查看详细推理过程</summary>
+        <div className="detail-actions">
+          <button className="button secondary" type="button" onClick={() => downloadJson('argument-chain-session.json', exportSession(state))}><Download size={17} />导出记录</button>
+        </div>
+
+        {chains.length ? <LineageGraph state={state} chains={chains} selectedId={selected?.id} onSelect={(chainId) => {
+          setSelectedId(chainId);
+          setConsent(false);
+          setSubmitState({ loading: false, success: null, error: null });
+        }} /> : null}
+
+        {chains.length > 1 ? (
+          <label className="chain-selector">
+            <span>选择一条记录</span>
+            <select value={selected?.id || ''} onChange={(event) => {
+              setSelectedId(event.target.value);
+              setConsent(false);
+              setSubmitState({ loading: false, success: null, error: null });
+            }}>
+              {chains.map((chain, index) => (
+                <option key={chain.id} value={chain.id}>记录 {index + 1} · {statusCopy[chain.status] || chain.status}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        <ArgumentPreview chain={selected} />
+        <MechanicalReport state={state} chains={chains} />
+
+        {selected ? <section className="contribution-zone">
+          <header>
+            <ShieldCheck size={27} />
+            <div><h2>贡献到公开题库</h2><p>这是独立于本地保存的公开动作。</p></div>
+          </header>
+
+          {eligibility.eligible ? (
+            <>
+              <p className="contribution-disclosure">
+                确认后，这份<strong>规范化结构论证</strong>会离开浏览器，进入私有候选区；定期审核会把它放入公开 GitHub PR。
+                人工合并后，它会成为公开正式题库的一部分。不会上传原始输入、AI 对话、API 配置、时间、设备或会话标识。
+              </p>
+              <label className="consent-check">
+                <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+                <span>我已检查完整预览，并明确同意这份结构化论证进入公开审核记录和正式题库。</span>
+              </label>
+              <div className="contribution-actions">
+                <button className="button primary" type="button" disabled={!consent || submitState.loading || !bankClient.configured} onClick={submit}>
+                  <Send size={17} /> {submitState.loading ? '正在提交…' : '贡献到公开题库'}
+                </button>
+                {contribution.ok ? <button className="button secondary" type="button" onClick={() => downloadJson('argument-chain-contribution.json', contribution.value)}><Download size={17} />下载贡献包</button> : null}
+              </div>
+              {!bankClient.configured ? <p className="service-note">这个部署尚未配置候选区服务地址，因此当前只能下载贡献包，不会上传。</p> : null}
+              {submitState.success ? <p className="submit-success" role="status"><Check size={17} />{submitState.success}</p> : null}
+              {submitState.error ? <p className="field-error" role="alert">{submitState.error}</p> : null}
+            </>
+          ) : (
+            <div className="ineligible-message">
+              <h3>这条记录暂时不能进入候选区</h3>
+              <ul>{eligibility.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+            </div>
+          )}
+        </section> : null}
       </details>
+
+      {summaries.length ? <PrototypeOverlay state={state} /> : null}
     </main>
   );
 }
