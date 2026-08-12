@@ -16,7 +16,7 @@ import {
   validateModel,
 } from '../src/lib/decisionEngine.js';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.1.0.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
 const validation = validateModel(model);
 assert.equal(validation.ok, true, validation.errors.join('\n'));
 assert.equal(model.policies.length, 13);
@@ -38,6 +38,16 @@ for (const policy of model.policies) {
 const newSpeechSession = () => startSession(model, createSession(model, { policyIds: ['speech_restriction'] }));
 
 {
+  const question = getQuestion(model, newSpeechSession());
+  assert.equal(question.kind, 'policy_decision');
+  assert.match(question.scenarioSummary, /这道题已经排除了/);
+  assert.equal(question.proposalItems.length, Object.keys(model.policies[0].dimensions).length);
+  assert(question.proposalItems.some((item) => (
+    item.dimensionLabel === '处罚方式' && item.valueLabel === '可以罚款或拘留'
+  )));
+}
+
+{
   let state = answer(model, newSpeechSession(), 'yes');
   assert.equal(state.phase, PHASES.REASON_CHOICE);
   assert.equal(state.activeClaimId, 'c_speech_support_root');
@@ -47,7 +57,17 @@ const newSpeechSession = () => startSession(model, createSession(model, { policy
 {
   let state = answer(model, newSpeechSession(), 'no');
   assert.equal(state.phase, PHASES.REVISION_TEST);
-  assert.equal(getQuestion(model, state).candidateFrameId, 'speech_civil_only');
+  const question = getQuestion(model, state);
+  assert.equal(question.candidateFrameId, 'speech_civil_only');
+  assert.equal(question.title, '这样修改以后，你可以接受吗？');
+  assert.deepEqual(question.changes, [{
+    dimensionId: 'sanction',
+    dimensionLabel: '处罚方式',
+    fromId: 'fine_or_detention',
+    fromLabel: '可以罚款或拘留',
+    toId: 'civil_only',
+    toLabel: '只允许较轻的民事责任',
+  }]);
   state = answer(model, state, 'accept');
   assert.equal(state.acceptedRevisionFrameId, 'speech_civil_only');
   assert.equal(state.activeClaimId, 'c_speech_reject_sanction');
@@ -79,7 +99,7 @@ const newSpeechSession = () => startSession(model, createSession(model, { policy
   const result = state.policyResults.speech_restriction;
   assert.equal(result.derivedConditionalAcceptance, true);
   const summary = summarizePolicyResult(model, result);
-  assert.equal(summary.diagnosis, '反对罚款或拘留');
+  assert.equal(summary.diagnosis, '罚款或拘留');
   assert(summary.changes.some((item) => item.dimensionId === 'sanction'));
   assert.equal(summary.mainReasonTitle, '罚款或拘留超过了必要程度');
 }

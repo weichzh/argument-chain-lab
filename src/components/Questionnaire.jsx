@@ -9,47 +9,90 @@ import {
 } from 'lucide-react';
 import { sessionDraftKey } from '../hooks/useSession.js';
 import { getQuestion } from '../lib/decisionEngine.js';
-import {
-  getModelV4,
-  getPolicyV4,
-  getTermExplanationV4,
-} from '../lib/modelV4.js';
+import { getModelV4, getPolicyV4 } from '../lib/modelV4.js';
+import InlineTermText from './InlineTermText.jsx';
 import QuestionCard from './QuestionCard.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
-import TermHelp from './TermHelp.jsx';
 
-function ScenarioDetails({ fixedConditions, terms }) {
-  if (!fixedConditions?.length && !terms?.length) return null;
+const CopyText = ({ children, definitions }) => (
+  <InlineTermText text={children} definitions={definitions} />
+);
+
+function PolicyQuestionPrelude({ question, termDefinitions }) {
   return (
-    <div className="v4-scenario-details">
-      {fixedConditions?.length ? (
-        <div>
-          <h2>本题边界</h2>
-          <ul>{fixedConditions.map((item) => (
-            <li key={item.id}><strong>{item.text}</strong><span>{item.explanation}</span></li>
+    <div className="v4-question-prelude">
+      <p className="v4-scenario-summary">
+        <CopyText definitions={termDefinitions}>{question.scenarioSummary}</CopyText>
+      </p>
+      {question.fixedConditions?.length ? (
+        <section aria-labelledby="fixed-conditions-title">
+          <h2 id="fixed-conditions-title">作答时，请按这些条件理解题目</h2>
+          <ul>{question.fixedConditions.map((item) => (
+            <li key={item.id}>
+              <strong><CopyText definitions={termDefinitions}>{item.text}</CopyText></strong>
+              <span><CopyText definitions={termDefinitions}>{item.explanation}</CopyText></span>
+            </li>
           ))}</ul>
-        </div>
+        </section>
       ) : null}
-      {terms?.length ? (
-        <div className="v4-term-list" aria-label="名词解释">
-          {terms.map((term) => <TermHelp key={term} term={term} explanation={getTermExplanationV4(term)} />)}
-        </div>
-      ) : null}
+      <section aria-labelledby="proposal-title">
+        <h2 id="proposal-title">题目中的完整方案包括</h2>
+        <ul>{question.proposalItems.map((item) => (
+          <li key={item.dimensionId}>
+            <strong>{item.dimensionLabel}：</strong>
+            <span><CopyText definitions={termDefinitions}>{item.valueLabel}</CopyText></span>
+          </li>
+        ))}</ul>
+      </section>
     </div>
   );
 }
 
-function RevisionDiff({ policy, question }) {
-  if (question.kind !== 'revision_test') return null;
+function RevisionQuestionPrelude({ question, termDefinitions }) {
   return (
-    <dl className="v4-frame-diff">
-      {question.changedDimensionIds.map((dimensionId) => (
-        <React.Fragment key={dimensionId}>
-          <dt>{policy.dimensions[dimensionId].label}</dt>
-          <dd>{policy.dimensions[dimensionId].explanation}</dd>
-        </React.Fragment>
-      ))}
-    </dl>
+    <section className="v4-revision-prelude" aria-labelledby="revision-change-title">
+      <h2 id="revision-change-title">这次只改动下面这些内容</h2>
+      <dl>
+        {question.changes.map((change) => (
+          <React.Fragment key={change.dimensionId}>
+            <dt>{change.dimensionLabel}</dt>
+            <dd>
+              <span><CopyText definitions={termDefinitions}>{change.fromLabel}</CopyText></span>
+              <span aria-hidden="true"> → </span>
+              <strong><CopyText definitions={termDefinitions}>{change.toLabel}</CopyText></strong>
+            </dd>
+          </React.Fragment>
+        ))}
+      </dl>
+      <p>没有列出的安排保持不变。</p>
+    </section>
+  );
+}
+
+function QuestionPrelude({ question, termDefinitions }) {
+  if (question.kind === 'policy_decision') {
+    return <PolicyQuestionPrelude question={question} termDefinitions={termDefinitions} />;
+  }
+  if (question.kind === 'revision_test') {
+    return <RevisionQuestionPrelude question={question} termDefinitions={termDefinitions} />;
+  }
+  return null;
+}
+
+function QuestionAfter({ question, state, dispatch, onAskAi, aiLoading, distinctionOpen }) {
+  return (
+    <>
+      {question.kind === 'custom_reason_required' ? (
+        <CustomReason state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
+      ) : null}
+      {distinctionOpen ? (
+        <StressDistinction onSubmit={(distinction) => dispatch({
+          type: 'ANSWER',
+          optionId: 'qualified',
+          extra: { distinction },
+        })} />
+      ) : null}
+    </>
   );
 }
 
@@ -159,14 +202,23 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
         <button className="button quiet stop-answering" type="button" title="中止并看结果" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><Eye size={17} />中止并看结果</button>
       </nav>
 
-      <QuestionCard question={{ ...question, options: question.kind === 'custom_reason_required' ? [] : question.options }} context={`${policy.shortTitle} · ${state.policyPosition + 1} / ${state.policyIds.length}`} onAnswer={handleAnswer}>
-        {question.kind === 'policy_decision' ? <ScenarioDetails fixedConditions={question.fixedConditions} terms={question.terms} /> : null}
-        <RevisionDiff policy={policy} question={question} />
-        {question.kind === 'custom_reason_required' ? (
-          <CustomReason state={state} dispatch={dispatch} onAskAi={onAskAi} aiLoading={aiLoading} />
-        ) : null}
-        {distinctionOpen ? <StressDistinction onSubmit={(distinction) => dispatch({ type: 'ANSWER', optionId: 'qualified', extra: { distinction } })} /> : null}
-      </QuestionCard>
+      <QuestionCard
+        question={{ ...question, options: question.kind === 'custom_reason_required' ? [] : question.options }}
+        context={`${policy.shortTitle} · ${state.policyPosition + 1} / ${state.policyIds.length}`}
+        onAnswer={handleAnswer}
+        termDefinitions={model.terms}
+        beforeQuestion={<QuestionPrelude question={question} termDefinitions={model.terms} />}
+        afterQuestion={(
+          <QuestionAfter
+            question={question}
+            state={state}
+            dispatch={dispatch}
+            onAskAi={onAskAi}
+            aiLoading={aiLoading}
+            distinctionOpen={distinctionOpen}
+          />
+        )}
+      />
 
       <ReviewAnswers entries={sessionControls.answerHistory} onRevisit={(answerId) => dispatch({ type: 'BACK_TO_ANSWER', answerId })} />
     </main>

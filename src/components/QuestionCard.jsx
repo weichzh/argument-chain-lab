@@ -1,29 +1,44 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import InlineTermText from './InlineTermText.jsx';
 
-export default function QuestionCard({ question, context, onAnswer, children }) {
+export default function QuestionCard({
+  question,
+  context,
+  onAnswer,
+  termDefinitions = {},
+  beforeQuestion = null,
+  afterQuestion = null,
+}) {
   return (
     <section className="v4-question-card" aria-labelledby="current-question">
       <div className="v4-question-context">{context}</div>
+      {beforeQuestion}
       <header>
-        <h1 id="current-question">{question.title}</h1>
-        {question.statement ? <p>{question.statement}</p> : null}
-        {question.explanation ? <small>{question.explanation}</small> : null}
+        <h1 id="current-question"><InlineTermText text={question.title} definitions={termDefinitions} /></h1>
+        {question.statement ? <p><InlineTermText text={question.statement} definitions={termDefinitions} /></p> : null}
+        {question.explanation ? <small><InlineTermText text={question.explanation} definitions={termDefinitions} /></small> : null}
       </header>
-      {children}
       {question.options?.length ? (
         <div className="v4-choice-list">
           {question.options.map((option) => (
-            <button type="button" key={option.id} onClick={() => onAnswer(option.id)}>
+            <button
+              type="button"
+              key={option.id}
+              aria-labelledby={`question-option-${option.id}`}
+              aria-describedby={option.description ? `question-option-${option.id}-description` : undefined}
+              onClick={() => onAnswer(option.id)}
+            >
               <span>
-                <strong>{option.label}</strong>
-                {option.description ? <small>{option.description}</small> : null}
+                <strong id={`question-option-${option.id}`}>{option.label}</strong>
+                {option.description ? <small id={`question-option-${option.id}-description`}>{option.description}</small> : null}
               </span>
               <ArrowRight size={18} aria-hidden="true" />
             </button>
           ))}
         </div>
       ) : null}
+      {afterQuestion}
     </section>
   );
 }

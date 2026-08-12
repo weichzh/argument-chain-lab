@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
-const model = read('../public/bank/model-1.1.0.json');
-const benchmark = read('../public/bank/ideology-benchmark-1.1.0.json');
+const model = read('../public/bank/model-1.2.0.json');
+const benchmark = read('../public/bank/ideology-benchmark-1.2.0.json');
 
 const EXPECTED_LABELS = [
   'Anarcho-Communism', 'Libertarian Communism', 'Trotskyism', 'Marxism',
@@ -22,6 +22,13 @@ const EXPECTED_LABELS = [
   'State Capitalism', 'Neo-Conservatism', 'Fundamentalism',
   'Libertarian Capitalism', 'Market Anarchism', 'Objectivism',
   'Totalitarian Capitalism', 'Ultra-Capitalism', 'Anarcho-Capitalism',
+  'Eco-Marxism', 'Centrist-Marxism', 'Council-Communism', 'Left-Communism',
+  'Eco-Anarchism', 'Utopian-Socialism', 'Left-Wing-Nationalism',
+  'Absolute Monarchism', 'Constitutional Monarchism', 'Theocracy',
+  'Individualist Anarchism', 'Agorism', 'Minarchism', 'Paleolibertarianism',
+  'Geolibertarianism', 'Centre-Right Politics', 'Reactionary Conservatism',
+  'Paleoconservatism', 'Paternalistic Conservatism', 'Fiscal Conservatism',
+  'Pink Capitalism', 'Civic Nationalism', 'Progressive Conservatism',
 ];
 
 const errors = [];
@@ -51,6 +58,11 @@ if (missingLabels.length || extraLabels.length) {
   add(errors, 'IDEOLOGY_LIST_MISMATCH', 'Benchmark 与 ideologies.js 的名称列表不一致.', { missingLabels, extraLabels });
 }
 if (new Set(labels).size !== labels.length) add(errors, 'DUPLICATE_LABEL', '原型名称存在重复。');
+const labelsZh = benchmark.profiles.map((profile) => profile.labelZh);
+if (labelsZh.some((label) => typeof label !== 'string' || !/[\u3400-\u9fff]/u.test(label))) {
+  add(errors, 'MISSING_CHINESE_LABEL', '每个参考名称都必须提供中文名称。');
+}
+if (new Set(labelsZh).size !== labelsZh.length) add(errors, 'DUPLICATE_CHINESE_LABEL', '中文参考名称存在重复。');
 const ids = benchmark.profiles.map((profile) => profile.id);
 if (new Set(ids).size !== ids.length) add(errors, 'DUPLICATE_ID', '原型 ID 存在重复。');
 
@@ -61,7 +73,12 @@ for (const policyId of allPolicyIds) {
   if (!policyById[policyId]) add(errors, 'UNKNOWN_POLICY', `Benchmark 引用了不存在的政策 ${policyId}.`);
 }
 
-const allowedSourceStatuses = new Set(['source_anchored', 'tradition_reconstruction', 'synthetic_stress_fixture']);
+const allowedSourceStatuses = new Set([
+  'source_anchored',
+  'tradition_reconstruction',
+  'synthetic_stress_fixture',
+  'site_label_provisional',
+]);
 const allowedRootAnswers = new Set(['yes', 'no', 'uncertain']);
 const allowedRevisionAnswers = new Set(['accept', 'reject', 'uncertain']);
 const allowedStress = new Set(['apply', 'qualified', 'retract', 'uncertain']);
@@ -115,6 +132,14 @@ for (const profile of benchmark.profiles) {
   }
   if (!profile.source?.anchor || !profile.source?.caveat) {
     add(errors, 'SOURCE_METADATA', `${profile.label} 缺少代表锚点或限制说明。`);
+  }
+  if (/夹具/.test(`${profile.source?.displayBasis || ''}${profile.source?.userNote || ''}`)) {
+    add(errors, 'SOURCE_JARGON', `${profile.label} 的用户可见来源说明包含内部测试术语。`);
+  }
+  if (profile.referenceStatus === 'provisional_reference_variant') {
+    if (profile.allowUniqueResult !== false || !profile.referenceFamilyId || !profile.inheritedPathFrom) {
+      add(errors, 'PROVISIONAL_REFERENCE', `${profile.label} 的暂定参考限制不完整。`);
+    }
   }
   const profilePolicyIds = Object.keys(profile.expectedPaths || {});
   const missingPolicies = allPolicyIds.filter((policyId) => !profilePolicyIds.includes(policyId));
@@ -226,10 +251,14 @@ const sourceStatusCounts = benchmark.profiles.reduce((counts, profile) => {
   counts[profile.source.status] = (counts[profile.source.status] || 0) + 1;
   return counts;
 }, {});
+const provisionalCount = benchmark.profiles.filter((profile) => (
+  profile.referenceStatus === 'provisional_reference_variant'
+)).length;
+if (provisionalCount !== 23) add(errors, 'PROVISIONAL_COUNT', `应有 23 个暂定参考，实际为 ${provisionalCount}.`);
 
 const report = {
   schema: 'argument-chain-ideology-benchmark-validation',
-  version: '1.1.0',
+  version: '1.2.0',
   ok: errors.length === 0,
   summary: {
     modelVersion: model.meta.version,
@@ -238,6 +267,7 @@ const report = {
     pathCount: benchmark.profiles.length * allPolicyIds.length,
     reasonCount: Object.keys(model.reasons).length,
     sourceStatusCounts,
+    provisionalCount,
     errorCount: errors.length,
     warningCount: warnings.length,
   },

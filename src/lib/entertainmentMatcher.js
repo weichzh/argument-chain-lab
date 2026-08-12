@@ -1,4 +1,4 @@
-export const MATCHER_VERSION = 'entertainment-matcher-2.0';
+export const MATCHER_VERSION = 'entertainment-matcher-3.0';
 
 export const DEFAULT_FEATURE_WEIGHTS = Object.freeze({
   rootAnswer: 0.10,
@@ -151,10 +151,28 @@ const policySimilarity = (user, profile, weights) => {
 };
 
 const sourceQuality = (status) => ({
-  source_anchored: { band: '文本锚定夹具', note: '以一项代表文本或著作为测试锚点。' },
-  tradition_reconstruction: { band: '传统重建夹具', note: '以人物或思想传统作编辑性重建。' },
-  synthetic_stress_fixture: { band: '合成压力夹具', note: '这是合成或刻板压力夹具，不是历史身份判断。' },
-}[status] || { band: '未标注夹具', note: '基准来源状态未标注。' });
+  source_anchored: {
+    band: '依据代表文本整理',
+    note: '以一项代表文本或著作为参考；不表示这一思想传统只有一种解释。',
+  },
+  tradition_reconstruction: {
+    band: '依据常见思想概述整理',
+    note: '包含编辑性概括；结果应当同时说明具体相似点和差异。',
+  },
+  synthetic_stress_fixture: {
+    band: '仅供测试的假想参考',
+    note: '这是为了检查系统边界而构造的参考，不是历史身份判断。',
+  },
+  site_label_provisional: {
+    band: '参考名称，尚待独立整理',
+    note: '名称来自其他政治测试，目前只借用相邻参考检查候选范围，不能单独作为唯一结果。',
+  },
+}[status] || { band: '来源说明缺失', note: '这个参考名称尚未补充整理依据。' });
+
+const eligibleForUniqueResult = (profile) => (
+  profile?.allowUniqueResult !== false
+  && profile?.referenceStatus !== 'provisional_reference_variant'
+);
 
 const normalizeUserResults = (model, policyResults) => Object.fromEntries(
   Object.entries(policyResults || {}).flatMap(([policyId, result]) => {
@@ -243,7 +261,7 @@ export const recommendTieBreaker = (model, benchmark, ranked, answeredPolicyIds,
     ...best,
     title: policy?.shortTitle || policy?.title || best.policyId,
     question: policy?.entry?.question || null,
-    explanation: `当前接近的 ${candidates.length} 个原型在这道题上的完整路径分成 ${best.uniqueExpectedPaths} 组。`,
+    explanation: `当前最接近的 ${candidates.length} 个参考立场，在这道题上的回答、可接受修改和主要理由分成 ${best.uniqueExpectedPaths} 组。`,
   };
 };
 
@@ -428,10 +446,26 @@ const explainMatches = (model, userByPolicy, profile, limit = 5) => {
 };
 
 const resultStage = (reasoningDepthPercent) => {
-  if (reasoningDepthPercent < 25) return { id: 'policy_outline', label: '政策外观', note: '主要依据政策答案，适合显示候选组，不适合唯一化。' };
-  if (reasoningDepthPercent < 45) return { id: 'revision_boundary', label: '接受边界', note: '已经包含部分可接受修改，但理由与价值仍较浅。' };
-  if (reasoningDepthPercent < 65) return { id: 'reason_profile', label: '理由轮廓', note: '已经包含主要理由，可给出暂定最近邻。' };
-  return { id: 'audited_path', label: '论证路径', note: '已经包含较完整的理由、价值或相反理由复核。' };
+  if (reasoningDepthPercent < 25) return {
+    id: 'policy_answers_only',
+    label: '目前主要知道你的政策答案',
+    note: '这时只能显示一组接近的参考立场，不适合挑出唯一名称。',
+  };
+  if (reasoningDepthPercent < 45) return {
+    id: 'revision_preferences_known',
+    label: '已经知道哪些修改会改变你的判断',
+    note: '这比只看支持或反对更有区分力，但还不知道足够多的主要理由。',
+  };
+  if (reasoningDepthPercent < 65) return {
+    id: 'main_reasons_known',
+    label: '已经知道你的主要理由',
+    note: '可以给出暂时最接近的参考，同时保留其他相近结果。',
+  };
+  return {
+    id: 'deeper_reasons_reviewed',
+    label: '已经检查到更深理由和相反理由',
+    note: '信息相对充分，但结果仍然只是参考库中的相似比较。',
+  };
 };
 
 const presentationPolicy = (profile) => {
@@ -440,7 +474,7 @@ const presentationPolicy = (profile) => {
     || profile.derivedTraits?.authoritarianism >= 85;
   return highRisk
     ? { mode: 'neutral_contextualized', celebratoryEffectsAllowed: false, note: '使用中性说明并同时展示实质差异，不使用成就式动画或英雄化文案。' }
-    : { mode: 'playful_but_qualified', celebratoryEffectsAllowed: true, note: '可以使用轻量娱乐化呈现，但必须保留覆盖度、差距和基准限制。' };
+    : { mode: 'playful_but_qualified', celebratoryEffectsAllowed: true, note: '可以使用轻量娱乐化呈现，但必须同时说明用户回答了多少题、理由核对到哪一步，以及其他候选有多接近。' };
 };
 
 export const matchEntertainment = async (model, benchmark, policyResults, options = {}) => {
@@ -466,6 +500,7 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     return {
       profileId: profile.id,
       label: profile.label,
+      labelZh: profile.labelZh,
       similarity: scored.similarity,
       similarityPercent: Math.round(scored.similarity * 10000) / 100,
       reasoningDepth: scored.reasoningDepth,
@@ -480,6 +515,10 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
       sourceStatus: profile.source.status,
       sourceQuality: sourceQuality(profile.source.status),
       anchor: profile.source.anchor,
+      referenceStatus: profile.referenceStatus || 'reviewed_reference',
+      referenceFamilyId: profile.referenceFamilyId || profile.id,
+      allowUniqueResult: eligibleForUniqueResult(profile),
+      sourceMemberships: profile.sourceMemberships || [],
       presentation: presentationPolicy(profile),
       policyDetails: scored.policyDetails,
     };
@@ -490,28 +529,50 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
   const top = ranked[0];
   const second = ranked[1];
   const margin = top && second ? top.similarityPercent - second.similarityPercent : 0;
+  const candidateWindow = options.candidateDisplayWindow ?? 3;
+  const candidateGroup = top
+    ? ranked.filter((item) => item.similarityPercent >= top.similarityPercent - candidateWindow)
+      .slice(0, options.maxDisplayedCandidates || 8)
+    : [];
+  const provisionalNearTop = candidateGroup.some((item) => !item.allowUniqueResult);
+  const uniquenessBlocked = !top?.allowUniqueResult || (provisionalNearTop && margin < 7);
   const confidence = !top || top.policyCoveragePercent < 40 || top.reasoningDepthPercent < 20
     ? 'exploratory'
-    : top.policyCoveragePercent >= 75 && top.reasoningDepthPercent >= 65 && margin >= 7
-      ? 'stable'
-      : top.policyCoveragePercent >= 60 && top.reasoningDepthPercent >= 45 && margin >= 3
-        ? 'provisional'
-        : 'ambiguous';
+    : uniquenessBlocked
+      ? 'ambiguous'
+      : top.policyCoveragePercent >= 75 && top.reasoningDepthPercent >= 65 && margin >= 7
+        ? 'stable'
+        : top.policyCoveragePercent >= 60 && top.reasoningDepthPercent >= 45 && margin >= 3
+          ? 'provisional'
+          : 'ambiguous';
   const profileById = Object.fromEntries(benchmark.profiles.map((profile) => [profile.id, profile]));
   const decorateCandidate = (candidate) => candidate ? {
     ...candidate,
     differences: explainDifferences(model, userByPolicy, profileById[candidate.profileId]),
   } : null;
-  const nearestPrototype = decorateCandidate(top);
+  const closestReference = decorateCandidate(top);
+  const nearestPrototype = uniquenessBlocked ? null : closestReference;
   const alternatives = ranked
     .slice(1, options.alternativeCount ? options.alternativeCount + 1 : 5)
     .map(decorateCandidate);
+  const displayedCandidates = candidateGroup.map(decorateCandidate);
   const tieBreaker = recommendTieBreaker(model, benchmark, ranked, answeredPolicyIds, options);
   const displayStrategy = top?.policyCoveragePercent < 40
-    ? { id: 'argument_profile_only', note: '已答政策过少，只显示用户自己的论证型，不显示单一历史原型。' }
-    : ['stable', 'provisional'].includes(confidence)
-      ? { id: 'nearest_with_alternatives', note: '显示一个最近邻，同时保留替代原型、差距和覆盖度。' }
-      : { id: 'candidate_group', note: '当前多个原型接近，显示候选组并建议一题区分，不强行唯一化历史标签。' };
+    ? {
+        id: 'argument_profile_only',
+        note: '已回答的政策还太少。只显示你自己的判断特点，不显示单一历史名称。',
+      }
+    : ['stable', 'provisional'].includes(confidence) && !uniquenessBlocked
+      ? {
+          id: 'nearest_with_alternatives',
+          note: '显示一个目前最接近的参考，同时保留其他相近结果、差距和信息覆盖。',
+        }
+      : {
+          id: 'candidate_group',
+          note: provisionalNearTop
+            ? '当前候选中包含尚未完成独立整理的细分名称，因此只显示候选组，不挑出唯一名称。'
+            : '当前有多个参考立场十分接近，只显示候选组，并推荐一题继续区分。',
+        };
   return {
     matcherVersion: MATCHER_VERSION,
     expectedPolicyIds,
@@ -520,35 +581,47 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     policyCoveragePercent: top?.policyCoveragePercent ?? 0,
     reasoningDepthPercent: top?.reasoningDepthPercent ?? 0,
     evidenceCoveragePercent: top?.evidenceCoveragePercent ?? 0,
-    nearestPrototype,
+    closestReference,
+    nearestPrototype: displayStrategy.id === 'nearest_with_alternatives' ? nearestPrototype : null,
+    candidateGroup: displayedCandidates,
+    provisionalCandidates: displayedCandidates.filter((item) => !item.allowUniqueResult),
     alternatives,
     marginToSecond: Math.round(margin * 100) / 100,
     confidence,
     displayStrategy,
     confidenceExplanation: {
-      stable: '已回答的政策和论证深度都较充分，且第一名与第二名有明显差距。',
-      provisional: '当前第一名较清楚，但仍有未回答或未深入核对的部分。',
-      ambiguous: '多个原型目前十分接近；不应强行解释为唯一历史标签。',
-      exploratory: '当前信息只覆盖少量政策，或主要停留在政策答案层，尚不足以稳定比较完整论证路径。',
+      stable: '已回答的政策和理由比较充分，而且最接近的参考与其他候选有明显差距。',
+      provisional: '目前有一个较接近的参考，但仍有未回答或没有深入核对的部分。',
+      ambiguous: uniquenessBlocked
+        ? '当前最接近的候选中包含尚待独立整理的细分名称，或多个候选差距很小，因此不应挑出唯一名称。'
+        : '多个参考立场目前十分接近，不应强行解释为唯一历史标签。',
+      exploratory: '当前只回答了少量政策，或者还没有说明足够多的理由，暂时无法稳定比较。',
     }[confidence],
     coverageExplanation: {
-      policyCoverage: '已回答的预期政策占比。',
-      reasoningDepth: '在已回答政策中，修改边界、理由、价值与反方复核等可比较信息的完整程度。',
-      evidenceCoverage: '政策覆盖与论证深度的合并指标。',
+      policyCoverage: '在建议回答的政策中，你已经完成了多少道。',
+      reasoningDepth: '在已经回答的题目里，你是否只选了应当或不应当，还是已经继续说明可接受的修改、主要理由和相反理由。',
+      evidenceCoverage: '把已回答题数和理由核对程度合在一起，用来判断当前信息是否足够。',
     },
     tieBreaker,
     resultStage: resultStage(top?.reasoningDepthPercent ?? 0),
     argumentProfile: await buildArgumentProfile(model, userByPolicy),
     decisiveSimilarities: top ? explainMatches(model, userByPolicy, profileById[top.profileId]) : [],
     differencesFromNearest: top ? explainDifferences(model, userByPolicy, profileById[top.profileId]) : [],
+    referenceSourceNote: top ? {
+      label: top.sourceQuality.band,
+      note: top.sourceQuality.note,
+      anchor: top.anchor,
+      showByDefault: false,
+    } : null,
     comparisonWithSecond: second ? {
       profileId: second.profileId,
       label: second.label,
+      labelZh: second.labelZh,
       similarityPercent: second.similarityPercent,
       differences: explainDifferences(model, userByPolicy, profileById[second.profileId]),
     } : null,
     presentation: top?.presentation || null,
-    displayCaveat: '最近邻只表示在当前 benchmark 中的论证路径相似，不表示政治身份概率，也不表示该标签穷尽你的价值观。',
+    displayCaveat: '这里比较的是你目前的政策答案、可接受修改和理由，与参考库中哪些整理结果比较接近。它不是政治身份概率，也不能概括你的全部价值观。',
     ranked,
   };
 };

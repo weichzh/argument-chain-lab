@@ -49,7 +49,10 @@ export const validateArgumentCandidate = (candidate, expectedScope, expectedDire
   }
   if (!exactKeys(candidate.stressTest, ['scenario', 'question'])
     || !hasText(candidate.stressTest.scenario, 3200)
-    || !hasText(candidate.stressTest.question, 1600)) {
+    || candidate.stressTest.scenario.trim().length < 35
+    || !hasText(candidate.stressTest.question, 1600)
+    || candidate.stressTest.question.trim().length < 12
+    || /对象不同|关键结构相同|立场、身份或群体不同/.test(candidate.stressTest.scenario)) {
     return { ok: false, error: '候选相似案例不完整。' };
   }
   return { ok: true, value: candidate };

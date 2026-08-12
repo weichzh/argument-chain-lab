@@ -40,7 +40,7 @@ const freshState = (model, retained = {}) => ({
 
 const normalizeCurrentState = (value, model) => {
   const compatibleModel = value?.modelVersion === model.meta.version
-    || (value?.modelVersion === '1.0.0' && model.meta.version === '1.1.0');
+    || (model.meta.version === '1.2.0' && ['1.0.0', '1.1.0'].includes(value?.modelVersion));
   if (value?.storageVersion !== STORAGE_VERSION || !compatibleModel) return null;
   const allPolicyIds = [...model.policies]
     .sort((left, right) => left.order - right.order)

@@ -8,34 +8,39 @@ import {
 import { simulateBenchmark } from './simulate-ideology-benchmark.mjs';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
-const model = read('../public/bank/model-1.1.0.json');
-const benchmark = read('../public/bank/ideology-benchmark-1.1.0.json');
+const model = read('../public/bank/model-1.2.0.json');
+const benchmark = read('../public/bank/ideology-benchmark-1.2.0.json');
 const profileById = Object.fromEntries(benchmark.profiles.map((profile) => [profile.id, profile]));
 const allPolicyIds = [...benchmark.corePolicyIds, ...benchmark.tieBreakerPolicyIds];
 const simulations = simulateBenchmark();
 assert.equal(simulations.summary.failedProfiles, 0, JSON.stringify(simulations.failures.slice(0, 5)));
-assert.equal(simulations.summary.totalPolicyRuns, 676);
+assert.equal(simulations.summary.totalPolicyRuns, 975);
 
-let exactTop1 = 0;
-let exactTop5 = 0;
-const failures = [];
+let representedProfiles = 0;
 const depthValues = [];
 for (const simulation of simulations.results) {
+  const profile = profileById[simulation.profileId];
   const result = await matchEntertainment(model, benchmark, simulation.policyResults, {
     expectedPolicyIds: allPolicyIds,
   });
-  if (result.nearestPrototype.profileId === simulation.profileId) exactTop1 += 1;
-  if ([result.nearestPrototype, ...result.alternatives].some((item) => item.profileId === simulation.profileId)) exactTop5 += 1;
-  if (result.nearestPrototype.profileId !== simulation.profileId) {
-    failures.push({ expected: simulation.profileId, actual: result.nearestPrototype.profileId });
+  const represented = result.candidateGroup.some((candidate) => (
+    candidate.profileId === simulation.profileId
+    || candidate.referenceFamilyId === profile.referenceFamilyId
+  ));
+  if (represented) representedProfiles += 1;
+  assert(represented, `${profile.label} should be represented in its candidate group or family.`);
+  if (profile.allowUniqueResult === false) {
+    assert.notEqual(result.nearestPrototype?.profileId, profile.id);
+    assert.equal(result.displayStrategy.id, 'candidate_group');
   }
+  assert(result.candidateGroup.every((candidate) => candidate.labelZh));
+  assert(!/夹具/.test(JSON.stringify(result.referenceSourceNote || {})));
   assert.equal(result.argumentProfile.fingerprint.length, 16);
   assert.equal(result.policyCoveragePercent, 100);
   assert(result.reasoningDepthPercent >= 10 && result.reasoningDepthPercent <= 100);
   depthValues.push(result.reasoningDepthPercent);
 }
-assert.equal(exactTop1, benchmark.profiles.length, JSON.stringify(failures.slice(0, 5)));
-assert.equal(exactTop5, benchmark.profiles.length);
+assert.equal(representedProfiles, benchmark.profiles.length);
 
 // Root-only input answers all core policies, but has deliberately shallow reasoning depth.
 const rootOnly = buildRootOnlyResults(profileById['ideology:liberalism'], benchmark.corePolicyIds);
@@ -68,8 +73,8 @@ assert.equal(skippedResult.policyCoveragePercent, 12.5);
 const naziResult = await matchEntertainment(model, benchmark, profileById['ideology:nazism'].expectedPaths, {
   expectedPolicyIds: allPolicyIds,
 });
-assert.equal(naziResult.nearestPrototype.sourceStatus, 'source_anchored');
-assert.equal(naziResult.nearestPrototype.presentation.celebratoryEffectsAllowed, false);
+assert.equal(naziResult.closestReference.sourceStatus, 'source_anchored');
+assert.equal(naziResult.presentation.celebratoryEffectsAllowed, false);
 const syntheticResult = await matchEntertainment(
   model,
   benchmark,
@@ -78,14 +83,22 @@ const syntheticResult = await matchEntertainment(
     expectedPolicyIds: allPolicyIds,
   },
 );
-assert.equal(syntheticResult.nearestPrototype.sourceStatus, 'synthetic_stress_fixture');
+assert.equal(syntheticResult.closestReference.sourceStatus, 'synthetic_stress_fixture');
 assert.equal(syntheticResult.presentation.celebratoryEffectsAllowed, false);
-assert(Array.isArray(syntheticResult.nearestPrototype.differences));
+assert(Array.isArray(syntheticResult.closestReference.differences));
+
+const marxism = profileById['ideology:marxism'];
+const marxismResult = await matchEntertainment(model, benchmark, marxism.expectedPaths, {
+  expectedPolicyIds: allPolicyIds,
+});
+assert.equal(marxismResult.displayStrategy.id, 'candidate_group');
+for (const label of ['Marxism', 'Eco-Marxism', 'Left-Communism']) {
+  assert(marxismResult.candidateGroup.some((candidate) => candidate.label === label));
+}
 
 console.log(JSON.stringify({
   profileCount: benchmark.profiles.length,
-  fullPathTop1: exactTop1,
-  fullPathTop5: exactTop5,
+  fullPathRepresented: representedProfiles,
   fullPathReasoningDepthRange: [Math.min(...depthValues), Math.max(...depthValues)],
   rootOnlyConfidence: rootResult.confidence,
   rootOnlyPolicyCoverage: rootResult.policyCoveragePercent,

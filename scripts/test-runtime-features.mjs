@@ -17,13 +17,13 @@ import {
 import { validateArgumentCandidate } from '../src/lib/sessionOverlay.js';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../public/bank/manifest.json', import.meta.url), 'utf8'));
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.1.0.json', import.meta.url), 'utf8'));
-const benchmark = JSON.parse(fs.readFileSync(new URL('../public/bank/ideology-benchmark-1.1.0.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
+const benchmark = JSON.parse(fs.readFileSync(new URL('../public/bank/ideology-benchmark-1.2.0.json', import.meta.url), 'utf8'));
 
-assert.equal(validateBankManifest(manifest).version, '1.1.0');
-assert.equal(validateEntertainmentBenchmark(benchmark, '1.1.0').profiles.length, 52);
+assert.equal(validateBankManifest(manifest).version, '1.2.0');
+assert.equal(validateEntertainmentBenchmark(benchmark, '1.2.0').profiles.length, 75);
 const index = configureModelV4(model);
-assert.deepEqual(index, { version: '1.1.0', policyCount: 13, claimCount: 197, reasonCount: 302 });
+assert.deepEqual(index, { version: '1.2.0', policyCount: 13, claimCount: 197, reasonCount: 302 });
 assert.equal(getPolicyV4('speech_restriction').rootFrameId, 'speech_root');
 assert.equal(getResolvedFrameV4('speech_restriction', 'speech_civil_only').sanction, 'civil_only');
 assert(getReasonsForClaimV4('c_speech_reject_sanction').length >= 2);
@@ -62,8 +62,19 @@ const candidate = {
     explanation: '把政策负担纳入判断。',
     example: '同样目标下优先选择负担更小的办法。',
   },
-  stressTest: { scenario: '换成对象不同但负担相同的政策。', question: '你仍接受这条理由吗？' },
+  stressTest: {
+    scenario: '某市为了减少深夜噪声，准备拘留第一次在住宅区大声播放音乐的人，但罚款已经能达到相同效果。',
+    question: '在这个具体案例里，你仍认为拘留造成的负担超过了实现目标所需的程度吗？',
+  },
 };
 assert.equal(validateArgumentCandidate(candidate, 'current_target', 'oppose').ok, true);
 assert.equal(validateArgumentCandidate({ ...candidate, direction: 'support' }, 'current_target', 'oppose').ok, false);
+assert.equal(validateArgumentCandidate({
+  ...candidate,
+  stressTest: { scenario: '换成一个对象不同、但关键结构相同的案例。', question: '仍然适用吗？' },
+}, 'current_target', 'oppose').ok, false);
+assert.equal(validateArgumentCandidate({
+  ...candidate,
+  stressTest: { ...candidate.stressTest, question: '适用吗？' },
+}, 'current_target', 'oppose').ok, false);
 console.log('Runtime feature tests passed.');

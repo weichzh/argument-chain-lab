@@ -1,20 +1,20 @@
 {
   "schema": "argument-chain-bank-manifest",
   "version": 2,
-  "default": "1.1.0",
+  "default": "1.2.0",
   "models": [
     {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "schemaVersion": 4,
-      "path": "model-1.1.0.json",
+      "path": "model-1.2.0.json",
       "status": "current",
-      "title": "完整政策框架、顺序诊断与按需精度题"
+      "title": "通俗文案、具体相似案例与扩展参考库"
     }
   ],
   "entertainmentBenchmark": {
-    "version": "1.1.0",
-    "targetModelVersion": "1.1.0",
-    "path": "ideology-benchmark-1.1.0.json",
+    "version": "1.2.0",
+    "targetModelVersion": "1.2.0",
+    "path": "ideology-benchmark-1.2.0.json",
     "defaultLoaded": false
   },
   "legacy": [

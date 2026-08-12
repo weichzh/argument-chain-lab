@@ -77,7 +77,7 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
           <div className="candidate-section">
             <div className="candidate-symbol stress">换对象</div>
             <div className="candidate-fields">
-              <label className="field"><span>换一个对象的案例</span><textarea rows={3} value={candidate.stressTest.scenario} onChange={(event) => update(['stressTest', 'scenario'], event.target.value)} /></label>
+              <label className="field"><span>具体相似案例</span><textarea rows={3} value={candidate.stressTest.scenario} onChange={(event) => update(['stressTest', 'scenario'], event.target.value)} /></label>
               <label className="field"><span>要问的问题</span><textarea rows={2} value={candidate.stressTest.question} onChange={(event) => update(['stressTest', 'question'], event.target.value)} /></label>
             </div>
           </div>

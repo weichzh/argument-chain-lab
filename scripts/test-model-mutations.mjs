@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
-const source = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.1.0.json', import.meta.url), 'utf8'));
+const source = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
 const mutate = (change) => {
   const model = structuredClone(source);
   change(model);
@@ -41,6 +41,15 @@ const mutations = [
   [(model) => {
     model.product.entertainmentTieBreakerPolicyIds.push('speech_restriction');
   }, /both default and precision-only/],
+  [(model) => {
+    delete model.claims.n_proportionate_burden.stressTest;
+  }, /missing concrete stress test/],
+  [(model) => {
+    model.claims.n_proportionate_burden.stressTest.scenario = '一个很短的案例。';
+  }, /too short to describe a concrete case/],
+  [(model) => {
+    model.claims.n_proportionate_burden.stressTest.scenario = '换成一个对象不同、但关键结构相同的案例。';
+  }, /generic stress placeholder/],
 ];
 
 for (const [change, expected] of mutations) {

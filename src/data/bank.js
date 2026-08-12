@@ -43,7 +43,10 @@ export const validateEntertainmentBenchmark = (benchmark, expectedVersion) => {
     || benchmark.targetModelVersion !== expectedVersion
     || !Array.isArray(benchmark.corePolicyIds)
     || !Array.isArray(benchmark.tieBreakerPolicyIds)
-    || !Array.isArray(benchmark.profiles)) {
+    || !Array.isArray(benchmark.profiles)
+    || benchmark.profiles.some((profile) => (
+      !profile?.id || !profile.label || !profile.labelZh
+    ))) {
     throw new Error('娱乐基准版本或结构无效。');
   }
   return benchmark;

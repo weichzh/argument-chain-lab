@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { validateReasonPath } from '../src/lib/formalValidator.js';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.1.0.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
 const reason = model.reasons.r_speech_sanction_disproportionate;
 const validPath = {
   rootClaimId: reason.targetClaimId,

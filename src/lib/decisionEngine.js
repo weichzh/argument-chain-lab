@@ -48,6 +48,32 @@ export const diffFrames = (policy, leftFrameId, rightFrameId) => {
   return Object.keys(policy.dimensions).filter((dimensionId) => left[dimensionId] !== right[dimensionId]);
 };
 
+export const proposalItemsFor = (policy, frameId = policy.rootFrameId) => {
+  const assignments = resolveFrame(policy, frameId);
+  return Object.keys(policy.dimensions).map((dimensionId) => {
+    const valueId = assignments[dimensionId];
+    return {
+      dimensionId,
+      dimensionLabel: policy.dimensions[dimensionId].label,
+      valueId,
+      valueLabel: policy.dimensions[dimensionId].values[valueId].label,
+    };
+  });
+};
+
+export const revisionChangesFor = (policy, candidateFrameId) => {
+  const root = resolveFrame(policy, policy.rootFrameId);
+  const candidate = resolveFrame(policy, candidateFrameId);
+  return diffFrames(policy, policy.rootFrameId, candidateFrameId).map((dimensionId) => ({
+    dimensionId,
+    dimensionLabel: policy.dimensions[dimensionId].label,
+    fromId: root[dimensionId],
+    fromLabel: policy.dimensions[dimensionId].values[root[dimensionId]].label,
+    toId: candidate[dimensionId],
+    toLabel: policy.dimensions[dimensionId].values[candidate[dimensionId]].label,
+  }));
+};
+
 const reasonsByTarget = (model) => {
   const result = new Map();
   Object.values(model.reasons).forEach((reason) => {
@@ -280,6 +306,14 @@ export const validateModel = (model) => {
 
   const bridgeClaims = unique(Object.values(reasons).map((reason) => reason.bridgeClaimId));
   bridgeClaims.forEach((claimId) => {
+    const stress = claims[claimId]?.stressTest;
+    if (!stress?.scenario || !stress?.question) {
+      errors.push(`${claimId}: missing concrete stress test.`);
+    } else if (/对象不同|关键结构相同|立场、身份或群体不同/.test(stress.scenario)) {
+      errors.push(`${claimId}: generic stress placeholder is forbidden.`);
+    } else if (stress.scenario.trim().length < 35 || stress.question.trim().length < 12) {
+      errors.push(`${claimId}: stress test is too short to describe a concrete case.`);
+    }
     if (!claims[claimId]?.terminalCandidate && !(byTarget.get(claimId) || []).length) {
       errors.push(`Non-terminal bridge ${claimId} has no deeper reasons.`);
     }
@@ -409,11 +443,6 @@ const availableReasons = (model, state, claimId) => {
   ));
 };
 
-const genericStress = (claim) => ({
-  scenario: '换成一个对象不同、但与刚才理由具有相同关键结构的案例。',
-  question: `在这个相似案例中，你仍接受“${claim.plain || claim.text}”吗？`,
-});
-
 export const getQuestion = (model, state) => {
   if (state.phase === PHASES.RESULTS) {
     return { kind: 'results', title: '当前结果', options: [] };
@@ -426,9 +455,9 @@ export const getQuestion = (model, state) => {
       return {
         kind: 'policy_decision',
         title: policy.entry.question,
-        statement: policy.scenario.summary,
+        scenarioSummary: policy.scenario.summary,
         fixedConditions: policy.scenario.fixedConditions,
-        terms: policy.scenario.terms,
+        proposalItems: proposalItemsFor(policy),
         options: model.product.entryAnswers,
       };
 
@@ -436,10 +465,11 @@ export const getQuestion = (model, state) => {
       const diagnostic = policy.diagnostics[state.diagnosticIndex];
       return {
         kind: 'revision_test',
-        title: diagnostic.question,
-        statement: diagnostic.explanation,
+        title: '这样修改以后，你可以接受吗？',
+        statement: diagnostic.question,
+        explanation: diagnostic.explanation,
         candidateFrameId: diagnostic.candidateFrameId,
-        changedDimensionIds: diagnostic.changedDimensionIds,
+        changes: revisionChangesFor(policy, diagnostic.candidateFrameId),
         options: model.product.revisionAnswers,
       };
     }
@@ -506,7 +536,15 @@ export const getQuestion = (model, state) => {
 
     case PHASES.STRESS_TEST: {
       const claim = model.claims[state.currentBridgeClaimId];
-      const stress = claim.stressTest || genericStress(claim);
+      const stress = claim.stressTest;
+      if (!stress) {
+        return {
+          kind: 'stress_test_unavailable',
+          title: '这条理由还没有准备好检验案例',
+          statement: '本次先把它保留为未检查，不会假装已经通过。',
+          options: [{ id: 'continue_unchecked', label: '保留为未检查并继续' }],
+        };
+      }
       return {
         kind: 'stress_test',
         title: stress.question,
@@ -823,15 +861,16 @@ const advance = (model, originalState, optionId, extra = {}) => {
       }, optionId);
 
     case PHASES.STRESS_TEST: {
-      if (!['apply', 'qualified', 'retract', 'uncertain'].includes(optionId)) {
+      if (!['apply', 'qualified', 'retract', 'uncertain', 'continue_unchecked'].includes(optionId)) {
         throw new Error('Invalid stress answer.');
       }
       const finishedPath = {
         ...state.currentPath,
-        status: optionId === 'apply' ? 'accepted'
+        status: optionId === 'continue_unchecked' ? 'unchecked'
+          : optionId === 'apply' ? 'accepted'
           : optionId === 'qualified' ? 'qualified'
           : optionId === 'retract' ? 'retracted' : 'uncertain',
-        stress: {
+        stress: optionId === 'continue_unchecked' ? null : {
           response: optionId,
           distinction: extra.distinction || null,
           claimId: state.currentBridgeClaimId,
