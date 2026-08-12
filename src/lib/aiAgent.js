@@ -1,5 +1,5 @@
 import { validateArgumentCandidate } from './sessionOverlay.js';
-import { arglogicCatalog } from '../data/model.js';
+import { getArgumentSchemesV4 } from './modelV4.js';
 
 let modelsCollectionPromise;
 
@@ -77,7 +77,10 @@ export const proposeWithPiAgent = async ({
   signal?.throwIfAborted();
   const catalogModel = models.getModel(config.provider, config.model);
   if (!catalogModel) throw new Error('在 pi-ai 目录中找不到所选模型，请重新选择。');
-  const schemes = arglogicCatalog?.schemes || [];
+  const schemes = getArgumentSchemesV4().map((scheme) => ({
+    ...scheme,
+    requiredPremises: scheme.requiredRoles.map((role) => ({ slot: role })),
+  }));
   if (!schemes.length) throw new Error('形式论证方案目录尚未加载。');
   const model = config.baseUrl
     ? { ...catalogModel, baseUrl: config.baseUrl }

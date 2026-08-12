@@ -5,129 +5,140 @@ const startFirstQuestion = async (page) => {
   await page.getByRole('button', { name: '开始答题', exact: true }).click();
 };
 
-const satisfyFollowUpQuestions = async (page) => {
-  const answer = page.getByRole('button', { name: '是，继续', exact: true });
-  while (await answer.count()) await answer.click();
-};
-
-test('每道题在作答前都会显示完整题设', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: '题目列表', exact: true }).click();
+test('根判断只有应当、不应当和不确定，固定题设不接受作答', async ({ page }) => {
+  await startFirstQuestion(page);
+  await expect(page.getByRole('heading', { name: '在上述范围内，国家应当允许法律处罚这类表达吗？' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '应当', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '不应当', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '不确定', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /有条件/ })).toHaveCount(0);
+  await expect(page.getByText('直接威胁、针对个人的骚扰、可核实的虚假事实陈述和指挥组织暴力已经排除。')).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(0);
-  await page.locator('[data-policy-id="metadata_surveillance"]').getByRole('button', { name: /从这里开始/ }).click();
-  await expect(page.getByText(/拟议制度要求通信服务商保存所有成年人的通信时间/)).toBeVisible();
-  await page.getByRole('button', { name: '跳过这题', exact: true }).click();
-  await expect(page.getByText('是否发放不附带工作条件的基本现金').first()).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
-    const state = JSON.parse(localStorage.getItem('argument-chain-lab:progress:v6'));
-    return [state.records.metadata_surveillance.status, state.records.metadata_surveillance.chains.length];
-  })).toEqual(['skipped', 0]);
 });
 
-test('按顺序答题，并且下位问题只在相关回答后出现', async ({ page }) => {
+test('反对原方案后一次只测试一个完整修改方案', async ({ page }) => {
   await startFirstQuestion(page);
-  await expect(page.getByRole('heading', { name: /国家是否应当用法律处罚这类表达/ })).toBeVisible();
-  await page.getByRole('button', { name: '只在某些条件下处罚', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '哪些处罚方式可以接受？' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '只允许民事责任', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '上一题', exact: true }).click();
+  await page.getByRole('button', { name: '不应当', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '如果不再允许罚款或拘留，只保留较轻的民事责任，这样可以接受吗？' })).toBeVisible();
+  await expect(page.getByText('这里只改变处罚强度，其他题设保持不变。')).toBeVisible();
+  await expect(page.getByText('处罚方式')).toBeVisible();
 
-  await page.getByRole('button', { name: '不应处罚', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '你反对这项决定的最主要原因是什么？' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '哪些处罚方式可以接受？' })).toHaveCount(0);
-  await page.getByRole('button', { name: /查看已答/ }).click();
-  await page.getByRole('button', { name: '修改：你的判断：不应处罚', exact: true }).click();
-
-  await page.getByRole('button', { name: '暂时不能判断', exact: true }).click();
-  await expect(page.getByText('是否保存所有成年人的通信记录五年').first()).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (
-    JSON.parse(localStorage.getItem('argument-chain-lab:progress:v6')).selectedPolicyPosition
-  ))).toBe(1);
+  await page.getByRole('button', { name: '这样可以接受', exact: true }).click();
+  await expect(page.getByText('原方案不可接受，罚款或拘留是其中一个足以改变判断的原因。')).toBeVisible();
+  await expect(page.getByRole('button', { name: /罚款或拘留超过了必要程度/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /强制程度越高，说明责任越重/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /禁令能够减少严重暴力伤害/ })).toHaveCount(0);
 });
 
-test('上一题、查看已答、中止和刷新续答保持同一条流程', async ({ page }) => {
-  await startFirstQuestion(page);
-  await page.getByRole('button', { name: '不应处罚', exact: true }).click();
-  await page.getByRole('button', { name: /因为模糊标准会让执法机关选择性处理不同说话者/ }).click();
-  await expect(page.getByRole('heading', { name: /下面先假设这件事确实发生/ })).toBeVisible();
-  await page.getByRole('button', { name: '上一题', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '你反对这项决定的最主要原因是什么？' })).toBeVisible();
+test('自定义理由走完整条路径并生成普通语言结果', async ({ page }) => {
+  const errors = [];
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('pageerror', (error) => errors.push(error.message));
 
-  await page.getByRole('button', { name: /查看已答/ }).click();
-  await expect(page.getByRole('button', { name: '修改：你的判断：不应处罚', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '题目列表', exact: true }).click();
+  await startFirstQuestion(page);
+  await page.getByRole('button', { name: '不应当', exact: true }).click();
+  await page.getByRole('button', { name: '这样可以接受', exact: true }).click();
+  await page.getByRole('button', { name: '这些都不是我的主要原因', exact: true }).click();
+  await page.getByLabel('写下你的理由').fill('较强处罚在这里造成了不必要的负担。');
+  await page.getByRole('button', { name: '保存这条理由', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '下面哪条相反理由最值得你认真考虑？' })).toBeVisible();
+  await page.getByRole('button', { name: '这些理由都不影响我的判断', exact: true }).click();
+  await page.getByRole('button', { name: '现在查看结果', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
+  await expect(page.getByText('可接受的修改方案：只允许民事责任')).toBeVisible();
+  await expect(page.getByText('主要理由：较强处罚在这里造成了不必要的负担。')).toBeVisible();
+  await expect(page.getByText('罚款或拘留 → 只允许较轻的民事责任')).toBeVisible();
+  await expect(page.getByText('formalStatus')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('上一题、修改已答和刷新只保留当前有效路径', async ({ page }) => {
+  await startFirstQuestion(page);
+  await page.getByRole('button', { name: '不应当', exact: true }).click();
+  await page.getByRole('button', { name: '上一题', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '在上述范围内，国家应当允许法律处罚这类表达吗？' })).toBeVisible();
+
+  await page.getByRole('button', { name: '不应当', exact: true }).click();
+  await page.getByRole('button', { name: '这样可以接受', exact: true }).click();
   await page.reload();
-  await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /继续/ }).click();
-  await expect(page.getByRole('heading', { name: '你反对这项决定的最主要原因是什么？' })).toBeVisible();
-  await page.getByRole('button', { name: /查看已答/ }).click();
-  await expect(page.getByRole('button', { name: '修改：你的判断：不应处罚', exact: true })).toBeVisible();
-
-  await page.getByRole('button', { name: '中止并看结果', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '这次还没有完成题目' })).toBeVisible();
-  await expect(page.getByText('1 道题停在中途，回答仍保存在这个浏览器中。')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '你这样判断的最主要原因是什么？' })).toBeVisible();
+  await page.getByText('查看已答（2）', { exact: true }).click();
+  await page.getByRole('button', { name: '修改：不应当', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '在上述范围内，国家应当允许法律处罚这类表达吗？' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')).answerLog.length)).toBe(0);
 });
 
-test('可以回到主页并确认重新开始', async ({ page }) => {
+test('跳过、题目列表和中止查看结果保持单一问卷', async ({ page }) => {
   await startFirstQuestion(page);
-  await page.getByRole('button', { name: '不应处罚', exact: true }).click();
-  await page.getByRole('button', { name: '回到主页', exact: true }).click();
-  await expect(page.getByRole('button', { name: '继续答题', exact: true })).toBeVisible();
-
-  await page.getByRole('button', { name: '重新开始', exact: true }).click();
-  await expect(page.getByText('这会清除当前答题进度和临时草稿。')).toBeVisible();
-  await page.getByRole('button', { name: '确认重新开始', exact: true }).click();
-  await expect(page.getByRole('button', { name: '开始答题', exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
-    const state = JSON.parse(localStorage.getItem('argument-chain-lab:progress:v6'));
-    return [state.startedAt, Object.keys(state.records).length];
-  })).toEqual([null, 0]);
-});
-
-test('完成后默认只显示普通语言摘要，详细结构按需展开', async ({ page }) => {
-  const browserErrors = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') browserErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => browserErrors.push(error.message));
-
-  await startFirstQuestion(page);
-  await page.getByRole('button', { name: '不应处罚', exact: true }).click();
-  await page.getByRole('button', { name: '因为法律处罚的是没有直接伤害他人的表达', exact: true }).click();
-  await page.getByRole('button', { name: '接受这个假设，继续判断', exact: true }).click();
-  await page.getByRole('button', { name: '是，这足以成为理由', exact: true }).click();
-  await satisfyFollowUpQuestions(page);
-  await page.getByRole('button', { name: '这就是我目前最根本的理由', exact: true }).click();
-  await page.getByRole('button', { name: '仍然适用', exact: true }).click();
-  await page.getByRole('button', { name: '这些理由都不会改变我的判断', exact: true }).click();
-
-  await expect(page.getByText('是否保存所有成年人的通信记录五年').first()).toBeVisible();
-  await page.getByRole('button', { name: '中止并看结果', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '已完成 1 道题' })).toBeVisible();
-  await expect(page.getByText('你的判断：')).toContainText('不应处罚');
-  await expect(page.getByText(/主要原因是：因为法律处罚的是没有直接伤害他人的表达/)).toBeVisible();
-  await expect(page.getByText('本轮机械报告')).not.toBeVisible();
-  await expect(page.getByText(/这些结果建立在题目中采用的效果假设上/)).toBeVisible();
-
-  await page.getByText('查看详细推理过程', { exact: true }).click();
-  await expect(page.getByRole('heading', { name: '本轮机械报告' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '论证谱系' })).toBeVisible();
-  expect(browserErrors).toEqual([]);
-});
-
-test('移动端题目列表、答题页和配置对话框没有横向溢出', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.getByRole('button', { name: '跳过', exact: true }).click();
+  await expect(page.getByText('元数据收集 · 2 / 8')).toBeVisible();
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.locator('[data-policy-id="speech_restriction"]').getByRole('button', { name: /从这里开始/ }).click();
-  await expect(page.getByRole('heading', { name: /国家是否应当用法律处罚这类表达/ })).toBeInViewport();
+  await expect(page.locator('[data-policy-id="speech_restriction"]')).toContainText('已跳过');
+  await page.locator('[data-policy-id="metadata_surveillance"]').getByRole('button', { name: /从这里开始/ }).click();
+  await page.getByRole('button', { name: '中止并看结果', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
+  await expect(page.getByText('当前题停在中途，回答仍保存在这个浏览器中。')).toBeVisible();
+});
+
+test('0.9 会话只读归档，不会提升为新版结果', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('argument-chain-lab:progress:v8', JSON.stringify({
+      modelVersion: '0.9.0',
+      records: { speech_restriction: { stance: 'conditional', policyChoiceResponses: { penalty_power: 'civil_only' }, chains: [] } },
+    }));
+  });
+  await page.goto('/');
+  await expect(page.getByText(/旧版回答已保留为只读记录/)).toBeVisible();
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')));
+  expect(state.policyResults).toEqual({});
+  expect(state.legacyArchive.policies[0].oldStance).toBe('conditional');
+  expect(state.legacyArchive.snapshot.records.speech_restriction.policyChoiceResponses.penalty_power).toBe('civil_only');
+  expect(await page.evaluate(() => localStorage.getItem('argument-chain-lab:progress:v8'))).toBeNull();
+});
+
+test('AI 请求失败不会改变当前进度或清空自定义理由', async ({ page }) => {
+  await page.route('http://127.0.0.1:9/**', (route) => route.abort());
+  await startFirstQuestion(page);
+  await page.getByRole('button', { name: '不应当', exact: true }).click();
+  await page.getByRole('button', { name: '这样可以接受', exact: true }).click();
+  await page.getByRole('button', { name: '这些都不是我的主要原因', exact: true }).click();
+  const reason = '较强处罚在这里造成了不必要的负担。';
+  await page.getByLabel('写下你的理由').fill(reason);
+  const before = await page.evaluate(() => localStorage.getItem('argument-chain-lab:progress:v10'));
+
+  await page.getByRole('button', { name: '交给 AI 整理', exact: true }).click();
+  await page.getByLabel('粘贴配置文本').fill(JSON.stringify({
+    schema: 'argument-chain-ai-config',
+    version: 1,
+    provider: 'openai',
+    model: 'gpt-5',
+    apiKey: 'test-only-placeholder',
+    baseUrl: 'http://127.0.0.1:9/v1',
+    providerOptions: {},
+  }));
+  await page.getByRole('button', { name: '解析并应用', exact: true }).click();
+
+  await expect(page.locator('.global-alert')).toBeVisible();
+  await expect(page.getByLabel('写下你的理由')).toHaveValue(reason);
+  expect(await page.evaluate(() => localStorage.getItem('argument-chain-lab:progress:v10'))).toBe(before);
+});
+
+test('移动端无横向溢出，术语解释和配置对话框可用键盘关闭', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startFirstQuestion(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  const opener = page.getByTitle('AI 配置');
-  await opener.click();
-  const dialog = page.getByRole('dialog', { name: 'AI 配置' });
-  await expect(dialog).toBeVisible();
+  const term = page.getByRole('button', { name: '民事责任', exact: true });
+  await term.click();
+  await expect(page.getByRole('tooltip')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(opener).toBeFocused();
+  await expect(term).toBeFocused();
+
+  const config = page.getByTitle('AI 配置');
+  await config.click();
+  await expect(page.getByRole('dialog', { name: 'AI 配置' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(config).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

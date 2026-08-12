@@ -1,0 +1,799 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://argument-chain-lab.example/schema/model-v4.schema.json",
+  "title": "Argument Chain Dialogue Model v4",
+  "type": "object",
+  "required": [
+    "schema",
+    "schemaVersion",
+    "meta",
+    "product",
+    "formalLanguage",
+    "argumentSchemes",
+    "claims",
+    "reasons",
+    "policies"
+  ],
+  "properties": {
+    "schema": {
+      "const": "argument-chain-dialogue-model"
+    },
+    "schemaVersion": {
+      "const": 4
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "title",
+        "updatedAt",
+        "designPrinciples"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date"
+        },
+        "replaces": {
+          "type": "string"
+        },
+        "designPrinciples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "contentStatus": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "product": {
+      "type": "object",
+      "required": [
+        "entryAnswers",
+        "revisionAnswers",
+        "defaultFlow"
+      ],
+      "properties": {
+        "entryAnswers": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/answerOption"
+          }
+        },
+        "revisionAnswers": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/answerOption"
+          }
+        },
+        "assumptionAnswers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/answerOption"
+          }
+        },
+        "ruleAnswers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/answerOption"
+          }
+        },
+        "defaultFlow": {
+          "const": "sequential_questionnaire"
+        },
+        "allowSkipPolicy": {
+          "type": "boolean"
+        },
+        "allowStopAndViewResults": {
+          "type": "boolean"
+        },
+        "showInternalTermsByDefault": {
+          "const": false
+        },
+        "detailMode": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "terms": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "formalLanguage": {
+      "type": "object",
+      "required": [
+        "version",
+        "sorts",
+        "predicates"
+      ],
+      "properties": {
+        "version": {
+          "const": "arglogic-dialogue-1.0"
+        },
+        "sorts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "predicates": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "formalEntities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "sort",
+          "label"
+        ],
+        "properties": {
+          "sort": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "policyId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "argumentSchemes": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/argumentScheme"
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "reasons": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/reason"
+      }
+    },
+    "policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/policy"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "answerOption": {
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "formula": {
+      "type": "object",
+      "required": [
+        "pred",
+        "args"
+      ],
+      "properties": {
+        "pred": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "argumentScheme": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "requiredRoles",
+        "inferenceKind",
+        "criticalQuestions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "requiredRoles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "inferenceKind": {
+          "enum": [
+            "strict",
+            "defeasible"
+          ]
+        },
+        "criticalQuestions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "plain",
+        "terminalCandidate",
+        "tags"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "policy_position",
+            "local_objection",
+            "normative",
+            "value",
+            "local_defense"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terminalCandidate": {
+          "type": "boolean"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "policyId": {
+          "type": "string"
+        },
+        "frameId": {
+          "type": "string"
+        },
+        "stressTest": {
+          "type": "object",
+          "required": [
+            "scenario",
+            "question"
+          ],
+          "properties": {
+            "scenario": {
+              "type": "string"
+            },
+            "question": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "whenUserContinuesPastCandidate": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "premise": {
+      "type": "object",
+      "required": [
+        "id",
+        "role",
+        "statement",
+        "question",
+        "formula"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "statement": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "formula": {
+          "$ref": "#/$defs/formula"
+        }
+      },
+      "additionalProperties": false
+    },
+    "formalization": {
+      "type": "object",
+      "required": [
+        "languageVersion",
+        "schemeId",
+        "premiseRoles",
+        "bridgeClaimId",
+        "conclusionClaimId"
+      ],
+      "properties": {
+        "languageVersion": {
+          "const": "arglogic-dialogue-1.0"
+        },
+        "schemeId": {
+          "type": "string"
+        },
+        "policyId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contextFrameId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "premiseRoles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "bridgeClaimId": {
+          "type": "string"
+        },
+        "conclusionClaimId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "reason": {
+      "type": "object",
+      "required": [
+        "id",
+        "targetClaimId",
+        "title",
+        "summary",
+        "premises",
+        "bridgeClaimId",
+        "formalization",
+        "tags"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "targetClaimId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "premises": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/premise"
+          }
+        },
+        "bridgeClaimId": {
+          "type": "string"
+        },
+        "formalization": {
+          "$ref": "#/$defs/formalization"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dimension": {
+      "type": "object",
+      "required": [
+        "label",
+        "logicalRole",
+        "type",
+        "values",
+        "explanation"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "logicalRole": {
+          "enum": [
+            "root_action",
+            "means",
+            "safeguard",
+            "parameter",
+            "fixed_constraint"
+          ]
+        },
+        "type": {
+          "const": "enum"
+        },
+        "values": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "explanation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "frame": {
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "assignments": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "extends": {
+          "type": "string"
+        },
+        "changes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "assignments"
+          ],
+          "not": {
+            "required": [
+              "extends"
+            ]
+          }
+        },
+        {
+          "required": [
+            "extends",
+            "changes"
+          ],
+          "not": {
+            "required": [
+              "assignments"
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": [
+        "id",
+        "candidateFrameId",
+        "question",
+        "explanation",
+        "acceptedClaimId",
+        "changedDimensionIds",
+        "revisionCost",
+        "counterClaimId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "candidateFrameId": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "acceptedClaimId": {
+          "type": "string"
+        },
+        "changedDimensionIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "revisionCost": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "counterClaimId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "id",
+        "order",
+        "title",
+        "shortTitle",
+        "scenario",
+        "dimensions",
+        "frames",
+        "rootFrameId",
+        "entry",
+        "diagnosisStrategy",
+        "diagnostics",
+        "fallbackOpposeClaimId",
+        "counterClaims",
+        "resultTemplate",
+        "reviewActions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "shortTitle": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "object",
+          "required": [
+            "summary",
+            "fixedConditions",
+            "terms"
+          ],
+          "properties": {
+            "summary": {
+              "type": "string"
+            },
+            "fixedConditions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "text",
+                  "explanation"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "explanation": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "terms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "dimensions": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/dimension"
+          }
+        },
+        "frames": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "$ref": "#/$defs/frame"
+          }
+        },
+        "rootFrameId": {
+          "type": "string"
+        },
+        "entry": {
+          "type": "object",
+          "required": [
+            "question",
+            "supportClaimId"
+          ],
+          "properties": {
+            "question": {
+              "type": "string"
+            },
+            "supportClaimId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "diagnosisStrategy": {
+          "const": "first_accepting_minimal_revision"
+        },
+        "diagnostics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        },
+        "fallbackOpposeClaimId": {
+          "type": "string"
+        },
+        "counterClaims": {
+          "type": "object",
+          "required": [
+            "whenSupportingRoot",
+            "whenOpposingWithoutAcceptedRevision"
+          ],
+          "properties": {
+            "whenSupportingRoot": {
+              "type": "string"
+            },
+            "whenOpposingWithoutAcceptedRevision": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "resultTemplate": {
+          "type": "object",
+          "required": [
+            "rootYes",
+            "rootNoNoRevision",
+            "rootNoAcceptedRevision",
+            "uncertain"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reviewActions": {
+          "type": "object",
+          "required": [
+            "allowAddAnotherReason",
+            "allowTestAnotherRevision",
+            "showOnlyAfterUserOpensReview"
+          ],
+          "properties": {
+            "allowAddAnotherReason": {
+              "type": "boolean"
+            },
+            "allowTestAnotherRevision": {
+              "type": "boolean"
+            },
+            "showOnlyAfterUserOpensReview": {
+              "const": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

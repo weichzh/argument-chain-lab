@@ -1,201 +1,312 @@
-# 题库与推理模型
+# Model v4 参考：完整政策框架、修订诊断与局部理由图
 
-## 1. 最小桥接原则与系统中的推理记号
+## 1. 模型解决什么问题
 
-对于描述语汇中的前提集 `F` 与含不可还原评价谓词的结论 `V`，题库不允许 `F → V` 的无标记跳跃。命题 1.1 只给出模型论限制：
+v4 不再把政策描述拆成并列“组件”，而是保存：
 
-```text
-F₁, …, Fₙ ⊭ V
+1. 一个用户实际判断的完整原方案；
+2. 若干完整修改方案；
+3. 原方案与修改方案之间的精确差异；
+4. 接受某项修改时应定位到的局部反对命题；
+5. 针对该局部命题的多条理由；
+6. 每条理由的描述前提、判断依据和更深理由。
+
+## 2. 顶层答案
+
+`product.entryAnswers` 必须严格为：
+
+```json
+[
+  {"id": "yes", "label": "应当"},
+  {"id": "no", "label": "不应当"},
+  {"id": "uncertain", "label": "不确定"}
+]
 ```
 
-它说明规范内容必须从某处进入，但没有证明任意加入一条 B 就足以严格推出 V。普通政策推理因此采用：
+不得加入：
 
 ```text
-F₁, …, Fₙ, B ⇝ V
+conditional
+mixed
+depends
+partly
 ```
 
-`⇝` 表示可撤销支持：这组前提构成一项可被反例、例外、竞争理由或事实失败击败的理由。只有 B 明确表达充分条件、且所有相关前提都已经纳入时，才可标记为严格的 `⊨`。
+这些状态只能由后续比较推导，不能作为根答案。
 
-模型把最小桥接原则作为类型约束，而不是声称解决了定义性评价、制度事实、厚概念、道德自然主义或事实／价值缠结的全部争论。
+## 3. 情景边界
 
-## 2. 节点类型
-
-### `descriptive`
-
-每个 F 必须表达原则上能够判真或判假的命题，并包含：
-
-- `statement`：经过中文改写、但不改变逻辑内容的命题正文；
-- `plainExplanation`：说明这句话具体在问什么，以及它没有在判断什么；
-- `plainTruthConditions`、`plainFalsifier`：用户首先看到的判断说明；
-- `truthConditions`：什么观察、记录、计算或题设会使其为真；
-- `falsifier`：什么结果会反驳它；
-- `kind`：`stipulated`、`empirical` 或 `descriptive`；
-- `note`：可选的对象、时间、比较基线或操作化说明。
-- `scenarioProfile`、`mutuallyExclusiveWith`、`dependsOn`：用于跨链识别互斥题设和被否定的事实依赖；
-- `sourceIds`、`sourceStatus`：事实来源锚点与当前审核状态；
-- `sensitivity`：可选的基准情景和低／高幅度，用于记录阈值翻转，而不是篡改原事实回答。
-
-用户选项 `unknown` 只表示认识悬置，不是第三种真值。自动词汇扫描只能发现明显的规范性偷渡，不能替代人工语义审核。
-
-### `bridge`
-
-B 必须含有规范内容，例如理由、许可、义务、优先、权利、资格或评价地位。任何非终点 B 都可在下一轮成为待说明的 `V′`：
-
-```text
-F₀ + B₀ ⇝ V
-F₁ + B₁ ⇝ B₀
-F₂ + B₂ ⇝ B₁
-…
-```
-
-### `terminal`
-
-`terminal` 表示题库把该规范命题设计为可能的反思终点，不表示它客观自明。一个 terminal 只有经过以下两步才成为该用户本轮的 G：
-
-1. 用户提名它为候选停止点；
-2. 用户另行明确确认：即使暂时拿掉所有其他规范前提，仍独立接受它。
-
-“题库没有更深路径”或“用户暂时想不到理由”都不能自动生成 G。确认后还必须经过结构相似反例。
-
-### `policy`
-
-具体政策结论。每项政策分别提供支持与反对方向；用户也可以保持悬置，或把任一方向当作思想实验而不承诺。
-
-## 2.1 题库来源与会话扩展
-
-`public/bank/manifest.json` 是客户端选择题库版本的唯一入口。当前基础题库、人工审核后的社区扩展均为同源只读 JSON；运行时合并后再交给状态机。基础题库文件不再从 JavaScript 常量导出，`src/data/model.js` 只负责校验、只读适配和实时查询。
-
-AI 生成内容不能直接修改正式题库。AI 必须从当前 ArgLogic 方案目录选择 `schemeId`；用户可检查并修改方案及中文—AST 对照。确认后，系统只把它转换为当前浏览器会话扩展和 `proposedSchemeId`，所有 ID 使用 `local_` 命名空间，且不生成 `formalization` 或证书。加载本地进度时，任何试图覆盖正式题库 ID 的扩展都会被丢弃。
-
-## 2.2 面向用户的语言层
-
-形式字段与显示字段分离。严格判真条件、反驳条件和节点类型不因中文改写而改变；默认答题流程只显示普通中文问题，严格标准只在结果页的详细推理中展开。每个非政策规范命题还必须包含：
-
-- `explanation`：说明该原则加入了什么价值判断，以及它没有自动证明什么；
-- `example`：一个直接适用该原则的具体案例，不使用比喻，也不把例子当作证明；
-- `shortLabel`：用于理由卡和论证图的简短名称。
-
-理由模板还必须提供 `plainSteps`，供后台选择问题和详细推理记录使用；默认理由列表只显示用户可直接判断的标题。
-
-理由模板通过 `reasonFamilyId` 连接规范理由家族，桥接原则和终点通过 `valueFamilyId` 连接价值家族。最近邻匹配使用这些语义家族，不要求不同题目复用同一个具体节点 ID。
-
-政策入口分别保存 `scenarioConditions`、`policyChoices`、`safeguards` 和 `parameters`。每个元素都带 `kind`、`plainExplanation` 和 `whyItMatters`。上位判断会自动写入首个政策选择；其余元素只有在用户选择条件性支持且该元素确实影响范围时才进入回答状态。固定情景由后续题设假设核对，不能保存支持或反对。
-
-## 3. 论证模板
-
-```js
+```json
 {
-  id,
-  title,
-  summary,
-  targetClaimId,   // 当前 V
-  factIds,         // 一个或多个 F
-  bridgeClaimId,   // 当前 B
+  "scenario": {
+    "summary": "本题讨论什么",
+    "fixedConditions": [
+      {
+        "id": "scope_1",
+        "text": "已经固定的边界",
+        "explanation": "为什么这不是用户要另行回答的组件"
+      }
+    ],
+    "terms": ["需要解释的名词"]
+  }
 }
 ```
 
-版本 0.9.0 为全部 189 条策展路径提供 `formalization`。它引用 `arglogic-0.2` 方案目录，用有类型谓词、变量绑定、前提槽位和具体政策元素结论表达推理结构。政策包立场仍由用户单独回答；根论证默认只得到 `ReasonFor(PolicyElement)` 或 `ReasonAgainst(PolicyElement)`，不能把对一个元素的理由冒充为对整包选择、保障和参数的证明。
+固定条件只能展示和解释，不得进入回答状态。
 
-构建期检查谓词类型、情景、必需前提、结论模式、循环、前提矛盾、行动类别、数值／命题约束和结论范围，并生成 `formal-index-0.9.0.json`。索引保存每条证书的 SHA-256、攻击边、邻接表和全图 grounded 状态。运行时证书按模型版本、论证 ID 和规范化回答键缓存，只重算当前论证及所选反方邻居，并分别保存：
+## 4. 维度
 
-- `certificateHash`：与当前不可变形式 AST 对应的证书摘要；
-- `inferenceStatus`：规则结构是否许可当前结论；
-- `evidenceStatus`：用户是否建立了这次实例的前提；
-- `scopeStatus`：结论是否超出实际覆盖的政策元素；
-- `dialecticalStatus`：竞争理由是否仍未裁定；
-- `errors`、`warnings` 和仍开放的批判问题。
+```json
+{
+  "sanction": {
+    "label": "处罚方式",
+    "logicalRole": "means",
+    "type": "enum",
+    "values": {
+      "fine_or_detention": {"label": "可以罚款或拘留"},
+      "civil_only": {"label": "只允许较轻民事责任"}
+    },
+    "explanation": "这个维度改变什么"
+  }
+}
+```
 
-接受事实与桥梁后，状态机每次只显示一个仍可能改变结果的批判问题；回答可能满足条件、保留未知或形成击败。`complete` 仍只表示承诺流程闭合，不等于逻辑有效、事实为真或反方已经被击败。已有形式化但带 error 的路径不能进入公开贡献。
+`logicalRole` 允许：
 
-最低约束：
+```text
+root_action
+means
+safeguard
+parameter
+fixed_constraint
+```
 
-1. `factIds` 全部指向描述命题；
-2. `bridgeClaimId` 指向 `bridge` 或 `terminal`；
-3. 递归论证的 `targetClaimId` 必须正是上一层被追问的 B；
-4. 递归说明图必须无环；
-5. 策展基础题库的每个政策方向至少有三条候选根路径；人工审核的单条社区贡献可以只覆盖其实际论证方向，但界面必须明确这一限制；
-6. 每条路径必须把规范进入点显式写出，不得把评价内容塞进 F；
-7. 用户可选择“这些都不是我的理由”，系统必须记录 `modelGap`，而不是替其选择。
+它只用于作者和检查器，不作为用户标题。
 
-## 4. 承诺记录与递归停止
+## 5. 完整框架
 
-系统保存的不是对用户心理本质的猜测，而是当前对话中的公开承诺：
+根框架必须直接包含所有维度：
 
-- 对 F：`true`、`false`、`unknown`；
-- 对 B：`accept`、`reject`、`uncertain`；
-- 对候选固定点：`terminal_candidate`、`provisional_fixed_point`、`unconfirmed`、`rejected_as_fixed_point` 或 `retracted_after_stress`；
-- 对反例：适用、带相关区别的限定、不明例外、撤回或悬置。
+```json
+{
+  "speech_root": {
+    "label": "原方案",
+    "assignments": {
+      "legal_rule": "yes",
+      "sanction": "fine_or_detention",
+      "standard": "open_textured",
+      "review": "ordinary"
+    }
+  }
+}
+```
 
-用户可以在任意中层 B 停止，也可以继续追问到 terminal。停止是否合理由用户确认和反例压力共同记录，而不是由节点深度决定。
+修改框架使用继承：
 
-## 5. 链条分类
+```json
+{
+  "speech_civil_only": {
+    "label": "只允许民事责任",
+    "extends": "speech_root",
+    "changes": {
+      "sanction": "civil_only"
+    }
+  }
+}
+```
 
-- `complete`：全部 F 被相信为真，全部 B 被接受，G 经独立确认，且反例测试没有造成未解释张力。
-- `conditional`：规范结构闭合，但至少一个 F 被判断为假或未知；只能得到“若 F 成立，则 V 获得支持”。
-- `tension`：G 在结构相似案例中被排除却没有相关差别，或相反回答被保留为命题范围缺口。
-- `unresolved`：桥接被拒或悬置、停止点未确认、反例撤回、题库未覆盖实际理由，或用户主动停止。
+检查器必须展开为完整赋值后再比较。
 
-政策层状态从其已保存链条重新计算；修改旧回答时不得沿用过时结果。
+## 6. 诊断节点
 
-链条分别记录 `commitmentClosure`、`formalStatus`、`evidenceStatus`、`scopeStatus`、`dialecticalStatus` 和 `packageJudgment`；`packageStanceBeforeDefeater` 与 `packageStanceAfterDefeater` 分别描述反方复核前后的整包立场。只有形式检查合格、grounded 状态为 `accepted` 且 `matchingStatus=active` 的已闭合链进入最近邻匹配；张力、撤回、未解决、被反方抵消或被压过的路径不增加相似度和覆盖度。一个政策可以保留多条有效理由链。
+```json
+{
+  "id": "speech_test_sanction",
+  "candidateFrameId": "speech_civil_only",
+  "question": "如果只允许较轻民事责任，这样可以接受吗？",
+  "explanation": "这里只改变处罚强度。",
+  "acceptedClaimId": "c_speech_reject_sanction",
+  "changedDimensionIds": ["sanction"],
+  "revisionCost": 1
+}
+```
 
-已闭合链还必须记录最强反方理由的事实回答、桥接回答和影响。若影响为削弱、抵消或压过，链条不再满足严格贡献条件；没有可接受的反方理由也必须显式记录。已结束链只保存在政策记录中，当前草稿不保留重复副本。
+必要条件：
 
-## 6. 实时矛盾状态机
+- `candidateFrameId` 存在；
+- 与根框架不同；
+- 实际差异恰好等于 `changedDimensionIds`；
+- `acceptedClaimId` 存在并至少有一条理由；
+- 诊断成本不应倒退；
+- 最后的组合修改可以成本更高。
 
-同一命题 ID 出现相反决定性回答时，系统进入 `CONFLICT`，不继续推导。用户必须机械地选择：
+`revisionCost` 表示作者认定的一次有意义修改单位，不等于简单计算维度数量。
 
-1. `revise_prior`：以当前回答统一修订此前记录；
-2. `keep_prior`：撤回当前回答，沿用此前稳定判断；
-3. `scope_gap`：保留相反回答，并把命题范围不足记录为链条张力；
-4. `suspend`：把此前与当前回答一并改为未知／悬置。
+## 7. 条件性接受
 
-主链和最强反方复核共用同一命题回答索引。所有冲突事件与处理方式进入导出 JSON。若事实或桥梁被修订，旧链条及依赖它的反方复核状态必须重新分类。
+引擎保存：
 
-## 7. 反例与价值两难
+```json
+{
+  "rootAnswer": "no",
+  "rootFrameId": "speech_root",
+  "acceptedRevisionFrameId": "speech_civil_only",
+  "derivedConditionalAcceptance": true,
+  "diagnosisClaimId": "c_speech_reject_sanction"
+}
+```
 
-### 结构相似反例
+不要把原方案改写成支持，也不要把修改回答附在原方案的支持命题上。
 
-- 尽量只更换政治对象，保持原则相关事实结构不变。
-- 用户可以指出相关事实差别；该差别被保存为原则的适用限定。
-- 不愿适用且不能指出相关差别时，记录范围张力，不直接诊断人格或动机。
+## 8. 命题
 
-### 两难
+命题类型：
 
-- 只有当两端价值都在本轮成为 `provisional_fixed_point` 时，相应预设两难才可进入队列。
-- 不用未确认原则填充“通用两难”，也不从单一固定点猜测其他价值。
-- 题设尽量固定经验事实，使选择主要暴露价值冲突。
-- 输出是局部成对关系；明确区分强弱、平局、取决于条件、不可通约、暂时未判断以及 `A ≻ B ≻ C ≻ A` 的循环，不强制生成全序。
-- 带敏感性情景的两难另外保存低／高幅度下的局部关系，用于显示关系是否翻转。
+```text
+policy_position
+local_objection
+normative
+value
+```
 
-## 8. 当前规模与深度
+局部反对命题应使用保守表达：
 
-版本 0.9.0 的策展基础题库包含：
+> 某项设计是一个足以改变判断的原因。
 
-- 20 个可由用户按顺序回答、逐题跳过或从任意位置开始的政策入口；题库仍保留 8 个核心场景和 12 个扩展场景的内部标记；
-- 216 个描述命题；
-- 189 条显式论证模板；
-- 189 条 ArgLogic 形式化和 396 条预编译攻击边；
-- 133 个规范命题或政策结论；
-- 37 个 terminal 候选；
-- 19 个两难；
-- 17 个只读固定情景、40 个政策选择、30 个保障条件和 13 个数值参数；
-- 52 个来源锚定的娱乐基准原型，每个原型当前包含 1 个内部变体。
+不要写成：
 
-产品不再自动要求核心题量或追加区分题；按列表顺序进行、由用户逐题跳过的问卷是唯一政策流程。原有信息增益函数保留为离线分析能力，不构成产品入口。基准原型层与正式论证模型分离；它可以给出最近邻和唯一化论证型，但不能回写用户承诺，也不能宣称 52 个标签互斥、穷尽或构成身份诊断。
+> 这是用户唯一的反对原因。
 
-## 9. 新增内容的最低审核
+因为顺序诊断只能确认当前测试中的决定性差异，不能证明没有其他原因。
 
-1. 明确写出 V。
-2. 列出所有参与当前理由的 F，并逐句删除规范性偷渡。
-3. 给每个 F 写判真与反驳条件，限定对象、时间、样本、因果口径与比较基线。
-4. 写出最小 B：它应精确说明何种事实结构获得何种规范意义，而不是只写宽泛口号。
-5. 说明该步是严格蕴含还是可撤销支持；默认使用 `⇝`。
-6. 为 B 提供至少一条更深说明路径，或把它明确设计为可供用户确认的 terminal 候选。
-7. 提供结构相似反例和至少一个相关区别条件。
-8. 检查同一 F／B 是否应复用已有 ID；只有语义与范围真正相同时才能复用。
-9. 检查至少一条相反路径或潜在击败者，避免题库只替一种立场发言。
-10. 运行 `npm test` 或 `deno task test`、`npm run export:model` 与浏览器端完整流程验证。
-11. 由不同立场的审阅者分别检查政治平衡、命题类型、推导相关性、遗漏路径和措辞诱导。
+## 9. 理由
 
-`formal-review-benchmark-0.9.0.json` 为 12 条跨传统高风险路径预留方案、必需前提、结论范围、反驳、削弱和争议重建六项标注。每项至少需要两名独立人工审阅者；一致意见记为 `consensus`，分歧必须保留带名称的 `alternatives`。当前仓库只提供种子和校验器，不把自动结果伪装成人工金标准。
+```json
+{
+  "id": "r_speech_procedure_discretion",
+  "targetClaimId": "c_speech_reject_procedure",
+  "title": "模糊标准容易导致选择性执法",
+  "summary": "...",
+  "premises": [
+    {
+      "id": "...",
+      "role": "discretion",
+      "statement": "...",
+      "question": "...",
+      "formula": {
+        "pred": "OpenTextured",
+        "args": ["frame:speech_root", "dimension:c_speech_reject_procedure"]
+      }
+    }
+  ],
+  "bridgeClaimId": "n_law_predictable_reviewable",
+  "formalization": {
+    "languageVersion": "arglogic-dialogue-1.0",
+    "schemeId": "procedural_risk",
+    "policyId": "speech_restriction",
+    "contextFrameId": "speech_root",
+    "premiseRoles": {
+      "discretion": ["..."],
+      "review_gap": ["..."]
+    },
+    "bridgeClaimId": "n_law_predictable_reviewable",
+    "conclusionClaimId": "c_speech_reject_procedure"
+  }
+}
+```
+
+## 10. 多条更深理由
+
+若两个理由都指向同一个 `targetClaimId`，用户会看到两个不同选项。
+
+例如：
+
+```text
+“规则应明确并可复核”
+可以继续基于：
+- 法治与可预期性；
+- 免受任意支配。
+```
+
+模型不能给每个中间原则只保留唯一父节点。
+
+## 11. 暂时停止点
+
+价值命题具有：
+
+```json
+{
+  "terminalCandidate": true,
+  "whenUserContinuesPastCandidate": "offer_custom_deeper_reason"
+}
+```
+
+含义是：
+
+- 题库允许用户暂时停止；
+- 不宣称哲学上已经不可追问；
+- 用户继续时进入自定义理由，不显示空理由页。
+
+## 12. 反方理由
+
+根判断使用：
+
+```json
+{
+  "counterClaims": {
+    "whenSupportingRoot": "该政策的实质反对命题",
+    "whenOpposingWithoutAcceptedRevision": "该政策的原方案支持命题"
+  }
+}
+```
+
+若用户接受了某个修改方案，反方必须针对同一个局部争点。每个诊断节点保存：
+
+```json
+{
+  "acceptedClaimId": "为什么原方案的这一设计不可接受",
+  "counterClaimId": "为什么原方案的这一设计可能仍有必要"
+}
+```
+
+例如用户反对罚款或拘留，反方应讨论较强处罚是否不可替代，而不是只重复“禁令有社会收益”。
+
+反方理由使用同一理由结构和同一假设检查。
+
+## 13. 新政策的作者流程
+
+1. 写清完整原方案；
+2. 把题设边界和可修改政策维度分开；
+3. 为每个维度定义有限值；
+4. 建立根框架；
+5. 根据用户可能反对的位置设计少量完整修改框架；
+6. 先测试单一有意义修改，再测试必要组合；
+7. 为每个接受叶写局部命题；
+8. 为支持命题、所有局部命题和最终实质反对命题各写至少两条理由；
+9. 为每条理由选择方案、前提角色和更深原则；
+10. 运行结构、语义、变异和浏览器测试。
+
+## 14. 不应加入正式题库的内容
+
+- 只有政策标签、没有完整方案；
+- 修改后没有生成新框架；
+- 组件回答仍指向原政策结论；
+- 题设事实被要求赞成或反对；
+- 只有一个预定理由路径；
+- 继续追问会进入空白页；
+- 把“第一个发现的差异”写成“唯一原因”；
+- 用意识形态名称标记理由；
+- 未经来源和人工审查的 AI 内容。
+
+## 15. 文件的完整性状态
+
+`model-1.0.0.json` 已满足：
+
+- JSON Schema v4；
+- 语义引用和角色检查；
+- 完整框架检查；
+- 框架差异检查；
+- 理由图无环；
+- 所有非终点桥梁有更深理由；
+- 八个政策的所有支持、诊断和最终反对叶至少两条理由；
+- 顶层没有 `conditional`。

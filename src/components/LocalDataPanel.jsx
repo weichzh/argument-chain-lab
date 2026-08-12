@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, HardDrive, KeyRound, Trash2, Upload, X } from 'lucide-react';
+import { Download, HardDrive, KeyRound, Trash2, X } from 'lucide-react';
 import useDialogFocus from '../hooks/useDialogFocus.js';
 
 const downloadProgress = (state) => {
@@ -15,6 +15,18 @@ const downloadProgress = (state) => {
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = 'argument-chain-local-progress.json';
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const downloadLegacy = (legacyArchive) => {
+  const url = URL.createObjectURL(new Blob(
+    [`${JSON.stringify(legacyArchive, null, 2)}\n`],
+    { type: 'application/json;charset=utf-8' },
+  ));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'argument-chain-legacy-0.9.json';
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
@@ -64,11 +76,16 @@ export default function LocalDataPanel({
             <div><strong>AI 配置与对话</strong><p>配置只在当前页面内存中；完整 AI 消息不会写入浏览器持久存储。</p></div>
             <span>{aiConfigured ? '仅内存' : '未配置'}</span>
           </div>
-          <div className="data-boundary-row">
-            <Upload size={22} />
-            <div><strong>公开候选区</strong><p>只有完整预览后的独立贡献确认，才会上传白名单结构并进入公开审核。</p></div>
-            <span>未自动上传</span>
-          </div>
+          {state.legacyArchive ? (
+            <details className="legacy-data-details">
+              <summary>查看旧版记录（{state.legacyArchive.policies?.length || 0} 项）</summary>
+              <p>0.9 回答只读保留，不会被重新解释成新版政策判断。</p>
+              <ul>{state.legacyArchive.policies?.map((policy) => (
+                <li key={policy.policyId}><strong>{policy.policyId}</strong><span>{policy.oldStance || policy.oldStatus || '未形成判断'}</span></li>
+              ))}</ul>
+              <button className="button secondary full" type="button" onClick={() => downloadLegacy(state.legacyArchive)}><Download size={17} />下载旧版记录</button>
+            </details>
+          ) : null}
 
           <div className="local-data-actions">
             <button className="button secondary full" type="button" onClick={() => downloadProgress(state)} disabled={!hasProgress}><Download size={17} />下载本地进度</button>

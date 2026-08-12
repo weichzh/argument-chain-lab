@@ -14,9 +14,9 @@ export default function Landing({ onStart, onBrowse, onReset, hasSavedProgress }
   return (
     <main className="landing simple-landing">
       <section className="landing-intro">
-        <span className="landing-kicker">论证链实验室</span>
-        <h1>从一个问题开始。</h1>
-        <p>系统会按顺序继续；不想回答时可以直接跳过，也可以从题目列表任选一道开始。</p>
+        <span className="landing-kicker">完整方案 · 逐题判断</span>
+        <h1>论证链实验室</h1>
+        <p>先判断一个完整政策方案，再逐步找出真正改变判断的条件与理由。</p>
         <div className="landing-actions">
           <button className="button primary landing-start" type="button" onClick={onStart}>
             {hasSavedProgress ? '继续答题' : '开始答题'}<ArrowRight size={18} />

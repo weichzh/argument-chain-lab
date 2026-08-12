@@ -1,21 +1,6 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import {
-  applySessionOverlay,
-  argumentsById,
-  claims,
-  configureFormalModel,
-  facts,
-  formalCertificates,
-  getPolicyElements,
-  normalizeSessionOverlay,
-  policies,
-} from '../src/data/model.js';
-import {
-  communityBankToExtension,
-  validateBankManifest,
-} from '../src/data/bank.js';
-import { loadPiCatalog, proposeWithPiAgent } from '../src/lib/aiAgent.js';
+import fs from 'node:fs';
+import { validateBankManifest } from '../src/data/bank.js';
 import {
   AI_CONFIG_SCHEMA,
   AI_CONFIG_VERSION,
@@ -23,302 +8,60 @@ import {
   serializeAiConfig,
   validateAiConfig,
 } from '../src/lib/aiConfig.js';
-import { HttpBankClient } from '../src/lib/bankClient.js';
-import { buildContributionPackage, contributionEligibility } from '../src/lib/contribution.js';
-import { createInitialState, getSelectedChain, PHASES, reducer } from '../src/lib/engine.js';
-import sitesWorker from '../public/server/index.js';
 import {
-  candidateRequestMatchesState,
-  mergeCandidateIntoOverlay,
-  validateArgumentCandidate,
-} from '../src/lib/sessionOverlay.js';
-import { validateContributionPackage } from '../shared/contribution-contract.js';
-import { loadCurrentFormalModel } from './lib/load-formal-model.mjs';
+  configureModelV4,
+  getPolicyV4,
+  getReasonsForClaimV4,
+  getResolvedFrameV4,
+} from '../src/lib/modelV4.js';
+import { validateArgumentCandidate } from '../src/lib/sessionOverlay.js';
 
-const { manifest, model } = await loadCurrentFormalModel();
-assert.equal(validateBankManifest(manifest).version, manifest.current);
-configureFormalModel(model);
-const invalidElementModel = structuredClone(model);
-invalidElementModel.policies[0].policyChoices[0].kind = 'scenario_condition';
-assert.throws(() => configureFormalModel(invalidElementModel), /kind/);
-configureFormalModel(model);
+const manifest = JSON.parse(fs.readFileSync(new URL('../public/bank/manifest.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.0.0.json', import.meta.url), 'utf8'));
 
-const config = {
+assert.equal(validateBankManifest(manifest).version, '1.0.0');
+const index = configureModelV4(model);
+assert.deepEqual(index, { version: '1.0.0', policyCount: 8, claimCount: 117, reasonCount: 173 });
+assert.equal(getPolicyV4('speech_restriction').rootFrameId, 'speech_root');
+assert.equal(getResolvedFrameV4('speech_restriction', 'speech_civil_only').sanction, 'civil_only');
+assert(getReasonsForClaimV4('c_speech_reject_sanction').length >= 2);
+
+const aiConfig = {
   schema: AI_CONFIG_SCHEMA,
   version: AI_CONFIG_VERSION,
   provider: 'openai',
-  model: 'gpt-5-mini',
-  apiKey: 'test-key-that-must-stay-local',
-  baseUrl: 'https://example.invalid/v1',
-  providerOptions: { temperature: 0.2 },
+  model: 'gpt-5',
+  apiKey: 'test-only-placeholder',
+  baseUrl: null,
+  providerOptions: {},
 };
-const serializedConfig = serializeAiConfig(config);
-assert.equal(serializedConfig.ok, true);
-assert.deepEqual(parseAiConfig(serializedConfig.value).value, config);
-assert.equal(validateAiConfig({ ...config, accountId: 'forbidden' }).ok, false);
+assert.equal(validateAiConfig(aiConfig).ok, true);
+const serialized = serializeAiConfig(aiConfig);
+assert.equal(serialized.ok, true);
+assert.equal(parseAiConfig(serialized.value).value.apiKey, 'test-only-placeholder');
 
-const catalog = await loadPiCatalog();
-assert(catalog.length > 10, 'pi-ai should expose its built-in provider catalog.');
-assert(catalog.some((provider) => provider.id === 'openai' && provider.models.length > 0));
-const abortedRequest = new AbortController();
-abortedRequest.abort();
-await assert.rejects(
-  proposeWithPiAgent({
-    config,
-    userText: 'This request must never reach a provider.',
-    scope: 'new_root',
-    context: {},
-    signal: abortedRequest.signal,
-  }),
-  { name: 'AbortError' },
-);
-
-const rawDraft = 'RAW_DRAFT_MUST_NOT_BE_PERSISTED_OR_CONTRIBUTED';
 const candidate = {
-  scope: 'new_root',
-  direction: 'support',
-  schemeId: 'harm_prevention',
-  target: {
-    shortLabel: '优先修复危险路口',
-    text: '城市应当优先修复事故风险明确偏高的路口。',
-  },
-  argument: {
-    title: '先处理可核查的高风险点',
-    summary: '事故记录和可行改造共同构成优先处理的理由。',
-  },
-  facts: [
-    {
-      kind: 'empirical',
-      statement: '这些路口的严重事故率持续高于同类路口。',
-      plainExplanation: '这里只比较同类路口的严重事故率。',
-      truthConditions: '连续多个统计周期的可比记录显示事故率更高。',
-      falsifier: '可比记录显示差异不存在或来自统计口径错误。',
-    },
-    {
-      kind: 'descriptive',
-      statement: '已有工程方案能够在现有预算内降低主要风险。',
-      plainExplanation: '这里只判断方案是否可执行并能降低风险。',
-      truthConditions: '工程评估给出明确措施、预算和风险降低依据。',
-      falsifier: '评估显示措施不可执行、超出预算或不能降低风险。',
-    },
-  ],
+  scope: 'current_target',
+  direction: 'oppose',
+  schemeId: 'proportionality',
+  target: { shortLabel: '反对较强处罚', text: model.claims.c_speech_reject_sanction.text },
+  argument: { title: '负担过重', summary: '处罚强度超过题设目标所需程度。' },
+  facts: [{
+    kind: 'stipulated',
+    statement: '存在负担更小的办法。',
+    plainExplanation: '比较替代办法。',
+    truthConditions: '替代办法达到相近目标。',
+    falsifier: '替代办法明显无效。',
+  }],
   bridge: {
     kind: 'terminal',
-    shortLabel: '优先避免可预防的严重伤害',
-    text: '公共资源应当优先用于避免已有可靠方案可以预防的严重伤害。',
-    explanation: '这条原则说明可核查风险和可行方案为何形成优先理由。',
-    example: '同样预算下，应先修复有明确坍塌风险的公共设施。',
+    shortLabel: '负担相称',
+    text: '公共手段造成的负担应当与目标相称。',
+    explanation: '把政策负担纳入判断。',
+    example: '同样目标下优先选择负担更小的办法。',
   },
-  stressTest: {
-    scenario: '另一个社区也存在同等严重、同样可预防的公共安全风险。',
-    question: '即使社区立场与你不同，你仍接受相同的优先原则吗？',
-  },
+  stressTest: { scenario: '换成对象不同但负担相同的政策。', question: '你仍接受这条理由吗？' },
 };
-
-assert.equal(validateArgumentCandidate(candidate, 'new_root').ok, true);
-assert.equal(validateArgumentCandidate({ ...candidate, schemeId: 'invented_scheme' }, 'new_root').ok, false);
-assert.equal(validateArgumentCandidate({ ...candidate, direction: 'oppose' }, 'new_root', 'support').ok, false);
-const installed = mergeCandidateIntoOverlay(normalizeSessionOverlay(), candidate);
-assert(installed.policyId.startsWith('local_policy_'));
-assert(Object.keys(installed.overlay.facts).every((id) => id.startsWith('local_fact_')));
-assert(!JSON.stringify(installed.overlay).includes(rawDraft));
-
-const protectedFactId = Object.keys(model.facts)[0];
-const protectedStatement = facts[protectedFactId].statement;
-applySessionOverlay({
-  facts: {
-    [protectedFactId]: { id: protectedFactId, statement: 'attempted overwrite' },
-  },
-});
-assert.equal(facts[protectedFactId].statement, protectedStatement, 'Session overlay must not replace formal bank ids.');
-
-applySessionOverlay(installed.overlay);
-assert.equal(policies.find((policy) => policy.id === installed.policyId)?.origin, 'session_overlay');
-assert.equal(claims[installed.targetClaimId].text, candidate.target.text);
-assert.equal(claims[installed.overlay.arguments[installed.argumentId].bridgeClaimId].nominatable, true);
-assert.equal(argumentsById[installed.argumentId].factIds.length, candidate.facts.length);
-assert.equal(argumentsById[installed.argumentId].proposedSchemeId, candidate.schemeId);
-applySessionOverlay({
-  ...installed.overlay,
-  arguments: {
-    ...installed.overlay.arguments,
-    [installed.argumentId]: {
-      ...installed.overlay.arguments[installed.argumentId],
-      formalization: model.arguments.speech_harm_support.formalization,
-    },
-  },
-});
-assert.equal(formalCertificates[installed.argumentId], undefined, 'Session candidates cannot mint formal certificates.');
-applySessionOverlay(installed.overlay);
-
-let state = reducer(createInitialState(), { type: 'SET_ASSESSMENT_MODE', mode: 'real_world_belief' });
-state = reducer(state, { type: 'SET_SESSION_OVERLAY', overlay: installed.overlay });
-state = reducer(state, {
-  type: 'START_FROM_CANDIDATE',
-  policyId: installed.policyId,
-  argumentId: installed.argumentId,
-  direction: installed.direction,
-});
-assert.equal(state.phase, PHASES.FACT);
-for (const _fact of candidate.facts) state = reducer(state, { type: 'ANSWER_FACT', response: 'true' });
-assert.equal(state.phase, PHASES.BRIDGE);
-state = reducer(state, { type: 'ANSWER_BRIDGE', response: 'accept' });
-assert.equal(state.phase, PHASES.TERMINAL_CONFIRM);
-state = reducer(state, { type: 'CONFIRM_TERMINAL', response: 'accept' });
-state = reducer(state, { type: 'ANSWER_STRESS', response: 'apply' });
-assert.equal(state.phase, PHASES.DEFEATER);
-state = reducer(state, { type: 'NO_DEFEATER_ACCEPTED' });
-const completedChain = getSelectedChain(state);
-assert.equal(completedChain.status, 'complete');
-
-const staleContext = {
-  updatedAt: state.updatedAt,
-  policyIndex: state.policyIndex,
-  phase: state.phase,
-  chainId: state.currentChain?.id || null,
-  targetClaimId: state.currentTargetClaimId,
-  argumentId: state.currentArgumentId,
-  factIndex: state.currentFactIndex,
-  stepCount: state.currentChain?.steps.length || 0,
-};
-assert.equal(candidateRequestMatchesState(state, staleContext), true);
-assert.equal(candidateRequestMatchesState({ ...state, phase: PHASES.RESULTS }, staleContext), false);
-
-configureFormalModel(model);
-let recursiveState = reducer(createInitialState(), { type: 'START' });
-for (const element of getPolicyElements(policies[recursiveState.policyIndex], ['policy_choice', 'safeguard', 'parameter'])) {
-  recursiveState = reducer(recursiveState, {
-    type: 'SET_POLICY_ELEMENT_RESPONSE',
-    elementId: element.id,
-    response: element.kind === 'policy_choice' ? 'undecided' : 'uncertain',
-  });
-}
-recursiveState = reducer(recursiveState, { type: 'COMPLETE_COMPONENTS' });
-recursiveState = reducer(recursiveState, { type: 'SET_STANCE', stance: 'support' });
-const recursiveCandidate = {
-  ...candidate,
-  scope: 'current_target',
-  target: {
-    shortLabel: claims[recursiveState.currentTargetClaimId].shortLabel,
-    text: claims[recursiveState.currentTargetClaimId].text,
-  },
-  bridge: { ...candidate.bridge, kind: 'bridge' },
-};
-const recursiveInstalled = mergeCandidateIntoOverlay(
-  normalizeSessionOverlay(),
-  recursiveCandidate,
-  { currentTargetClaimId: recursiveState.currentTargetClaimId },
-);
-applySessionOverlay(recursiveInstalled.overlay);
-recursiveState = reducer(recursiveState, { type: 'SET_SESSION_OVERLAY', overlay: recursiveInstalled.overlay });
-recursiveState = reducer(recursiveState, { type: 'USE_CANDIDATE_ARGUMENT', argumentId: recursiveInstalled.argumentId });
-for (const _fact of recursiveCandidate.facts) recursiveState = reducer(recursiveState, { type: 'ANSWER_FACT', response: 'true' });
-recursiveState = reducer(recursiveState, { type: 'ANSWER_BRIDGE', response: 'accept' });
-recursiveState = reducer(recursiveState, { type: 'SET_DEPTH', decision: 'deeper' });
-assert.equal(recursiveState.phase, PHASES.ARGUMENT);
-assert.equal(recursiveState.currentTargetClaimId, recursiveInstalled.overlay.arguments[recursiveInstalled.argumentId].bridgeClaimId);
-applySessionOverlay(installed.overlay);
-
-const contribution = buildContributionPackage(state, completedChain);
-assert.equal(contribution.ok, true, contribution.reasons?.join('; '));
-const unresolvedDefeater = {
-  ...completedChain,
-  defeaterReview: {
-    argumentId: 'removed_defeater',
-    factResponses: {},
-    bridgeClaimId: 'removed_bridge',
-    bridgeResponse: 'reject',
-    effect: 'reject',
-    stanceBefore: 'support',
-    stanceAfter: 'support',
-  },
-};
-assert.equal(contributionEligibility(state, unresolvedDefeater).eligible, false);
-const establishedRejectedDefeater = {
-  ...completedChain,
-  defeaterReview: {
-    argumentId: 'speech_choice_oppose',
-    factResponses: Object.fromEntries(argumentsById.speech_choice_oppose.factIds.map((factId) => [factId, 'true'])),
-    bridgeClaimId: argumentsById.speech_choice_oppose.bridgeClaimId,
-    bridgeResponse: 'accept',
-    effect: 'reject',
-    stanceBefore: 'support',
-    stanceAfter: 'support',
-  },
-};
-assert.equal(contributionEligibility(state, establishedRejectedDefeater).eligible, false);
-const conditionalContribution = buildContributionPackage(state, {
-  ...completedChain,
-  steps: completedChain.steps.map((step) => ({ ...step, assessmentMode: 'conditional_scenario' })),
-});
-assert.equal(conditionalContribution.ok, false, 'Conditionally stipulated facts must not enter the public contribution path.');
-assert.equal(validateContributionPackage(contribution.value).ok, true);
-assert.equal(contribution.value.checks.formalizationCoverage, 'none');
-const contributionText = JSON.stringify(contribution.value);
-assert(!contributionText.includes(rawDraft));
-assert(!contributionText.includes(config.apiKey));
-assert.deepEqual(Object.keys(contribution.value).sort(), [
-  'argument',
-  'bankVersion',
-  'checks',
-  'consentVersion',
-  'schema',
-  'status',
-  'version',
-]);
-
-let capturedRequest;
-const bankClient = new HttpBankClient({
-  endpoint: 'https://bank.example.invalid/',
-  fetchImpl: async (url, options) => {
-    capturedRequest = { url, options };
-    return new Response(JSON.stringify({ accepted: true, duplicate: false, contentHash: `sha256:${'a'.repeat(64)}` }), {
-      status: 202,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  },
-});
-await bankClient.contribute(contribution.value);
-assert.equal(capturedRequest.url, 'https://bank.example.invalid/v1/contributions');
-assert.equal(capturedRequest.options.credentials, 'omit');
-assert.equal(capturedRequest.options.referrerPolicy, 'no-referrer');
-assert.deepEqual(JSON.parse(capturedRequest.options.body), contribution.value);
-
-const fixture = JSON.parse(await fs.readFile(
-  new URL('../shared/fixtures/minimal-complete-contribution.json', import.meta.url),
-  'utf8',
-));
-const contentHash = `sha256:${'b'.repeat(64)}`;
-const extension = communityBankToExtension({
-  schema: 'argument-chain-community-bank',
-  version: 1,
-  entries: [{ contentHash, contribution: fixture }],
-});
-assert.equal(extension.policies.length, 1);
-assert.equal(getPolicyElements(extension.policies[0]).length, 0, 'Community policies may omit policy-element decomposition.');
-assert.equal(Object.keys(extension.arguments).length, fixture.argument.steps.length);
-const communityArguments = Object.values(extension.arguments);
-for (let index = 1; index < communityArguments.length; index += 1) {
-  assert.equal(communityArguments[index].targetClaimId, communityArguments[index - 1].bridgeClaimId);
-}
-configureFormalModel({
-  ...model,
-  facts: { ...model.facts, ...extension.facts },
-  claims: { ...model.claims, ...extension.claims },
-  arguments: { ...model.arguments, ...extension.arguments },
-  policies: [...model.policies, ...extension.policies],
-});
-const communityState = reducer(createInitialState(), { type: 'START_AT_POLICY', policyId: extension.policies[0].id });
-assert.equal(communityState.phase, PHASES.STANCE, 'A community policy without typed elements must open directly instead of crashing.');
-
-const hostedRuntimeConfig = await sitesWorker.fetch(new Request('https://argument-chain.example/runtime-config.js'), {
-  ASSETS: { fetch: async () => { throw new Error('runtime config must not use hosted persistence'); } },
-});
-assert.equal(await hostedRuntimeConfig.text(), "window.__ARGUMENT_CHAIN_BANK_ENDPOINT__ = '';\n");
-assert.equal(hostedRuntimeConfig.headers.get('content-type'), 'application/javascript; charset=utf-8');
-const hostedAsset = new Response('asset', { headers: { 'Content-Type': 'image/png' } });
-assert.equal(await sitesWorker.fetch(new Request('https://argument-chain.example/og.png'), {
-  ASSETS: { fetch: async () => hostedAsset },
-}), hostedAsset);
-
-console.log('Runtime feature tests passed: formal-bank protection, pi-ai catalog, memory-only config contract, confirmed session overlay, strict contribution, and community-bank links.');
+assert.equal(validateArgumentCandidate(candidate, 'current_target', 'oppose').ok, true);
+assert.equal(validateArgumentCandidate({ ...candidate, direction: 'support' }, 'current_target', 'oppose').ok, false);
+console.log('Runtime feature tests passed.');

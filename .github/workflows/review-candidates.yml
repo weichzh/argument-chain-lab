@@ -1,4 +1,4 @@
-name: 生成候选论证审核 PR
+name: 归档旧契约候选论证
 
 on:
   schedule:
@@ -25,7 +25,7 @@ jobs:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
     steps:
-      - name: 检出正式题库
+      - name: 检出兼容归档
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
@@ -97,7 +97,7 @@ jobs:
               >/dev/null
           done < .tmp/r2-object-keys.txt
 
-      - name: 校验、去重并生成正式扩展变更
+      - name: 校验、去重并生成兼容归档变更
         id: prepare
         if: steps.review-branch.outputs.has_open_pr != 'true'
         shell: bash
@@ -137,13 +137,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/bank/community-contributions-v1.json
-          git commit -m "data: 添加待审核的匿名完整论证"
+          git commit -m "data: 归档待审核的旧契约论证"
           git push --force-with-lease --set-upstream origin "$branch"
           url="$(gh pr create \
             --base main \
             --head "$branch" \
-            --title "审核匿名贡献的完整论证" \
-            --body "本 PR 由定时任务生成，只包含用户明确同意公开、且通过结构校验、内容哈希、去重和敏感信息扫描的完整论证。请人工检查命题类型、推导相关性、措辞、政治平衡与题库复用；合并前不得把自动检查视为事实认证。")"
+            --title "审核旧契约候选论证归档" \
+            --body "本 PR 由定时任务生成，只包含通过结构校验、内容哈希、去重和敏感信息扫描的旧契约候选。该归档不在 v4 manifest 中，合并不会使内容进入 1.0 正式题库；迁入新版前仍需按完整政策框架重新设计和人工审核。")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: 删除已进入审核流程或已去重的对象

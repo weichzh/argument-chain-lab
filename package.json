@@ -1,13 +1,13 @@
 {
-  "name": "argument-atlas-dialogue",
+  "name": "argument-chain-lab",
   "private": true,
-  "version": "0.9.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/validate-model.mjs && node scripts/validate-formal-model.mjs && node scripts/validate-formal-reviews.mjs && vite build",
+    "build": "node scripts/validate-model.mjs && vite build",
     "preview": "vite preview",
-    "test": "node scripts/test-engine.mjs && node scripts/test-formal-validator.mjs && node scripts/validate-model.mjs && node scripts/validate-formal-model.mjs && node scripts/validate-formal-reviews.mjs && node scripts/test-ideology.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs",
+    "test": "node scripts/test-engine.mjs && node scripts/test-model-mutations.mjs && node scripts/test-formal-validator.mjs && node scripts/test-session-migration.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs && node scripts/validate-model.mjs",
     "test:e2e": "playwright test",
     "export:model": "node scripts/export-model.mjs",
     "dev:worker": "wrangler -c worker/wrangler.jsonc dev",

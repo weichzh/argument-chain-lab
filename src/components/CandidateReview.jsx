@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, CircleAlert, X } from 'lucide-react';
-import { arglogicCatalog } from '../data/model.js';
+import { getArgumentSchemesV4 } from '../lib/modelV4.js';
 import useDialogFocus from '../hooks/useDialogFocus.js';
-
-const formatPattern = (formula) => (
-  formula?.pred ? `${formula.pred}(${formula.args.join(', ')})` : JSON.stringify(formula)
-);
 
 export default function CandidateReview({ review, onConfirm, onClose }) {
   const [candidate, setCandidate] = useState(null);
@@ -17,7 +13,8 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
   const dialogRef = useDialogFocus(Boolean(review && candidate), onClose);
 
   if (!review || !candidate) return null;
-  const selectedScheme = arglogicCatalog?.schemes?.find((scheme) => scheme.id === candidate.schemeId);
+  const schemes = getArgumentSchemesV4();
+  const selectedScheme = schemes.find((scheme) => scheme.id === candidate.schemeId);
 
   const update = (path, value) => {
     setCandidate((current) => {
@@ -48,7 +45,7 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
               {review.scope === 'new_root' ? <label className="field"><span>判断方向</span><select value={candidate.direction} onChange={(event) => update(['direction'], event.target.value)}><option value="support">支持</option><option value="oppose">反对</option></select></label> : null}
               <label className="field"><span>理由标题</span><input value={candidate.argument.title} onChange={(event) => update(['argument', 'title'], event.target.value)} /></label>
               <label className="field"><span>理由摘要</span><textarea rows={3} value={candidate.argument.summary} onChange={(event) => update(['argument', 'summary'], event.target.value)} /></label>
-              <label className="field"><span>理由类型</span><select value={candidate.schemeId} onChange={(event) => update(['schemeId'], event.target.value)}>{(arglogicCatalog?.schemes || []).map((scheme) => <option value={scheme.id} key={scheme.id}>{scheme.label}</option>)}</select></label>
+              <label className="field"><span>理由类型</span><select value={candidate.schemeId} onChange={(event) => update(['schemeId'], event.target.value)}>{schemes.map((scheme) => <option value={scheme.id} key={scheme.id}>{scheme.label}</option>)}</select></label>
             </div>
           </div>
 
@@ -90,14 +87,14 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
             <p>这是尚未绑定具体实体的方案槽位对照，不是“有效”证书。</p>
             <dl>
               <dt>方案</dt><dd>{selectedScheme?.label || candidate.schemeId}</dd>
-              {(selectedScheme?.requiredPremises || []).map((premise, index) => (
-                <React.Fragment key={premise.slot}>
+              {(selectedScheme?.requiredRoles || []).map((role, index) => (
+                <React.Fragment key={role}>
                   <dt>前提 {index + 1}</dt>
-                  <dd><span>{candidate.facts[index]?.statement || '尚未映射中文前提'}</span><code>{formatPattern(premise.pattern)}</code></dd>
+                  <dd><span>{candidate.facts[index]?.statement || '尚未映射中文前提'}</span><code>{role}</code></dd>
                 </React.Fragment>
               ))}
               <dt>桥接规则</dt><dd>{candidate.bridge.text}</dd>
-              <dt>结论</dt><dd><span>{candidate.target.text}</span><code>{formatPattern(selectedScheme?.conclusionPattern)}</code></dd>
+              <dt>结论</dt><dd><span>{candidate.target.text}</span><code>{selectedScheme?.inferenceKind || 'defeasible'}</code></dd>
             </dl>
           </details>
         </div>

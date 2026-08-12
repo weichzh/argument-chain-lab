@@ -1,5 +1,7 @@
 # 题库候选服务
 
+> 1.0 兼容说明：当前 v4 前端不提交本 Worker 的旧贡献包，正式 manifest 也不加载旧社区扩展。本目录只保留既有私有候选区的数据边界和独立验证；旧候选必须按完整政策框架重新设计并审核后，才能进入 1.0 正式题库。
+
 这个 Worker 只有一个写入职责：接收用户已经在浏览器中预览并明确同意公开的完整论证，执行严格白名单校验、文本规范化和内容哈希，然后写入私有 R2 候选区。它不代理 AI，不接收账号、会话、AI 配置、原始自由输入、时间、设备或行为数据。
 
 ## 数据边界
@@ -16,7 +18,7 @@
 
 正式环境先创建 `argument-chain-candidates` bucket。Wrangler 的默认本地开发使用本机模拟存储；只有需要远程预览时，才另建一个预览 bucket，并在自己的 Wrangler 配置中覆盖绑定。候选 bucket 不得开启公开访问或绑定公开自定义域名，也不要把 R2 凭据写入仓库。
 
-```powershell
+```bash
 npx wrangler r2 bucket create argument-chain-candidates
 npx wrangler --config worker/wrangler.jsonc dev
 ```
@@ -25,13 +27,13 @@ npx wrangler --config worker/wrangler.jsonc dev
 
 部署前把 `worker/wrangler.jsonc` 中的 bucket 名称和 `ALLOWED_ORIGINS` 改成真实值，然后运行：
 
-```powershell
+```bash
 npx wrangler --config worker/wrangler.jsonc deploy
 ```
 
 ## GitHub Actions
 
-`.github/workflows/review-candidates.yml` 每天从 `candidates/v1/` 最多拉取 25 个候选，重新执行 Schema 校验、哈希验证、去重和敏感信息扫描。通过的内容被写入 `public/bank/community-contributions-v1.json`，并由 GitHub Actions 建立公开审核 PR；只有人工合并后，它才成为正式题库扩展。只要前一份自动审核 PR 仍然打开，新候选就继续留在 R2，不会被追加到一个不断膨胀的 PR。限制单批数量可以避免异常流量直接生成无法人工审查的大型 PR。
+`.github/workflows/review-candidates.yml` 从 `candidates/v1/` 最多拉取 25 个旧契约候选，重新执行 Schema 校验、哈希验证、去重和敏感信息扫描。通过的内容写入 `public/bank/community-contributions-v1.json` 供兼容审核；该文件不在 v4 manifest 中，人工合并也不会自动使内容进入 1.0 正式题库。
 
 仓库需要配置以下 GitHub Actions Secrets：
 
@@ -44,7 +46,7 @@ R2 API token 只授予这个 bucket 的对象读写权限。未通过结构或�
 
 审核者可以直接修改 PR 中的规范化命题或条件，但不能添加 Schema 白名单以外的字段。编辑后运行下面的命令重新规范化文本并计算内容哈希；若修改引入重复论证、敏感信息或不完整状态，命令会失败而不会静默删改字段。
 
-```powershell
+```bash
 node scripts/normalize-community-bank.mjs public/bank/community-contributions-v1.json
 ```
 
@@ -52,6 +54,6 @@ node scripts/normalize-community-bank.mjs public/bank/community-contributions-v1
 
 共享契约、Worker 写入边界和本地审核流水线使用同一个无外部依赖测试入口：
 
-```powershell
+```bash
 node scripts/test-contribution-pipeline.mjs
 ```

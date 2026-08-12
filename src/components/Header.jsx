@@ -1,6 +1,7 @@
 import React from 'react';
 import { Database, Settings } from 'lucide-react';
-import { getCurrentPolicy, PHASES } from '../lib/engine.js';
+import { getPolicyV4 } from '../lib/modelV4.js';
+import { VIEWS } from '../hooks/useSession.js';
 
 const utilityButton = (label, Icon, onClick, active = false) => (
   <button
@@ -20,8 +21,8 @@ export default function Header({
   onConfig,
   onLocalData,
 }) {
-  const policy = getCurrentPolicy(state);
-  const inProgress = ![PHASES.LANDING, PHASES.POLICY_OVERVIEW, PHASES.RESULTS].includes(state.phase);
+  const policy = getPolicyV4(state.currentPolicyId);
+  const inProgress = state.view === VIEWS.QUESTIONNAIRE;
   return (
     <header className="app-header">
       <div className="header-brand">
