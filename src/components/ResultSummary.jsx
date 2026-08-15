@@ -19,6 +19,22 @@ const counterImpactCopy = {
   uncertain: '相反理由的影响暂时不能确定。',
 };
 
+const reasonLabel = (status, counter = false) => ({
+  accepted: counter ? '认真考虑的相反理由' : '主要理由',
+  qualified: counter ? '有保留的相反理由' : '有保留的主要理由',
+  retracted: counter ? '经检验撤回的相反理由' : '经检验撤回的理由',
+  uncertain: counter ? '尚未确认的相反理由' : '尚未确认的理由',
+  unchecked: counter ? '尚未检查的相反理由' : '尚未检查的主要理由',
+  custom_unverified: counter ? '认真考虑的相反理由' : '主要理由',
+}[status] || (counter ? '认真考虑的相反理由' : '主要理由'));
+
+const stressResultCopy = (stress) => ({
+  apply: '仍然适用',
+  qualified: `存在重要区别：${stress.distinction}`,
+  retract: '撤回这条理由',
+  uncertain: '是否适用尚不确定',
+}[stress.response] || '尚未检查');
+
 const downloadResults = (state) => {
   const payload = {
     schema: 'argument-chain-results-export',
@@ -54,7 +70,7 @@ function DetailedPath({ path, title }) {
         const bridge = getClaimV4(step.bridgeClaimId);
         return <li key={step.reasonId}><strong>{reason?.title}</strong><span>{bridge?.text}</span></li>;
       })}</ol>
-      {path.stress ? <p>相似案例：{path.stress.response === 'apply' ? '仍然适用' : path.stress.response === 'qualified' ? `存在重要区别：${path.stress.distinction}` : '未能维持原理由'}</p> : null}
+      {path.stress ? <p>相似案例：{stressResultCopy(path.stress)}</p> : null}
     </section>
   );
 }
@@ -98,18 +114,23 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
         <div className="v4-result-list">
           {results.map((result) => {
             const summary = summarizePolicyResult(model, result);
+            const finalAnswer = result.finalRootAnswer ?? result.rootAnswer;
+            const finalChanged = finalAnswer !== result.rootAnswer;
             return (
               <article className="v4-result-item" key={result.policyId}>
-                <header><span>{summary.title}</span><strong>{rootAnswerCopy[result.rootAnswer]}</strong></header>
-                <h2>{summary.summary}</h2>
+                <header><span>{summary.title}</span><strong>{finalChanged
+                  ? `${rootAnswerCopy[result.rootAnswer]} → ${rootAnswerCopy[finalAnswer]}`
+                  : rootAnswerCopy[result.rootAnswer]}</strong></header>
+                <h2>{finalChanged ? `初始判断：${summary.summary}` : summary.summary}</h2>
+                {finalChanged ? <p><b>复核后的最终判断：</b>{rootAnswerCopy[finalAnswer]}</p> : null}
                 {summary.acceptedRevision ? <p><b>可接受的修改方案：</b>{summary.acceptedRevision}</p> : null}
                 {summary.changes?.length ? (
                   <dl className="v4-result-changes">{summary.changes.map((change) => <React.Fragment key={change.dimensionId}><dt>{change.label}</dt><dd>{change.from} → {change.to}</dd></React.Fragment>)}</dl>
                 ) : null}
                 {summary.diagnosis ? <p><b>使判断改变的差异：</b>{summary.diagnosis}</p> : null}
-                {summary.mainReasonTitle ? <p><b>主要理由：</b>{summary.mainReasonTitle}</p> : null}
+                {summary.mainReasonTitle ? <p><b>{reasonLabel(summary.pathStatus)}：</b>{summary.mainReasonTitle}</p> : null}
                 {summary.deeperReason ? <p><b>更深理由：</b>{summary.deeperReason}</p> : null}
-                {summary.counterReasonTitle ? <p><b>认真考虑的相反理由：</b>{summary.counterReasonTitle}</p> : null}
+                {summary.counterReasonTitle ? <p><b>{reasonLabel(summary.counterPathStatus, true)}：</b>{summary.counterReasonTitle}</p> : null}
                 {counterImpactCopy[summary.counterImpact] ? <p><b>复核结果：</b>{counterImpactCopy[summary.counterImpact]}</p> : null}
                 <details>
                   <summary>查看详细推理记录</summary>

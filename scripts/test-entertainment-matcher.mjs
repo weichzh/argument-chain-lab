@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {
   buildRootOnlyResults,
   matchEntertainment,
+  validateEntertainmentResult,
 } from '../src/lib/entertainmentMatcher.js';
 import { simulateBenchmark } from './simulate-ideology-benchmark.mjs';
 
@@ -48,11 +49,91 @@ const rootResult = await matchEntertainment(model, benchmark, rootOnly, {
   expectedPolicyIds: benchmark.corePolicyIds,
 });
 assert.equal(rootResult.policyCoveragePercent, 100);
-assert(rootResult.reasoningDepthPercent < 30);
+assert.equal(rootResult.reasoningDepthPercent, 10);
 assert(['ambiguous', 'exploratory'].includes(rootResult.confidence));
 assert(rootResult.tieBreaker, 'A root-only match should normally recommend a tie-breaker.');
 assert.equal(rootResult.displayStrategy.id, 'candidate_group');
 assert.equal(rootResult.decisiveSimilarities.some((item) => item.kind === 'shared_reason_family'), false);
+assert(rootResult.candidateGroup.flatMap((candidate) => candidate.differences)
+  .every((item) => item.kind === 'different_answer'));
+
+// A shared terminal value must not be presented as the difference when the actual difference is the reason path.
+const absoluteMonarchism = profileById['ideology:absolute_monarchism'];
+const singlePolicyBenchmark = {
+  ...benchmark,
+  corePolicyIds: ['metadata_surveillance'],
+  tieBreakerPolicyIds: [],
+  profiles: [absoluteMonarchism],
+};
+const metadataUser = {
+  metadata_surveillance: {
+    policyId: 'metadata_surveillance',
+    rootAnswer: 'yes',
+    diagnosisClaimId: 'c_metadata_support_root',
+    mainPaths: [{
+      status: 'accepted',
+      steps: [
+        { reasonId: 'r_metadata_support_detection', bridgeClaimId: 'n_prevent_severe_harm' },
+        { reasonId: 'r_prevent_severe_harm_ground_1', bridgeClaimId: 'v_security' },
+      ],
+      stress: { response: 'apply', claimId: 'v_security' },
+    }],
+    counterImpact: 'no_change',
+  },
+};
+const metadataResult = await matchEntertainment(model, singlePolicyBenchmark, metadataUser);
+assert.equal(metadataResult.differencesFromNearest[0].kind, 'different_primary_reason');
+assert.equal(metadataResult.differencesFromNearest[0].userReason, '元数据模式能够发现协调性严重威胁');
+assert.equal(metadataResult.differencesFromNearest[0].profileReason, '现代安全威胁需要国家具备网络识别能力');
+assert(metadataResult.decisiveSimilarities.some((item) => (
+  item.kind === 'shared_terminal_value' && item.valueId === 'v_security'
+)));
+assert.equal(validateEntertainmentResult(
+  model,
+  singlePolicyBenchmark,
+  metadataUser,
+  metadataResult,
+).ok, true);
+const forgedExplanation = structuredClone(metadataResult);
+forgedExplanation.differencesFromNearest[0].userReason = '人身与公共安全';
+assert.equal(validateEntertainmentResult(
+  model,
+  singlePolicyBenchmark,
+  metadataUser,
+  forgedExplanation,
+).ok, false);
+const forgedMargin = structuredClone(metadataResult);
+forgedMargin.marginToSecond = 99;
+assert.equal(validateEntertainmentResult(
+  model,
+  singlePolicyBenchmark,
+  metadataUser,
+  forgedMargin,
+).ok, false);
+
+// Retracted paths can explain a stress-response difference, but cannot count as adopted reasons or values.
+const retractedMetadataUser = structuredClone(metadataUser);
+retractedMetadataUser.metadata_surveillance.mainPaths[0].status = 'retracted';
+retractedMetadataUser.metadata_surveillance.mainPaths[0].stress.response = 'retract';
+const retractedResult = await matchEntertainment(model, singlePolicyBenchmark, retractedMetadataUser);
+assert.equal(retractedResult.differencesFromNearest[0].kind, 'different_stress_response');
+assert.equal(retractedResult.decisiveSimilarities.some((item) => (
+  ['shared_terminal_value', 'shared_reason_family'].includes(item.kind)
+)), false);
+
+await assert.rejects(matchEntertainment(model, singlePolicyBenchmark, {
+  metadata_surveillance: {
+    policyId: 'metadata_surveillance',
+    rootAnswer: 'uncertain',
+    finalRootAnswer: 'yes',
+    acceptedRevisionFrameId: null,
+    derivedConditionalAcceptance: false,
+    diagnosisClaimId: null,
+    mainPaths: [],
+    counterPath: null,
+    counterImpact: null,
+  },
+}), /政策结果未通过形式校验/);
 
 // Missing policies reduce policy coverage; they do not count as disagreement.
 const onePolicy = { speech_restriction: rootOnly.speech_restriction };

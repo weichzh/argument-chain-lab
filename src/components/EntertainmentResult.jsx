@@ -9,6 +9,21 @@ const answerCopy = {
   uncertain: '不确定',
 };
 
+const stressCopy = {
+  apply: '仍然适用',
+  qualified: '存在重要区别',
+  retract: '撤回这条理由',
+  uncertain: '不确定',
+};
+
+const counterImpactCopy = {
+  no_change: '不改变原判断',
+  weaken: '有所犹豫但不改变结论',
+  offset: '两边暂时抵消',
+  reverse: '改变结论',
+  uncertain: '影响不确定',
+};
+
 const percent = (value) => `${Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`;
 
 const ideologyLabel = (item) => (
@@ -34,12 +49,28 @@ const differenceCopy = (item, model) => {
   if (item.kind === 'different_revision_boundary') {
     return `${item.policyTitle}：你接受“${frameLabel(model, item.policyId, item.userRevision)}”，该参考接受“${frameLabel(model, item.policyId, item.profileRevision)}”。`;
   }
-  if (item.kind === 'same_answer_different_reason') {
-    const userReason = item.userTerminal || item.userReason || '当前理由';
-    const profileReason = item.profileTerminal || item.profileReason || '另一条理由';
-    return `${item.policyTitle}：根判断相同，但你更重视“${userReason}”，该参考更重视“${profileReason}”。`;
+  if (item.kind === 'different_diagnosis') {
+    return `${item.policyTitle}：根判断相同，但你们定位到的判断目标分别是“${item.userDiagnosis}”和“${item.profileDiagnosis}”。`;
   }
-  return `${item.policyTitle}：你和该参考对相反理由的反应不同。`;
+  if (item.kind === 'different_terminal_value') {
+    return `${item.policyTitle}：根判断相同，但你的更深理由停在“${item.userTerminal}”，该参考路径停在“${item.profileTerminal}”。`;
+  }
+  if (item.kind === 'different_primary_reason') {
+    return `${item.policyTitle}：根判断相同；你的主要理由是“${item.userReason}”，该参考路径的主要理由是“${item.profileReason}”。`;
+  }
+  if (item.kind === 'different_reason_path') {
+    return `${item.policyTitle}：根判断和主要理由相同，但后续理由路径分别经过“${item.userReason}”和“${item.profileReason}”。`;
+  }
+  if (item.kind === 'different_stress_response') {
+    return `${item.policyTitle}：对相似案例，你选择“${stressCopy[item.userStressResponse]}”，该参考路径记录“${stressCopy[item.profileStressResponse]}”。`;
+  }
+  if (item.kind === 'different_counter_reason') {
+    return `${item.policyTitle}：你认真考虑的相反理由是“${item.userReason}”，该参考路径记录的是“${item.profileReason}”。`;
+  }
+  if (item.kind === 'different_counter_response') {
+    return `${item.policyTitle}：相反理由对你的影响是“${counterImpactCopy[item.userCounterImpact]}”，该参考路径记录的是“${counterImpactCopy[item.profileCounterImpact]}”。`;
+  }
+  return `${item.policyTitle}：当前记录不足以说明具体差异。`;
 };
 
 function PrototypeList({ items, model }) {

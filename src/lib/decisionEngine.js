@@ -1026,12 +1026,13 @@ export const summarizePolicyResult = (model, result) => {
     mainReason: firstStep?.reasonId || null,
     mainReasonTitle: firstStep ? model.reasons[firstStep.reasonId]?.title || null
       : customReason?.argument?.title || customReason?.text || null,
-    deeperReason: lastStep ? model.claims[lastStep.bridgeClaimId]?.plain
+    deeperReason: lastStep && mainPath?.status !== 'retracted' ? model.claims[lastStep.bridgeClaimId]?.plain
       || model.claims[lastStep.bridgeClaimId]?.text || null : null,
     counterReasonTitle: counterStep ? model.reasons[counterStep.reasonId]?.title || null
       : result.counterPath?.customReason?.argument?.title
         || result.counterPath?.customReason?.text || null,
     pathStatus: mainPath?.status || null,
+    counterPathStatus: result.counterPath?.status || null,
   };
   if (result.rootAnswer === 'skipped') {
     return {

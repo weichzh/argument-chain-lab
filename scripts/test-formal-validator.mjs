@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { validateReasonPath } from '../src/lib/formalValidator.js';
+import {
+  validatePolicyResult,
+  validatePolicyResults,
+  validateReasonPath,
+} from '../src/lib/formalValidator.js';
 
 const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
 const reason = model.reasons.r_speech_sanction_disproportionate;
@@ -27,4 +31,29 @@ delete missingPremise.steps[0].premiseAnswers[reason.premises[0].id];
 assert.equal(validateReasonPath(model, missingPremise).ok, false);
 
 assert.equal(validateReasonPath(model, { customReason: { text: '自定义理由' } }).status, 'custom_unverified');
+
+const validResult = {
+  policyId: 'speech_restriction',
+  rootFrameId: 'speech_root',
+  rootAnswer: 'no',
+  finalRootAnswer: 'no',
+  acceptedRevisionFrameId: 'speech_civil_only',
+  derivedConditionalAcceptance: true,
+  diagnosisClaimId: 'c_speech_reject_sanction',
+  mainPaths: [validPath],
+  counterClaimId: 'c_speech_test_sanction_defense',
+  counterPath: null,
+  counterImpact: 'no_change',
+};
+assert.deepEqual(validatePolicyResult(model, validResult), { ok: true, errors: [], warnings: [] });
+
+const wrongFinalAnswer = structuredClone(validResult);
+wrongFinalAnswer.finalRootAnswer = 'yes';
+assert.equal(validatePolicyResult(model, wrongFinalAnswer).ok, false);
+
+const wrongPathRoot = structuredClone(validResult);
+wrongPathRoot.mainPaths[0].rootClaimId = 'c_speech_support_root';
+assert.equal(validatePolicyResult(model, wrongPathRoot).ok, false);
+
+assert.equal(validatePolicyResults(model, { speech_restriction: validResult }).ok, true);
 console.log('Reason-path validator tests passed.');

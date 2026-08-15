@@ -102,6 +102,11 @@ const newSpeechSession = () => startSession(model, createSession(model, { policy
   assert.equal(summary.diagnosis, '罚款或拘留');
   assert(summary.changes.some((item) => item.dimensionId === 'sanction'));
   assert.equal(summary.mainReasonTitle, '罚款或拘留超过了必要程度');
+  const retractedResult = structuredClone(result);
+  retractedResult.mainPaths[0].status = 'retracted';
+  const retractedSummary = summarizePolicyResult(model, retractedResult);
+  assert.equal(retractedSummary.pathStatus, 'retracted');
+  assert.equal(retractedSummary.deeperReason, null);
 }
 
 {

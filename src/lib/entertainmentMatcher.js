@@ -1,4 +1,6 @@
-export const MATCHER_VERSION = 'entertainment-matcher-3.0';
+import { validatePolicyResults } from './formalValidator.js';
+
+export const MATCHER_VERSION = 'entertainment-matcher-3.1';
 
 export const DEFAULT_FEATURE_WEIGHTS = Object.freeze({
   rootAnswer: 0.10,
@@ -32,18 +34,21 @@ const jaccard = (left = [], right = []) => {
 
 const enginePathFeatures = (model, result) => {
   const mainPath = first(result.mainPaths) || null;
-  const mainReasonIds = mainPath?.steps?.map((step) => step.reasonId) || [];
-  const terminalValueId = mainPath?.stress?.claimId
-    || mainPath?.steps?.at(-1)?.bridgeClaimId
+  const supportedMainPath = mainPath?.status === 'retracted' ? null : mainPath;
+  const mainReasonIds = supportedMainPath?.steps?.map((step) => step.reasonId) || [];
+  const terminalValueId = supportedMainPath?.stress?.claimId
+    || supportedMainPath?.steps?.at(-1)?.bridgeClaimId
     || null;
-  const counterReasonIds = result.counterPath?.steps?.map((step) => step.reasonId) || [];
-  const counterTerminalValueId = result.counterPath?.stress?.claimId
-    || result.counterPath?.steps?.at(-1)?.bridgeClaimId
+  const supportedCounterPath = result.counterPath?.status === 'retracted' ? null : result.counterPath;
+  const counterReasonIds = supportedCounterPath?.steps?.map((step) => step.reasonId) || [];
+  const counterTerminalValueId = supportedCounterPath?.stress?.claimId
+    || supportedCounterPath?.steps?.at(-1)?.bridgeClaimId
     || null;
   return {
     policyId: result.policyId,
     rootAnswer: result.rootAnswer ?? null,
     finalRootAnswer: result.finalRootAnswer ?? result.rootAnswer ?? null,
+    revisionKnown: result.rootAnswer === 'no' && Boolean(result.diagnosisClaimId),
     acceptedRevisionFrameId: result.acceptedRevisionFrameId ?? null,
     diagnosisClaimId: result.diagnosisClaimId ?? null,
     primaryReasonId: mainReasonIds[0] ?? null,
@@ -63,6 +68,9 @@ const benchmarkPathFeatures = (model, path) => ({
   policyId: path.policyId,
   rootAnswer: path.rootAnswer ?? null,
   finalRootAnswer: path.rootAnswer ?? null,
+  revisionKnown: path.rootAnswer === 'no' && Boolean(
+    path.revisionBasis || path.diagnosisClaimId || path.revisionAnswers,
+  ),
   acceptedRevisionFrameId: path.acceptedRevisionFrameId ?? null,
   diagnosisClaimId: path.diagnosisClaimId ?? null,
   primaryReasonId: path.canonicalReasonPath?.[0] ?? null,
@@ -86,6 +94,7 @@ const equalityScore = (left, right, { uncertainPartial = 0.4 } = {}) => {
 
 const revisionScore = (user, profile) => {
   if (user.rootAnswer !== 'no' || profile.rootAnswer !== 'no') return null;
+  if (!user.revisionKnown || !profile.revisionKnown) return null;
   if (!user.acceptedRevisionFrameId && !profile.acceptedRevisionFrameId) return 1;
   if (user.acceptedRevisionFrameId === profile.acceptedRevisionFrameId) return 1;
   if (!user.acceptedRevisionFrameId || !profile.acceptedRevisionFrameId) return 0.15;
@@ -352,51 +361,104 @@ export const buildArgumentProfile = async (model, userByPolicy) => {
   };
 };
 
+const firstDifferentReason = (left = [], right = []) => {
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    if (left[index] !== right[index]) return [left[index] || null, right[index] || null];
+  }
+  return [null, null];
+};
+
+const reasonTitle = (model, reasonId) => reasonId ? model.reasons[reasonId]?.title || reasonId : null;
+
+const differenceForPolicy = (model, policyId, user, profile) => {
+  const policyTitle = model.policies.find((item) => item.id === policyId)?.shortTitle || policyId;
+  if (user.rootAnswer !== profile.rootAnswer) {
+    return {
+      kind: 'different_answer', policyId, policyTitle,
+      userAnswer: user.rootAnswer, profileAnswer: profile.rootAnswer,
+    };
+  }
+  if (user.revisionKnown && profile.revisionKnown
+    && user.acceptedRevisionFrameId !== profile.acceptedRevisionFrameId) {
+    return {
+      kind: 'different_revision_boundary', policyId, policyTitle,
+      userRevision: user.acceptedRevisionFrameId,
+      profileRevision: profile.acceptedRevisionFrameId,
+    };
+  }
+  if (user.diagnosisClaimId && profile.diagnosisClaimId
+    && user.diagnosisClaimId !== profile.diagnosisClaimId) {
+    return {
+      kind: 'different_diagnosis', policyId, policyTitle,
+      userDiagnosis: model.claims[user.diagnosisClaimId]?.plain || user.diagnosisClaimId,
+      profileDiagnosis: model.claims[profile.diagnosisClaimId]?.plain || profile.diagnosisClaimId,
+    };
+  }
+  if (user.terminalValueId && profile.terminalValueId
+    && user.terminalValueId !== profile.terminalValueId) {
+    return {
+      kind: 'different_terminal_value', policyId, policyTitle,
+      userTerminal: model.claims[user.terminalValueId]?.plain || user.terminalValueId,
+      profileTerminal: model.claims[profile.terminalValueId]?.plain || profile.terminalValueId,
+    };
+  }
+  if (user.primaryReasonId && profile.primaryReasonId
+    && user.primaryReasonId !== profile.primaryReasonId) {
+    return {
+      kind: 'different_primary_reason', policyId, policyTitle,
+      userReason: reasonTitle(model, user.primaryReasonId),
+      profileReason: reasonTitle(model, profile.primaryReasonId),
+    };
+  }
+  if (user.reasonFamilies?.length && profile.reasonFamilies?.length
+    && jaccard(user.reasonFamilies, profile.reasonFamilies) < 1) {
+    const [userReasonId, profileReasonId] = firstDifferentReason(user.reasonIds, profile.reasonIds);
+    return {
+      kind: 'different_reason_path', policyId, policyTitle,
+      userReason: reasonTitle(model, userReasonId) || '未记录后续理由',
+      profileReason: reasonTitle(model, profileReasonId) || '未记录后续理由',
+    };
+  }
+  if (user.stressResponse && profile.stressResponse
+    && user.stressResponse !== profile.stressResponse) {
+    return {
+      kind: 'different_stress_response', policyId, policyTitle,
+      userStressResponse: user.stressResponse,
+      profileStressResponse: profile.stressResponse,
+    };
+  }
+  if (user.counterFamilies?.length && profile.counterFamilies?.length
+    && jaccard(user.counterFamilies, profile.counterFamilies) < 1) {
+    const [userReasonId, profileReasonId] = firstDifferentReason(
+      user.counterReasonIds,
+      profile.counterReasonIds,
+    );
+    return {
+      kind: 'different_counter_reason', policyId, policyTitle,
+      userReason: reasonTitle(model, userReasonId) || '未记录相反理由',
+      profileReason: reasonTitle(model, profileReasonId) || '未记录相反理由',
+    };
+  }
+  if (user.counterImpact && profile.counterImpact
+    && user.counterImpact !== profile.counterImpact) {
+    return {
+      kind: 'different_counter_response', policyId, policyTitle,
+      userCounterImpact: user.counterImpact,
+      profileCounterImpact: profile.counterImpact,
+    };
+  }
+  return null;
+};
+
 const explainDifferences = (model, userByPolicy, profile, limit = 4) => {
   const items = [];
   for (const [policyId, user] of Object.entries(userByPolicy)) {
     const expected = profile.expectedPaths[policyId];
     if (!expected) continue;
     const profilePath = benchmarkPathFeatures(model, expected);
-    const policy = model.policies.find((item) => item.id === policyId);
-    if (user.rootAnswer !== profilePath.rootAnswer) {
-      items.push({
-        kind: 'different_answer',
-        policyId,
-        policyTitle: policy?.shortTitle || policyId,
-        userAnswer: user.rootAnswer,
-        profileAnswer: profilePath.rootAnswer,
-      });
-    } else if (user.acceptedRevisionFrameId !== profilePath.acceptedRevisionFrameId) {
-      items.push({
-        kind: 'different_revision_boundary',
-        policyId,
-        policyTitle: policy?.shortTitle || policyId,
-        userRevision: user.acceptedRevisionFrameId,
-        profileRevision: profilePath.acceptedRevisionFrameId,
-      });
-    } else if (
-      user.terminalValueId !== profilePath.terminalValueId
-      || jaccard(user.reasonFamilies, profilePath.reasonFamilies) < 1
-    ) {
-      items.push({
-        kind: 'same_answer_different_reason',
-        policyId,
-        policyTitle: policy?.shortTitle || policyId,
-        userReason: user.primaryReasonId ? model.reasons[user.primaryReasonId]?.title : null,
-        profileReason: profilePath.primaryReasonId ? model.reasons[profilePath.primaryReasonId]?.title : null,
-        userTerminal: user.terminalValueId ? model.claims[user.terminalValueId]?.plain : null,
-        profileTerminal: profilePath.terminalValueId ? model.claims[profilePath.terminalValueId]?.plain : null,
-      });
-    } else if (user.counterImpact !== profilePath.counterImpact) {
-      items.push({
-        kind: 'different_counter_response',
-        policyId,
-        policyTitle: policy?.shortTitle || policyId,
-        userCounterImpact: user.counterImpact,
-        profileCounterImpact: profilePath.counterImpact,
-      });
-    }
+    const difference = differenceForPolicy(model, policyId, user, profilePath);
+    if (difference) items.push(difference);
   }
   return items.slice(0, limit);
 };
@@ -445,6 +507,109 @@ const explainMatches = (model, userByPolicy, profile, limit = 5) => {
     .map(({ strength, ...item }) => item);
 };
 
+const validSimilarity = (model, item, user, profile) => {
+  if (!user || !profile || user.rootAnswer !== profile.rootAnswer) return false;
+  if (item.kind === 'shared_revision_boundary') {
+    return user.revisionKnown && profile.revisionKnown
+      && user.acceptedRevisionFrameId === item.frameId
+      && profile.acceptedRevisionFrameId === item.frameId;
+  }
+  if (item.kind === 'shared_terminal_value') {
+    return user.terminalValueId === item.valueId
+      && profile.terminalValueId === item.valueId
+      && item.valueLabel === (model.claims[item.valueId]?.plain || item.valueId);
+  }
+  if (item.kind === 'shared_reason_family') {
+    const similarity = user.reasonFamilies?.length && profile.reasonFamilies?.length
+      ? Math.round(jaccard(user.reasonFamilies, profile.reasonFamilies) * 100)
+      : 0;
+    return similarity > 0 && similarity === item.familySimilarity;
+  }
+  if (item.kind === 'shared_counter_response') {
+    return Boolean(user.counterImpact)
+      && user.counterImpact === profile.counterImpact
+      && item.counterImpact === user.counterImpact;
+  }
+  return item.kind === 'shared_root_answer' && item.rootAnswer === user.rootAnswer;
+};
+
+export const validateEntertainmentResult = (model, benchmark, policyResults, result) => {
+  const errors = [];
+  const userByPolicy = normalizeUserResults(model, policyResults);
+  const profiles = Object.fromEntries(benchmark.profiles.map((profile) => [profile.id, profile]));
+  const roundPercent = (value) => Math.round(value * 10000) / 100;
+  const answeredExpected = Object.keys(userByPolicy).filter((policyId) => (
+    result.expectedPolicyIds.includes(policyId)
+  )).length;
+  const expectedCoverage = result.expectedPolicyIds.length
+    ? roundPercent(answeredExpected / result.expectedPolicyIds.length)
+    : Object.keys(userByPolicy).length ? 100 : 0;
+  if (result.policyCoveragePercent !== expectedCoverage) {
+    errors.push('policyCoveragePercent: 政策覆盖率与已回答题目不一致。');
+  }
+  for (let index = 0; index < result.ranked.length; index += 1) {
+    const item = result.ranked[index];
+    if (item.rank !== index + 1
+      || item.similarityPercent !== roundPercent(item.similarity)
+      || item.evidenceCoveragePercent !== roundPercent(item.policyCoverage * item.reasoningDepth)
+      || (index && item.similarity > result.ranked[index - 1].similarity)) {
+      errors.push(`ranked/${item.profileId}: 排名或覆盖率数值不自洽。`);
+    }
+  }
+  const top = result.ranked[0] || null;
+  const second = result.ranked[1] || null;
+  const expectedMargin = top && second
+    ? Math.round((top.similarityPercent - second.similarityPercent) * 100) / 100
+    : 0;
+  if (result.closestReference?.profileId !== top?.profileId
+    || result.reasoningDepthPercent !== (top?.reasoningDepthPercent ?? 0)
+    || result.evidenceCoveragePercent !== (top?.evidenceCoveragePercent ?? 0)
+    || result.marginToSecond !== expectedMargin) {
+    errors.push('closestReference: 最近参考或第一、第二名差距与排名不一致。');
+  }
+  const featuresFor = (profileId, policyId) => {
+    const path = profiles[profileId]?.expectedPaths?.[policyId];
+    return path ? benchmarkPathFeatures(model, path) : null;
+  };
+  const validateDifferences = (profileId, items, location) => {
+    for (const item of items || []) {
+      const user = userByPolicy[item.policyId];
+      const profile = featuresFor(profileId, item.policyId);
+      const expected = user && profile ? differenceForPolicy(model, item.policyId, user, profile) : null;
+      if (JSON.stringify(item) !== JSON.stringify(expected)) {
+        errors.push(`${location}/${item.policyId}: 差异说明没有对应到实际不同的特征。`);
+      }
+    }
+  };
+
+  const topProfileId = result.closestReference?.profileId || null;
+  if (topProfileId) {
+    validateDifferences(topProfileId, result.closestReference.differences, 'closestReference');
+    validateDifferences(topProfileId, result.differencesFromNearest, 'differencesFromNearest');
+    for (const item of result.decisiveSimilarities || []) {
+      if (!validSimilarity(
+        model,
+        item,
+        userByPolicy[item.policyId],
+        featuresFor(topProfileId, item.policyId),
+      )) {
+        errors.push(`decisiveSimilarities/${item.policyId}: 相似说明没有对应到实际相同的特征。`);
+      }
+    }
+  }
+  for (const candidate of [...(result.candidateGroup || []), ...(result.alternatives || [])]) {
+    validateDifferences(candidate.profileId, candidate.differences, `candidate/${candidate.profileId}`);
+  }
+  if (result.comparisonWithSecond) {
+    validateDifferences(
+      result.comparisonWithSecond.profileId,
+      result.comparisonWithSecond.differences,
+      'comparisonWithSecond',
+    );
+  }
+  return { ok: errors.length === 0, errors };
+};
+
 const resultStage = (reasoningDepthPercent) => {
   if (reasoningDepthPercent < 25) return {
     id: 'policy_answers_only',
@@ -478,6 +643,13 @@ const presentationPolicy = (profile) => {
 };
 
 export const matchEntertainment = async (model, benchmark, policyResults, options = {}) => {
+  const completedResults = Object.fromEntries(Object.entries(policyResults || {}).filter(([, result]) => (
+    Object.hasOwn(result || {}, 'finalRootAnswer')
+  )));
+  const policyResultValidation = validatePolicyResults(model, completedResults);
+  if (!policyResultValidation.ok) {
+    throw new Error(`政策结果未通过形式校验：${policyResultValidation.errors[0]}`);
+  }
   const weights = { ...DEFAULT_FEATURE_WEIGHTS, ...(options.featureWeights || {}) };
   const userByPolicy = normalizeUserResults(model, policyResults);
   const expectedPolicyIds = unique(
@@ -573,7 +745,7 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
             ? '当前候选中包含尚未完成独立整理的细分名称，因此只显示候选组，不挑出唯一名称。'
             : '当前有多个参考立场十分接近，只显示候选组，并推荐一题继续区分。',
         };
-  return {
+  const result = {
     matcherVersion: MATCHER_VERSION,
     expectedPolicyIds,
     answeredPolicyIds,
@@ -624,6 +796,16 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     displayCaveat: '这里比较的是你目前的政策答案、可接受修改和理由，与参考库中哪些整理结果比较接近。它不是政治身份概率，也不能概括你的全部价值观。',
     ranked,
   };
+  const resultValidation = validateEntertainmentResult(
+    model,
+    benchmark,
+    policyResults,
+    result,
+  );
+  if (!resultValidation.ok) {
+    throw new Error(`娱乐结果未通过形式校验：${resultValidation.errors[0]}`);
+  }
+  return result;
 };
 
 export const buildRootOnlyResults = (benchmarkProfile, policyIds) => Object.fromEntries(policyIds.map((policyId) => [

@@ -62,6 +62,50 @@ test('自定义理由走完整条路径并生成普通语言结果', async ({ pa
   expect(errors).toEqual([]);
 });
 
+test('相反理由改变结论时同时显示初始判断和最终判断', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('argument-chain-lab:progress:v10', JSON.stringify({
+      storageVersion: 10,
+      modelVersion: '1.2.0',
+      policyIds: ['speech_restriction'],
+      policyPosition: 0,
+      currentPolicyId: 'speech_restriction',
+      policyResults: {
+        speech_restriction: {
+          policyId: 'speech_restriction',
+          rootAnswer: 'yes',
+          finalRootAnswer: 'no',
+          acceptedRevisionFrameId: null,
+          derivedConditionalAcceptance: false,
+          diagnosisClaimId: 'c_speech_support_root',
+          mainPaths: [],
+          counterClaimId: 'c_speech_reject_substance',
+          counterPath: {
+            rootClaimId: 'c_speech_reject_substance',
+            status: 'custom_unverified',
+            customReason: { text: '复核后认为这项限制本身不能成立。' },
+          },
+          counterImpact: 'reverse',
+        },
+      },
+      phase: 'results',
+      history: [],
+      answerLog: [],
+      notes: [],
+      startedAt: '2026-08-15T00:00:00.000Z',
+      updatedAt: '2026-08-15T00:00:00.000Z',
+      entertainmentEnabled: false,
+      view: 'results',
+    }));
+  });
+
+  await page.goto('/');
+  const result = page.locator('.v4-result-item').first();
+  await expect(result.locator('header strong')).toHaveText('应当 → 不应当');
+  await expect(result.getByRole('heading', { name: /初始判断：你接受题目中的完整方案/ })).toBeVisible();
+  await expect(result.getByText('复核后的最终判断：不应当')).toBeVisible();
+});
+
 test('上一题、修改已答和刷新只保留当前有效路径', async ({ page }) => {
   await startFirstQuestion(page);
   await page.getByRole('button', { name: '不应当', exact: true }).click();
