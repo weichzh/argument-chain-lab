@@ -234,6 +234,44 @@ test('1.0 结构化进度原样进入兼容的 1.2 模型', async ({ page }) => 
   expect(state.policyIds).toHaveLength(8);
 });
 
+test('旧进度中已进入但未解决的相反理由复核明确记为影响不确定', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('argument-chain-lab:progress:v10', JSON.stringify({
+      storageVersion: 10,
+      modelVersion: '1.2.0',
+      policyIds: ['speech_restriction'],
+      policyPosition: 0,
+      currentPolicyId: 'speech_restriction',
+      policyResults: {
+        speech_restriction: {
+          policyId: 'speech_restriction',
+          rootAnswer: 'no',
+          finalRootAnswer: 'no',
+          acceptedRevisionFrameId: 'speech_civil_only',
+          derivedConditionalAcceptance: true,
+          diagnosisClaimId: 'c_speech_reject_sanction',
+          mainPaths: [],
+          counterClaimId: 'c_speech_test_sanction_defense',
+          counterPath: null,
+          counterImpact: null,
+        },
+      },
+      phase: 'results',
+      history: [],
+      answerLog: [],
+      notes: [],
+      startedAt: '2026-08-12T00:00:00.000Z',
+      updatedAt: '2026-08-12T00:00:00.000Z',
+      view: 'results',
+    }));
+  });
+
+  await page.goto('/');
+  await expect(page.getByText('复核结果：相反理由的影响暂时不能确定。')).toBeVisible();
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')));
+  expect(state.policyResults.speech_restriction.counterImpact).toBe('uncertain');
+});
+
 test('0.9 会话只读归档，不会提升为新版结果', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('argument-chain-lab:progress:v8', JSON.stringify({

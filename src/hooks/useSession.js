@@ -58,6 +58,14 @@ const normalizeCurrentState = (value, model) => {
   const policyIds = [...defaultPolicyIds, ...extraPolicyIds];
   const currentPolicyId = policyIds.includes(value.currentPolicyId) ? value.currentPolicyId : policyIds[0];
   const policyPosition = Math.max(0, policyIds.indexOf(currentPolicyId));
+  const savedPolicyResults = value.policyResults && typeof value.policyResults === 'object'
+    ? value.policyResults : {};
+  const policyResults = Object.fromEntries(Object.entries(savedPolicyResults).map(([policyId, result]) => [
+    policyId,
+    ['yes', 'no'].includes(result?.rootAnswer) && result.counterClaimId && result.counterImpact == null
+      ? { ...result, counterImpact: 'uncertain' }
+      : result,
+  ]));
   return {
     ...freshState(model),
     ...value,
@@ -65,7 +73,7 @@ const normalizeCurrentState = (value, model) => {
     policyIds,
     policyPosition,
     currentPolicyId,
-    policyResults: value.policyResults && typeof value.policyResults === 'object' ? value.policyResults : {},
+    policyResults,
     history: Array.isArray(value.history)
       ? value.history.map((snapshot) => ({ ...snapshot, modelVersion: model.meta.version }))
       : [],

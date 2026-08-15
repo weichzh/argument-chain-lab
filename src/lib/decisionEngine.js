@@ -902,6 +902,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
       if (optionId !== 'leave_unresolved') throw new Error('Invalid custom-reason response.');
       return completeCurrentPolicy(model, {
         ...state,
+        counterImpact: state.chainMode === 'counter' ? 'uncertain' : state.counterImpact,
         notes: [...state.notes, `Unresolved custom reason for ${state.activeClaimId}`],
       });
 

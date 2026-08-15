@@ -128,6 +128,22 @@ const newSpeechSession = () => startSession(model, createSession(model, { policy
 }
 
 {
+  let state = {
+    ...newSpeechSession(),
+    phase: PHASES.CUSTOM_REASON_REQUIRED,
+    rootAnswer: 'no',
+    acceptedRevisionFrameId: 'speech_civil_only',
+    diagnosisClaimId: 'c_speech_reject_sanction',
+    chainMode: 'counter',
+    activeClaimId: 'c_speech_test_sanction_defense',
+    counterClaimId: 'c_speech_test_sanction_defense',
+  };
+  state = answer(model, state, 'leave_unresolved');
+  assert.equal(state.policyResults.speech_restriction.counterImpact, 'uncertain');
+  assert.equal(state.policyResults.speech_restriction.finalRootAnswer, 'no');
+}
+
+{
   let state = startSession(model, createSession(model));
   state = skipPolicy(model, state);
   assert.equal(state.policyResults.speech_restriction.rootAnswer, 'skipped');

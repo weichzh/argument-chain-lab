@@ -138,7 +138,7 @@ export const validatePolicyResult = (model, result) => {
   if (['yes', 'no'].includes(result.rootAnswer) && result.counterImpact == null) {
     warnings.push('这项政策尚未记录相反理由对判断的影响。');
   }
-  if (!result.counterPath && ![null, 'no_change'].includes(result.counterImpact)) {
+  if (!result.counterPath && ![null, 'no_change', 'uncertain'].includes(result.counterImpact)) {
     errors.push('没有相反理由路径时，不应记录它改变或削弱了判断。');
   }
   return { ok: errors.length === 0, errors: [...new Set(errors)], warnings: [...new Set(warnings)] };

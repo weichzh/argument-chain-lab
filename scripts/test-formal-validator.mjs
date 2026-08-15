@@ -47,6 +47,11 @@ const validResult = {
 };
 assert.deepEqual(validatePolicyResult(model, validResult), { ok: true, errors: [], warnings: [] });
 
+const unresolvedCounter = { ...validResult, counterImpact: 'uncertain' };
+assert.deepEqual(validatePolicyResult(model, unresolvedCounter), { ok: true, errors: [], warnings: [] });
+const missingCounter = { ...validResult, counterImpact: null };
+assert.deepEqual(validatePolicyResult(model, missingCounter).warnings, ['这项政策尚未记录相反理由对判断的影响。']);
+
 const wrongFinalAnswer = structuredClone(validResult);
 wrongFinalAnswer.finalRootAnswer = 'yes';
 assert.equal(validatePolicyResult(model, wrongFinalAnswer).ok, false);
