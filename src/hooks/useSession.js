@@ -40,7 +40,7 @@ const freshState = (model, retained = {}) => ({
 
 const normalizeCurrentState = (value, model) => {
   const compatibleModel = value?.modelVersion === model.meta.version
-    || (model.meta.version === '1.2.0' && ['1.0.0', '1.1.0'].includes(value?.modelVersion));
+    || (model.meta.version === '1.2.2' && ['1.0.0', '1.1.0', '1.2.0'].includes(value?.modelVersion));
   if (value?.storageVersion !== STORAGE_VERSION || !compatibleModel) return null;
   const allPolicyIds = [...model.policies]
     .sort((left, right) => left.order - right.order)
@@ -62,9 +62,12 @@ const normalizeCurrentState = (value, model) => {
     ? value.policyResults : {};
   const policyResults = Object.fromEntries(Object.entries(savedPolicyResults).map(([policyId, result]) => [
     policyId,
-    ['yes', 'no'].includes(result?.rootAnswer) && result.counterClaimId && result.counterImpact == null
-      ? { ...result, counterImpact: 'uncertain' }
-      : result,
+    {
+      ...result,
+      sourceModelVersion: result?.sourceModelVersion || value.modelVersion,
+      ...(['yes', 'no'].includes(result?.rootAnswer) && result.counterClaimId && result.counterImpact == null
+        ? { counterImpact: 'uncertain' } : {}),
+    },
   ]));
   return {
     ...freshState(model),
@@ -75,7 +78,12 @@ const normalizeCurrentState = (value, model) => {
     currentPolicyId,
     policyResults,
     history: Array.isArray(value.history)
-      ? value.history.map((snapshot) => ({ ...snapshot, modelVersion: model.meta.version }))
+      ? value.history.map((snapshot) => ({
+        ...snapshot, modelVersion: model.meta.version,
+        policyResults: Object.fromEntries(Object.entries(snapshot.policyResults || {}).map(([id, result]) => [
+          id, { ...result, sourceModelVersion: result?.sourceModelVersion || snapshot.modelVersion || value.modelVersion },
+        ])),
+      }))
       : [],
     answerLog: Array.isArray(value.answerLog) ? value.answerLog : [],
     notes: Array.isArray(value.notes) ? value.notes : [],

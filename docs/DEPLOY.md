@@ -1,6 +1,6 @@
 # 构建与发布
 
-应用 1.2.1 使用 `npm run test:release` 一次执行单元检查、生产构建和针对生产产物的浏览器回归。CI 同样使用生产预览，不以开发服务器测试替代产物验收。
+应用与题库 1.2.2 使用 `npm run test:release` 一次执行单元检查、生产构建和针对生产产物的浏览器回归。CI 同样使用生产预览，不以开发服务器测试替代产物验收。
 
 构建生成 `dist/client/release.json`，记录应用版本、题库版本、完整源码提交和题库哈希。正式发布必须由干净、已推送的提交构建，在线读取该文件并核对 `sourceCommit`、`sourceDirty: false`；Sites 返回部署成功与在线关键路径通过是两项独立证据。旧候选归档工作流改为手动触发，维护旧 R2 区时才启用。
 
@@ -19,9 +19,9 @@ npm run test:e2e
 
 发布前确认：
 
-- `dist/client/bank/manifest.json` 的 `default` 为 `1.2.0`；
+- `dist/client/bank/manifest.json` 的 `default` 为 `1.2.2`；
 - manifest 只有一个 `status: current` 的 v4 模型；
-- `model-1.2.0.json`、`ideology-benchmark-1.2.0.json` 和 `model-v4.schema.json` 可以从部署 Origin 读取；
+- `model-1.2.2.json`、`ideology-benchmark-1.2.2.json` 和 `model-v4.schema.json` 可以从部署 Origin 读取；
 - 1.0 和 0.9 模型只位于 `bank/legacy/`，且 `loadInProduct` 为 `false`；
 - 首次进入和普通问卷不会请求娱乐 benchmark，只有用户主动生成娱乐匹配后才请求；
 - 桌面与移动端的题前信息顺序、根判断、顺序诊断、理由、自定义理由、回退、刷新、跳过、结果、中英并列候选组和单道精度题流程通过；

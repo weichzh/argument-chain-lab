@@ -1839,3 +1839,16 @@ details > summary {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Reading aids stay secondary to the current question. */
+.policy-reminder, .revision-unchanged { margin: 16px 0; font-size: 1rem; line-height: 1.75; }
+.policy-reminder > summary, .revision-unchanged > summary { color: var(--blue); cursor: pointer; font-size: 0.9375rem; }
+.policy-reminder .v4-question-prelude { margin-top: 16px; }
+.revision-progress { color: var(--ink-soft); font-size: 0.875rem; }
+@media (max-width: 600px) {
+  .workspace-toolbar { flex-wrap: wrap; }
+  .workspace-toolbar .button { width: auto; min-width: 0; padding: 8px; gap: 4px; font-size: 0.875rem; }
+}
+
+.stress-principle { margin: 20px 0; padding: 16px; border-left: 3px solid var(--blue); font-size: 1rem; line-height: 1.8; }
+.stress-principle p { margin: 8px 0 0; }

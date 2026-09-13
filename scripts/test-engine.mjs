@@ -16,7 +16,7 @@ import {
   validateModel,
 } from '../src/lib/decisionEngine.js';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url), 'utf8'));
 const validation = validateModel(model);
 assert.equal(validation.ok, true, validation.errors.join('\n'));
 assert.equal(model.policies.length, 13);

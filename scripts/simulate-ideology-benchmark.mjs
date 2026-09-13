@@ -10,8 +10,8 @@ import {
   validateModel,
 } from '../src/lib/decisionEngine.js';
 
-const modelPath = process.argv[2] || new URL('../public/bank/model-1.2.0.json', import.meta.url);
-const benchmarkPath = process.argv[3] || new URL('../public/bank/ideology-benchmark-1.2.0.json', import.meta.url);
+const modelPath = process.argv[2] || new URL('../public/bank/model-1.2.2.json', import.meta.url);
+const benchmarkPath = process.argv[3] || new URL('../public/bank/ideology-benchmark-1.2.2.json', import.meta.url);
 const outputPath = process.argv[4] || null;
 const readJson = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
 const model = readJson(modelPath);
@@ -167,7 +167,7 @@ export const simulateBenchmark = () => {
   return {
     schema: 'argument-chain-ideology-simulation-results',
     schemaVersion: 1,
-    version: '1.2.0',
+    version: '1.2.2',
     targetModelVersion: model.meta.version,
     benchmarkVersion: benchmark.version,
     summary: {

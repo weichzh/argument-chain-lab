@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import fs from 'node:fs';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url)));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url)));
 const principle = model.claims.n_proportionate_burden.text;
 const storageKey = 'argument-chain-lab:progress:v10';
 const click = (page, name) => page.getByRole('button', { name, exact: true }).click();

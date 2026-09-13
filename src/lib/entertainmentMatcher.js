@@ -1,6 +1,6 @@
 import { validatePolicyResults } from './formalValidator.js';
 
-export const MATCHER_VERSION = 'entertainment-matcher-3.2';
+export const MATCHER_VERSION = 'entertainment-matcher-3.3';
 
 export const DEFAULT_FEATURE_WEIGHTS = Object.freeze({
   rootAnswer: 0.10,
@@ -32,6 +32,12 @@ const jaccard = (left = [], right = []) => {
   return intersection / new Set([...a, ...b]).size;
 };
 
+export const comparableStressResponse = (model, result, path) => {
+  const revisedCases = new Set(['n_hierarchical_authority', 'v_hierarchical_order', 'n_sacred_public_order', 'n_expertise_can_delay', 'n_institutional_learning', 'n_emergency_power_strictly_limited']);
+  const oldEdition = result.sourceModelVersion && result.sourceModelVersion !== model.meta.version;
+  return oldEdition && revisedCases.has(path?.stress?.claimId) ? null : path?.stress?.response ?? null;
+};
+
 const enginePathFeatures = (model, result) => {
   const mainPath = first(result.mainPaths) || null;
   const supportedMainPath = mainPath?.status === 'retracted' ? null : mainPath;
@@ -55,7 +61,7 @@ const enginePathFeatures = (model, result) => {
     reasonIds: mainReasonIds,
     reasonFamilies: reasonFamilies(model, mainReasonIds),
     terminalValueId,
-    stressResponse: mainPath?.stress?.response ?? null,
+    stressResponse: comparableStressResponse(model, result, mainPath),
     counterClaimId: result.counterClaimId ?? null,
     counterReasonIds,
     counterFamilies: reasonFamilies(model, counterReasonIds),

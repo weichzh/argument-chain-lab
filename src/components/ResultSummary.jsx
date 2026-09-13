@@ -52,7 +52,7 @@ const downloadResults = (state) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-function DetailedPath({ path, title }) {
+function DetailedPath({ path, title, sourceModelVersion }) {
   if (!path) return null;
   const custom = path.customReason;
   const customTarget = path.customTargetClaimId ? getClaimV4(path.customTargetClaimId) : null;
@@ -67,8 +67,9 @@ function DetailedPath({ path, title }) {
       {custom ? (
         <div className="v4-custom-detail">
           <h5>{path.steps?.length ? '补充的更深理由' : '自定义理由'}</h5>
-          {customTarget ? <p><b>这条理由说明的是：</b>{customTarget.text}</p> : null}
+          {customTarget ? <p><b>这条理由说明的是：</b>{custom.target?.text || customTarget.text}</p> : null}
           {!customTarget && path.steps?.length ? <p>旧记录没有标明这段补充文字的说明对象；这里保留原文，不替你重新解释。</p> : null}
+          {sourceModelVersion && sourceModelVersion !== getModelV4().meta.version ? <small>这段补充来自题库 {sourceModelVersion}，保留当时的文字，不替你重新解释。</small> : null}
           <p>{custom.argument?.title || custom.text}</p>
           {custom.argument?.summary ? <p>{custom.argument.summary}</p> : null}
           {custom.facts?.length ? <><h5>整理时采用的假设（尚未逐项检验）</h5><ul>{custom.facts.map((fact, index) => <li key={index}>{fact.statement}</li>)}</ul></> : null}
@@ -78,7 +79,14 @@ function DetailedPath({ path, title }) {
         </div>
       ) : null}
       {path.status === 'unresolved' ? <p>追问暂时停在这里，理由尚未补全；前面已经记录的步骤仍然保留。</p> : null}
-      {path.stress ? <p>相似案例：{stressResultCopy(path.stress)}</p> : null}
+      {path.stress ? <section className="recorded-stress">
+        <h5>相似案例检查</h5>
+        {path.stress.principle ? <p><b>当时采用的原则：</b>{path.stress.principle}</p> : null}
+        {path.stress.scenario ? <p>{path.stress.scenario}</p> : null}
+        {path.stress.question ? <p>{path.stress.question}</p> : null}
+        <p>你的回答：{stressResultCopy(path.stress)}</p>
+        {sourceModelVersion && sourceModelVersion !== getModelV4().meta.version ? <small>这是题库 {sourceModelVersion} 中的回答，未重新执行现版案例检查。</small> : null}
+      </section> : null}
     </section>
   );
 }
@@ -136,7 +144,7 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
                 {summary.changes?.length ? (
                   <dl className="v4-result-changes">{summary.changes.map((change) => <React.Fragment key={change.dimensionId}><dt>{change.label}</dt><dd>{change.from} → {change.to}</dd></React.Fragment>)}</dl>
                 ) : null}
-                {summary.diagnosis ? <p><b>使判断改变的差异：</b>{summary.diagnosis}</p> : null}
+                {summary.diagnosis ? <p><b>使你接受修改方案的差异：</b>{summary.diagnosis}</p> : null}
                 {summary.mainReasonTitle ? <p><b>{reasonLabel(summary.pathStatus)}：</b>{summary.mainReasonTitle}</p> : null}
                 {summary.deeperReason ? <p><b>更深理由：</b>{summary.deeperReason}</p> : null}
                 {summary.reasonUnresolved ? <p className="result-caveat">判断已记录，理由尚未补全；这不代表你没有理由。</p> : null}
@@ -146,8 +154,8 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
                 {counterImpactCopy[summary.counterImpact] ? <p><b>复核结果：</b>{counterImpactCopy[summary.counterImpact]}</p> : null}
                 <details>
                   <summary>查看详细推理记录</summary>
-                  <DetailedPath path={result.mainPaths?.[0]} title="主要理由路径" />
-                  <DetailedPath path={result.counterPath} title="相反理由路径" />
+                  <DetailedPath path={result.mainPaths?.[0]} sourceModelVersion={result.sourceModelVersion} title="主要理由路径" />
+                  <DetailedPath path={result.counterPath} sourceModelVersion={result.sourceModelVersion} title="相反理由路径" />
                 </details>
                 <button className="button quiet" type="button" onClick={() => dispatch({ type: 'OPEN_POLICY', policyId: result.policyId })}><RotateCcw size={16} />重新回答这题</button>
               </article>

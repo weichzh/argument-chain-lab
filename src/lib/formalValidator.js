@@ -1,7 +1,8 @@
 export { diffFrames, resolveFrame, validateModel } from './decisionEngine.js';
 
-export const validateReasonPath = (model, path) => {
+export const validateReasonPath = (model, path, sourceModelVersion = model.meta.version) => {
   const custom = Boolean(path?.customReason);
+  const legacyCopy = model.meta.version === '1.2.2' && ['1.0.0', '1.1.0', '1.2.0'].includes(sourceModelVersion);
   const errors = [];
   const allowedStatuses = new Set([
     'in_progress', 'accepted', 'qualified', 'retracted', 'uncertain', 'unchecked', 'unresolved', 'custom_unverified',
@@ -24,7 +25,7 @@ export const validateReasonPath = (model, path) => {
   }
   if (!path?.steps?.length && !custom && path?.status !== 'unresolved') errors.push('理由路径为空。');
   if (path?.customTargetClaimId && (path.customTargetClaimId !== targetClaimId
-    || (path.customReason?.target && path.customReason.target.text !== model.claims[targetClaimId]?.text))) {
+    || (!legacyCopy && path.customReason?.target && path.customReason.target.text !== model.claims[targetClaimId]?.text))) {
     errors.push('自定义理由没有指向已确认路径末端的判断或原则。');
   }
   if (path?.unresolvedTargetClaimId && path.unresolvedTargetClaimId !== targetClaimId) {
@@ -134,7 +135,7 @@ export const validatePolicyResult = (model, result) => {
     if (path.rootClaimId !== result.diagnosisClaimId) {
       errors.push('主要理由路径没有从当前判断目标开始。');
     }
-    const report = validateReasonPath(model, path);
+    const report = validateReasonPath(model, path, result.sourceModelVersion);
     if (!report.ok && report.status !== 'custom_unverified') errors.push(...report.errors);
   }
   if (['yes', 'no'].includes(result.rootAnswer) && !(result.mainPaths || []).length) {
@@ -147,7 +148,7 @@ export const validatePolicyResult = (model, result) => {
     if (result.counterPath.rootClaimId !== result.counterClaimId) {
       errors.push('相反理由路径没有从记录的反方命题开始。');
     }
-    const report = validateReasonPath(model, result.counterPath);
+    const report = validateReasonPath(model, result.counterPath, result.sourceModelVersion);
     if (!report.ok && report.status !== 'custom_unverified') errors.push(...report.errors);
   }
   if (['yes', 'no'].includes(result.rootAnswer) && result.counterImpact == null) {

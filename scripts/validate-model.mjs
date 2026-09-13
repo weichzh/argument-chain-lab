@@ -4,7 +4,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import { validateBankManifest } from '../src/data/bank.js';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
-const modelUrl = new URL('../public/bank/model-1.2.0.json', import.meta.url);
+const modelUrl = new URL('../public/bank/model-1.2.2.json', import.meta.url);
 const schemaUrl = new URL('../public/bank/model-v4.schema.json', import.meta.url);
 const manifestUrl = new URL('../public/bank/manifest.json', import.meta.url);
 const bytes = fs.readFileSync(modelUrl);
@@ -22,7 +22,7 @@ if (!schemaValid) {
 const semantic = validateModel(model);
 if (!semantic.ok) throw new Error(`Semantic validation failed:\n${semantic.errors.join('\n')}`);
 const selected = validateBankManifest(manifest);
-if (manifest.default !== model.meta.version || selected.path !== 'model-1.2.0.json') {
+if (manifest.default !== model.meta.version || selected.path !== 'model-1.2.2.json') {
   throw new Error('Manifest must load the 1.2 current model.');
 }
 if (!manifest.legacy?.every((item) => item.loadInProduct === false && item.status === 'archive_only')) {

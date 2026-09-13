@@ -17,13 +17,13 @@ import {
 import { validateArgumentCandidate } from '../src/lib/sessionOverlay.js';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../public/bank/manifest.json', import.meta.url), 'utf8'));
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url), 'utf8'));
-const benchmark = JSON.parse(fs.readFileSync(new URL('../public/bank/ideology-benchmark-1.2.0.json', import.meta.url), 'utf8'));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url), 'utf8'));
+const benchmark = JSON.parse(fs.readFileSync(new URL('../public/bank/ideology-benchmark-1.2.2.json', import.meta.url), 'utf8'));
 
-assert.equal(validateBankManifest(manifest).version, '1.2.0');
-assert.equal(validateEntertainmentBenchmark(benchmark, '1.2.0').profiles.length, 75);
+assert.equal(validateBankManifest(manifest).version, '1.2.2');
+assert.equal(validateEntertainmentBenchmark(benchmark, '1.2.2').profiles.length, 75);
 const index = configureModelV4(model);
-assert.deepEqual(index, { version: '1.2.0', policyCount: 13, claimCount: 197, reasonCount: 302 });
+assert.deepEqual(index, { version: '1.2.2', policyCount: 13, claimCount: 197, reasonCount: 302 });
 assert.equal(getPolicyV4('speech_restriction').rootFrameId, 'speech_root');
 assert.equal(getResolvedFrameV4('speech_restriction', 'speech_civil_only').sanction, 'civil_only');
 assert(getReasonsForClaimV4('c_speech_reject_sanction').length >= 2);

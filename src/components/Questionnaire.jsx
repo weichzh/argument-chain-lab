@@ -8,7 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { sessionDraftKey } from '../hooks/useSession.js';
-import { getQuestion, getReasonTargetId } from '../lib/decisionEngine.js';
+import { getQuestion, getReasonTargetId, proposalItemsFor } from '../lib/decisionEngine.js';
 import { getModelV4, getPolicyV4 } from '../lib/modelV4.js';
 import InlineTermText from './InlineTermText.jsx';
 import QuestionCard from './QuestionCard.jsx';
@@ -51,6 +51,7 @@ function PolicyQuestionPrelude({ question, termDefinitions }) {
 function RevisionQuestionPrelude({ question, termDefinitions }) {
   return (
     <section className="v4-revision-prelude" aria-labelledby="revision-change-title">
+      <p className="revision-progress">修改比较 {question.revisionNumber} / {question.revisionCount} · 每次都与原方案相比</p>
       <h2 id="revision-change-title">这次只改动下面这些内容</h2>
       <dl>
         {question.changes.map((change) => (
@@ -65,6 +66,13 @@ function RevisionQuestionPrelude({ question, termDefinitions }) {
         ))}
       </dl>
       <p>没有列出的安排保持不变。</p>
+      <p>之前未接受的修改不会自动叠加。</p>
+      {question.unchangedItems?.length ? <details className="revision-unchanged" key={question.candidateFrameId}>
+        <summary>查看本次保持不变的安排</summary>
+        <ul>{question.unchangedItems.map((item) => <li key={item.dimensionId}>
+          <strong>{item.dimensionLabel}：</strong><CopyText definitions={termDefinitions}>{item.valueLabel}</CopyText>
+        </li>)}</ul>
+      </details> : null}
     </section>
   );
 }
@@ -180,8 +188,9 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
 
   useEffect(() => {
     setDistinctionOpen(false);
+    document.querySelector('.v4-question-card')?.focus({ preventScroll: true });
     window.scrollTo(0, 0);
-  }, [state.phase, state.currentPolicyId, state.diagnosticIndex, state.premiseIndex, state.activeClaimId]);
+  }, [state.phase, state.currentPolicyId, state.diagnosticIndex, state.premiseIndex, state.activeClaimId, state.answerLog.length]);
 
   const handleAnswer = (optionId) => {
     if (question.kind === 'stress_test' && optionId === 'qualified') {
@@ -208,7 +217,17 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
         context={`${policy.shortTitle} · ${state.policyPosition + 1} / ${state.policyIds.length}`}
         onAnswer={handleAnswer}
         termDefinitions={model.terms}
-        beforeQuestion={<QuestionPrelude question={question} termDefinitions={model.terms} />}
+        beforeQuestion={<>
+          <QuestionPrelude question={question} termDefinitions={model.terms} />
+          {!['policy_decision', 'policy_done'].includes(question.kind) ? <details className="policy-reminder" key={`${policy.id}-${question.kind}`}>
+            <summary>回看题设与完整原方案</summary>
+            <PolicyQuestionPrelude question={{
+              scenarioSummary: policy.scenario.summary,
+              fixedConditions: policy.scenario.fixedConditions,
+              proposalItems: proposalItemsFor(policy),
+            }} termDefinitions={model.terms} />
+          </details> : null}
+        </>}
         afterQuestion={(
           <QuestionAfter
             question={question}

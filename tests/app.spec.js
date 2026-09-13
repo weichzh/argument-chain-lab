@@ -33,7 +33,7 @@ test('反对原方案后一次只测试一个完整修改方案', async ({ page 
   await expect(page.locator('.v4-revision-prelude dd')).toContainText('可以罚款或拘留 → 只允许较轻的民事责任');
 
   await page.getByRole('button', { name: '这样改以后可以接受', exact: true }).click();
-  await expect(page.getByText(/关键在于：罚款或拘留/)).toBeVisible();
+  await expect(page.getByText(/本轮确认的方案差异是：处罚方式：可以罚款或拘留/)).toBeVisible();
   await expect(page.getByRole('button', { name: /罚款或拘留超过了必要程度/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /强制程度越高，说明责任越重/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /禁令能够减少严重暴力伤害/ })).toHaveCount(0);
@@ -57,7 +57,7 @@ test('自定义理由走完整条路径并生成普通语言结果', async ({ pa
   await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
   await expect(page.getByText('可接受的修改方案：只允许民事责任')).toBeVisible();
   await expect(page.getByText('主要理由：较强处罚在这里造成了不必要的负担。')).toBeVisible();
-  await expect(page.getByText('可以罚款或拘留 → 只允许较轻的民事责任')).toBeVisible();
+  await expect(page.getByText('可以罚款或拘留 → 只允许较轻的民事责任', { exact: true })).toBeVisible();
   await expect(page.getByText('formalStatus')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -137,7 +137,7 @@ test('跳过、题目列表和中止查看结果保持单一问卷', async ({ pa
 test('娱乐基准只在主动启用后加载，并且一次只追加一道精度题', async ({ page }) => {
   const benchmarkRequests = [];
   page.on('request', (request) => {
-    if (request.url().includes('ideology-benchmark-1.2.0.json')) benchmarkRequests.push(request.url());
+    if (request.url().includes('ideology-benchmark-1.2.2.json')) benchmarkRequests.push(request.url());
   });
   await page.addInitScript(() => {
     const policyIds = [
@@ -229,7 +229,7 @@ test('1.0 结构化进度原样进入兼容的 1.2 模型', async ({ page }) => 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')));
-  expect(state.modelVersion).toBe('1.2.0');
+  expect(state.modelVersion).toBe('1.2.2');
   expect(state.policyResults.speech_restriction.rootAnswer).toBe('uncertain');
   expect(state.policyIds).toHaveLength(8);
 });
@@ -320,7 +320,8 @@ test('移动端无横向溢出，术语解释和配置对话框可用键盘关�
   await startFirstQuestion(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  const term = page.getByRole('button', { name: '独立审查', exact: true }).first();
+  await page.getByRole('button', { name: '不应当', exact: true }).click();
+  const term = page.getByRole('button', { name: '民事责任', exact: true }).first();
   await term.click();
   await expect(page.getByRole('tooltip')).toBeVisible();
   await page.keyboard.press('Escape');

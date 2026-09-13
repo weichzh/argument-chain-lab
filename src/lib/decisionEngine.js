@@ -486,6 +486,9 @@ export const getQuestion = (model, state) => {
         explanation: diagnostic.explanation,
         candidateFrameId: diagnostic.candidateFrameId,
         changes: revisionChangesFor(policy, diagnostic.candidateFrameId),
+        unchangedItems: proposalItemsFor(policy, diagnostic.candidateFrameId).filter((item) => !diagnostic.changedDimensionIds.includes(item.dimensionId)),
+        revisionNumber: state.diagnosticIndex + 1,
+        revisionCount: policy.diagnostics.length,
         options: model.product.revisionAnswers.map((option) => option.id === 'reject'
           ? { ...option, description: '这项修改还不足以让我接受整个方案。' } : option),
       };
@@ -566,7 +569,9 @@ export const getQuestion = (model, state) => {
       return {
         kind: 'stress_test',
         title: stress.question,
+        principle: claim.text,
         statement: stress.scenario,
+        explanation: '这里检查这条原则的适用范围；可以指出重要区别，也可以保留不确定。',
         options: [
           { id: 'apply', label: '仍然适用' },
           { id: 'qualified', label: '有一个重要区别' },
@@ -596,13 +601,14 @@ export const getQuestion = (model, state) => {
     case PHASES.COUNTER_IMPACT:
       return {
         kind: 'counter_impact',
-        title: '核对这条相反理由后，你的判断怎样变化？',
+        title: '核对相反理由后，你对完整原方案的判断怎样变化？',
+        statement: '这里只记录对完整原方案的最终判断。认可一条局部理由，不等于接受整个方案。',
         options: [
           { id: 'no_change', label: '不改变原判断' },
           { id: 'weaken', label: '让我有所犹豫，但不改变结论' },
           { id: 'offset', label: '两边暂时抵消，我不能决定' },
-          { id: 'reverse', label: '它使我改变结论' },
-          { id: 'uncertain', label: '不确定' },
+          { id: 'reverse', label: state.rootAnswer === 'yes' ? '改为不接受完整原方案' : '改为接受完整原方案' },
+          { id: 'uncertain', label: '影响还不确定，暂时保留原判断' },
         ],
       };
 
@@ -640,6 +646,26 @@ const markTried = (state, claimId, reasonId) => ({
     [claimId]: unique([...(state.triedReasonIds[claimId] || []), reasonId]),
   },
 });
+
+const rejectCurrentReason = (model, state, response, part) => {
+  const next = markTried(state, state.activeClaimId, state.currentReasonId);
+  const confirmedTarget = state.currentPath?.steps?.at(-1)?.bridgeClaimId;
+  const remaining = availableReasons(model, next, state.activeClaimId);
+  return {
+    ...next,
+    currentReasonId: null,
+    premiseIndex: 0,
+    notes: [...next.notes, `${response} ${part} in ${state.currentReasonId}`],
+    // Rejecting an explanation does not retract the principle it explains.
+    ...(confirmedTarget === state.activeClaimId ? {
+      currentBridgeClaimId: confirmedTarget,
+      phase: PHASES.WHY_OR_STOP,
+    } : {
+      phase: !remaining.length ? PHASES.CUSTOM_REASON_REQUIRED
+        : state.chainMode === 'counter' ? PHASES.COUNTER_REASON_CHOICE : PHASES.REASON_CHOICE,
+    }),
+  };
+};
 
 const beginReason = (model, state, reasonId) => {
   const reason = model.reasons[reasonId];
@@ -688,6 +714,7 @@ const finishPolicyRecord = (model, state) => {
   return {
     policyId: policy.id,
     rootFrameId: policy.rootFrameId,
+    sourceModelVersion: model.meta.version,
     rootAnswer: state.rootAnswer,
     finalRootAnswer,
     acceptedRevisionFrameId: state.acceptedRevisionFrameId,
@@ -830,16 +857,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
       if (!['accept', 'reject', 'uncertain'].includes(optionId)) throw new Error('Invalid premise answer.');
       const reason = model.reasons[state.currentReasonId];
       if (optionId !== 'accept') {
-        const next = markTried(state, state.activeClaimId, state.currentReasonId);
-        const remaining = availableReasons(model, next, state.activeClaimId);
-        if (!remaining.length) return { ...next, phase: PHASES.CUSTOM_REASON_REQUIRED };
-        return {
-          ...next,
-          currentReasonId: null,
-          premiseIndex: 0,
-          phase: state.chainMode === 'counter' ? PHASES.COUNTER_REASON_CHOICE : PHASES.REASON_CHOICE,
-          notes: [...next.notes, `${optionId} premise in ${reason.id}`],
-        };
+        return rejectCurrentReason(model, state, optionId, 'premise');
       }
       if (state.premiseIndex + 1 < reason.premises.length) {
         return { ...state, premiseIndex: state.premiseIndex + 1 };
@@ -851,15 +869,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
       if (!['accept', 'reject', 'uncertain'].includes(optionId)) throw new Error('Invalid rule answer.');
       const reason = model.reasons[state.currentReasonId];
       if (optionId !== 'accept') {
-        const next = markTried(state, state.activeClaimId, state.currentReasonId);
-        const remaining = availableReasons(model, next, state.activeClaimId);
-        if (!remaining.length) return { ...next, phase: PHASES.CUSTOM_REASON_REQUIRED };
-        return {
-          ...next,
-          currentReasonId: null,
-          premiseIndex: 0,
-          phase: state.chainMode === 'counter' ? PHASES.COUNTER_REASON_CHOICE : PHASES.REASON_CHOICE,
-        };
+        return rejectCurrentReason(model, state, optionId, 'rule');
       }
       const step = {
         claimId: state.activeClaimId,
@@ -905,6 +915,9 @@ const advance = (model, originalState, optionId, extra = {}) => {
           response: optionId,
           distinction: extra.distinction || null,
           claimId: state.currentBridgeClaimId,
+          principle: model.claims[state.currentBridgeClaimId].text,
+          scenario: model.claims[state.currentBridgeClaimId].stressTest?.scenario || null,
+          question: model.claims[state.currentBridgeClaimId].stressTest?.question || null,
         },
       };
       if (state.chainMode === 'counter') {

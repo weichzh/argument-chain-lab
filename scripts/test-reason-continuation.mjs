@@ -6,7 +6,7 @@ import {
 } from '../src/lib/decisionEngine.js';
 import { validatePolicyResult, validateReasonPath } from '../src/lib/formalValidator.js';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url)));
+const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url)));
 const start = () => startSession(model, createSession(model, { policyIds: ['speech_restriction'] }));
 const confirmFirstReason = (state) => {
   const reasonId = getQuestion(model, state).options.find((item) => model.reasons[item.id])?.id;

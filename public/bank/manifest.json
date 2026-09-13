@@ -1,20 +1,20 @@
 {
   "schema": "argument-chain-bank-manifest",
   "version": 2,
-  "default": "1.2.0",
+  "default": "1.2.2",
   "models": [
     {
-      "version": "1.2.0",
+      "version": "1.2.2",
       "schemaVersion": 4,
-      "path": "model-1.2.0.json",
+      "path": "model-1.2.2.json",
       "status": "current",
-      "title": "通俗文案、具体相似案例与扩展参考库"
+      "title": "明确比较对象与诊断限度的文案修订"
     }
   ],
   "entertainmentBenchmark": {
-    "version": "1.2.0",
-    "targetModelVersion": "1.2.0",
-    "path": "ideology-benchmark-1.2.0.json",
+    "version": "1.2.2",
+    "targetModelVersion": "1.2.2",
+    "path": "ideology-benchmark-1.2.2.json",
     "defaultLoaded": false
   },
   "legacy": [
@@ -27,6 +27,12 @@
     {
       "version": "0.9.0",
       "path": "legacy/model-0.9.0.json",
+      "status": "archive_only",
+      "loadInProduct": false
+    },
+    {
+      "version": "1.2.0",
+      "path": "model-1.2.0.json",
       "status": "archive_only",
       "loadInProduct": false
     }

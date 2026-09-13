@@ -9,8 +9,8 @@ import {
 import { simulateBenchmark } from './simulate-ideology-benchmark.mjs';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
-const model = read('../public/bank/model-1.2.0.json');
-const benchmark = read('../public/bank/ideology-benchmark-1.2.0.json');
+const model = read('../public/bank/model-1.2.2.json');
+const benchmark = read('../public/bank/ideology-benchmark-1.2.2.json');
 const profileById = Object.fromEntries(benchmark.profiles.map((profile) => [profile.id, profile]));
 const allPolicyIds = [...benchmark.corePolicyIds, ...benchmark.tieBreakerPolicyIds];
 const simulations = simulateBenchmark();

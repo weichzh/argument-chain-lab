@@ -11,9 +11,10 @@ export default function QuestionCard({
   afterQuestion = null,
 }) {
   return (
-    <section className="v4-question-card" aria-labelledby="current-question">
+    <section tabIndex={-1} className="v4-question-card" aria-labelledby="current-question">
       <div className="v4-question-context">{context}</div>
       {beforeQuestion}
+      {question.principle ? <aside className="stress-principle"><strong>正在检查的原则</strong><p><InlineTermText text={question.principle} definitions={termDefinitions} /></p></aside> : null}
       <header>
         <h1 id="current-question"><InlineTermText text={question.title} definitions={termDefinitions} /></h1>
         {question.statement ? <p><InlineTermText text={question.statement} definitions={termDefinitions} /></p> : null}
