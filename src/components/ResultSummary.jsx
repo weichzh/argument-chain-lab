@@ -24,6 +24,7 @@ const reasonLabel = (status, counter = false) => ({
   qualified: counter ? '有保留的相反理由' : '有保留的主要理由',
   retracted: counter ? '经检验撤回的相反理由' : '经检验撤回的理由',
   uncertain: counter ? '尚未确认的相反理由' : '尚未确认的理由',
+  unresolved: counter ? '尚未补全的相反理由' : '尚未补全的理由',
   unchecked: counter ? '尚未检查的相反理由' : '尚未检查的主要理由',
   custom_unverified: counter ? '认真考虑的相反理由' : '主要理由',
 }[status] || (counter ? '认真考虑的相反理由' : '主要理由'));
@@ -53,23 +54,30 @@ const downloadResults = (state) => {
 
 function DetailedPath({ path, title }) {
   if (!path) return null;
-  if (path.customReason) {
-    return (
-      <section className="v4-proof-path">
-        <h4>{title}</h4>
-        <p>{path.customReason.argument?.title || path.customReason.text}</p>
-        <small>自定义理由，尚未经过正式题库校验。</small>
-      </section>
-    );
-  }
+  const custom = path.customReason;
+  const customTarget = path.customTargetClaimId ? getClaimV4(path.customTargetClaimId) : null;
   return (
     <section className="v4-proof-path">
       <h4>{title}</h4>
-      <ol>{path.steps.map((step) => {
+      {path.steps?.length ? <ol>{path.steps.map((step) => {
         const reason = getReasonV4(step.reasonId);
         const bridge = getClaimV4(step.bridgeClaimId);
         return <li key={step.reasonId}><strong>{reason?.title}</strong><span>{bridge?.text}</span></li>;
-      })}</ol>
+      })}</ol> : null}
+      {custom ? (
+        <div className="v4-custom-detail">
+          <h5>{path.steps?.length ? '补充的更深理由' : '自定义理由'}</h5>
+          {customTarget ? <p><b>这条理由说明的是：</b>{customTarget.text}</p> : null}
+          {!customTarget && path.steps?.length ? <p>旧记录没有标明这段补充文字的说明对象；这里保留原文，不替你重新解释。</p> : null}
+          <p>{custom.argument?.title || custom.text}</p>
+          {custom.argument?.summary ? <p>{custom.argument.summary}</p> : null}
+          {custom.facts?.length ? <><h5>整理时采用的假设（尚未逐项检验）</h5><ul>{custom.facts.map((fact, index) => <li key={index}>{fact.statement}</li>)}</ul></> : null}
+          {custom.bridge ? <p><b>整理后的判断依据：</b>{custom.bridge.text}</p> : null}
+          {custom.stressTest ? <><h5>待检查的相似案例</h5><p>{custom.stressTest.scenario}</p><p>{custom.stressTest.question}</p></> : null}
+          <small>自定义理由尚未经过正式题库校验；保存不等于证明或通过检验。</small>
+        </div>
+      ) : null}
+      {path.status === 'unresolved' ? <p>追问暂时停在这里，理由尚未补全；前面已经记录的步骤仍然保留。</p> : null}
       {path.stress ? <p>相似案例：{stressResultCopy(path.stress)}</p> : null}
     </section>
   );
@@ -123,13 +131,17 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
                   : rootAnswerCopy[result.rootAnswer]}</strong></header>
                 <h2>{finalChanged ? `初始判断：${summary.summary}` : summary.summary}</h2>
                 {finalChanged ? <p><b>复核后的最终判断：</b>{rootAnswerCopy[finalAnswer]}</p> : null}
-                {summary.acceptedRevision ? <p><b>可接受的修改方案：</b>{summary.acceptedRevision}</p> : null}
+                {summary.acceptedRevision ? <p><b>{finalChanged ? '当时接受的修改方案：' : '可接受的修改方案：'}</b>{summary.acceptedRevision}</p> : null}
+                {summary.unresolvedRevision ? <p><b>尚未确定是否接受的修改：</b>{summary.unresolvedRevision}</p> : null}
                 {summary.changes?.length ? (
                   <dl className="v4-result-changes">{summary.changes.map((change) => <React.Fragment key={change.dimensionId}><dt>{change.label}</dt><dd>{change.from} → {change.to}</dd></React.Fragment>)}</dl>
                 ) : null}
                 {summary.diagnosis ? <p><b>使判断改变的差异：</b>{summary.diagnosis}</p> : null}
                 {summary.mainReasonTitle ? <p><b>{reasonLabel(summary.pathStatus)}：</b>{summary.mainReasonTitle}</p> : null}
                 {summary.deeperReason ? <p><b>更深理由：</b>{summary.deeperReason}</p> : null}
+                {summary.reasonUnresolved ? <p className="result-caveat">判断已记录，理由尚未补全；这不代表你没有理由。</p> : null}
+                {summary.customUnverified ? <p className="result-caveat">包含你补充的理由，尚未经过题库校验。完整内容保留在下方详细记录中。</p> : null}
+                {summary.customTargetUnrecorded ? <p className="result-caveat">旧记录未标明补充理由的说明对象，这里不替你重新解释。</p> : null}
                 {summary.counterReasonTitle ? <p><b>{reasonLabel(summary.counterPathStatus, true)}：</b>{summary.counterReasonTitle}</p> : null}
                 {counterImpactCopy[summary.counterImpact] ? <p><b>复核结果：</b>{counterImpactCopy[summary.counterImpact]}</p> : null}
                 <details>

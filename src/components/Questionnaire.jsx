@@ -8,7 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { sessionDraftKey } from '../hooks/useSession.js';
-import { getQuestion } from '../lib/decisionEngine.js';
+import { getQuestion, getReasonTargetId } from '../lib/decisionEngine.js';
 import { getModelV4, getPolicyV4 } from '../lib/modelV4.js';
 import InlineTermText from './InlineTermText.jsx';
 import QuestionCard from './QuestionCard.jsx';
@@ -97,7 +97,8 @@ function QuestionAfter({ question, state, dispatch, onAskAi, aiLoading, distinct
 }
 
 function CustomReason({ state, dispatch, onAskAi, aiLoading }) {
-  const key = sessionDraftKey(state.activeClaimId);
+  const targetClaimId = getReasonTargetId(state);
+  const key = sessionDraftKey(targetClaimId);
   const [draft, setDraft] = useState(() => {
     try {
       return window.sessionStorage.getItem(key) || '';
@@ -138,7 +139,7 @@ function CustomReason({ state, dispatch, onAskAi, aiLoading }) {
         maxLength={4000}
         value={draft}
         onChange={(event) => update(event.target.value)}
-        placeholder="只写当前判断最主要的理由。"
+        placeholder="例如：我接受上面这条原则，是因为……"
       />
       <div className="v4-custom-actions">
         <button className="button secondary" type="button" disabled={!draft.trim()} onClick={() => submit({ text: draft.trim() })}>
@@ -148,7 +149,7 @@ function CustomReason({ state, dispatch, onAskAi, aiLoading }) {
           className="button quiet"
           type="button"
           disabled={!draft.trim() || aiLoading}
-          onClick={() => onAskAi({ text: draft.trim(), claimId: state.activeClaimId, onConfirm: submit })}
+          onClick={() => onAskAi({ text: draft.trim(), claimId: targetClaimId, onConfirm: submit })}
         >
           <Sparkles size={17} />{aiLoading ? '正在整理' : '交给 AI 整理'}
         </button>
@@ -180,7 +181,7 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
   useEffect(() => {
     setDistinctionOpen(false);
     window.scrollTo(0, 0);
-  }, [state.phase, state.currentPolicyId, state.diagnosticIndex, state.premiseIndex]);
+  }, [state.phase, state.currentPolicyId, state.diagnosticIndex, state.premiseIndex, state.activeClaimId]);
 
   const handleAnswer = (optionId) => {
     if (question.kind === 'stress_test' && optionId === 'qualified') {

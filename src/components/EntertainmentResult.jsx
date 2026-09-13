@@ -118,13 +118,14 @@ function MatchedResult({ model, result, onTieBreaker }) {
         <dl>
           <div><dt>政策覆盖</dt><dd>{percent(result.policyCoveragePercent)}</dd></div>
           <div><dt>论证深度</dt><dd>{percent(result.reasoningDepthPercent)}</dd></div>
-          <div><dt>综合证据覆盖</dt><dd>{percent(result.evidenceCoveragePercent)}</dd></div>
+          <div><dt>可比较信息覆盖</dt><dd>{percent(result.evidenceCoveragePercent)}</dd></div>
         </dl>
+        <p className="metric-explanation">政策覆盖表示答过多少核心情景；论证深度表示留下了多少理由信息。这些百分比都不是身份概率。</p>
       </section>
 
       {result.displayStrategy.id === 'candidate_group' ? (
         <section className="entertainment-match-block">
-          <h3>只看目前的信息，你位于以下几个参考立场之间。</h3>
+          <h3>根据已答内容，以下几种参考路径与你比较接近。</h3>
           <PrototypeList items={candidates} model={model} />
           <p>{result.displayStrategy.note}</p>
         </section>
@@ -135,7 +136,7 @@ function MatchedResult({ model, result, onTieBreaker }) {
           <h3>目前最接近：{ideologyLabel(nearest)}</h3>
           <dl className="entertainment-nearest-details">
             <div><dt>论证路径相似度</dt><dd>{percent(nearest.similarityPercent)}</dd></div>
-            <div><dt>第一、第二名差距</dt><dd>{percent(result.marginToSecond)}</dd></div>
+            <div><dt>第一、第二名差距</dt><dd>{Number(result.marginToSecond).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} 个百分点</dd></div>
           </dl>
           {result.referenceSourceNote ? (
             <details className="entertainment-source-note">
@@ -207,7 +208,7 @@ export default function EntertainmentResult({ enabled, manifest, model, policyRe
   if (!enabled) {
     return (
       <section className="entertainment-opt-in">
-        <div><span>可选娱乐结果</span><h2>比较当前论证路径</h2><p>独立参考库只在你主动打开后读取，不会把参考名称写回正式题库。</p></div>
+        <div><span>可选娱乐结果</span><h2>比较当前论证路径</h2><p>比较你的已答内容与参考库中的路径。这不是政治身份或人格判断，也不会公开你的回答。</p></div>
         <button className="button secondary" type="button" onClick={onEnable}><Sparkles size={17} />生成娱乐匹配</button>
       </section>
     );

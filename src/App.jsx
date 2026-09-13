@@ -10,8 +10,9 @@ import ResultSummary from './components/ResultSummary.jsx';
 import { loadFormalBank } from './data/bank.js';
 import { VIEWS, useSession } from './hooks/useSession.js';
 import { proposeWithPiAgent } from './lib/aiAgent.js';
-import { configureModelV4, getClaimV4, getPolicyV4 } from './lib/modelV4.js';
+import { configureModelV4, getClaimV4, getModelV4, getPolicyV4 } from './lib/modelV4.js';
 import { validateArgumentCandidate } from './lib/sessionOverlay.js';
+import { getReasonDirection, getReasonTargetId } from './lib/decisionEngine.js';
 
 function LoadingScreen({ error, onRetry }) {
   return (
@@ -53,9 +54,7 @@ function ReadyApp({ bankManifest }) {
       policyId: state.currentPolicyId,
       claimId: request.claimId,
     };
-    const expectedDirection = state.chainMode === 'counter'
-      ? state.rootAnswer === 'yes' ? 'oppose' : 'support'
-      : state.rootAnswer === 'yes' ? 'support' : 'oppose';
+    const expectedDirection = getReasonDirection(getModelV4(), state);
     setAiStatus({ loading: true, error: null });
     try {
       const candidate = await proposeWithPiAgent({
@@ -93,13 +92,13 @@ function ReadyApp({ bankManifest }) {
     if (!candidateReview
       || candidateReview.requestContext.updatedAt !== state.updatedAt
       || candidateReview.requestContext.policyId !== state.currentPolicyId
-      || candidateReview.requestContext.claimId !== state.activeClaimId) {
+      || candidateReview.requestContext.claimId !== getReasonTargetId(state)) {
       setCandidateReview(null);
       setAiStatus({ loading: false, error: '当前问题已经改变，请在新步骤重新整理理由。' });
       return;
     }
     const validation = validateArgumentCandidate(candidate, 'current_target', candidateReview.expectedDirection);
-    if (!validation.ok || candidate.target.text !== getClaimV4(state.activeClaimId)?.text) {
+    if (!validation.ok || candidate.target.text !== getClaimV4(getReasonTargetId(state))?.text) {
       setAiStatus({ loading: false, error: validation.error || '候选不能改写当前正在说明的判断。' });
       return;
     }
@@ -110,6 +109,7 @@ function ReadyApp({ bankManifest }) {
   return (
     <div className="app-root">
       <Header state={state} aiConfigured={Boolean(aiConfig)} onConfig={() => setConfigOpen(true)} onLocalData={() => setLocalDataOpen(true)} />
+      {sessionControls.persistenceError ? <p className="persistence-warning" role="alert">{sessionControls.persistenceError}</p> : null}
       {aiStatus.error ? <div className="global-alert" role="alert"><span>{aiStatus.error}</span><button type="button" onClick={() => setAiStatus((value) => ({ ...value, error: null }))}>关闭</button></div> : null}
       {state.migrationNotice ? (
         <div className="migration-notice" role="status"><span>{state.migrationNotice}</span><div><button type="button" onClick={() => setLocalDataOpen(true)}>查看旧版记录</button><button type="button" onClick={() => dispatch({ type: 'DISMISS_MIGRATION' })}>知道了</button></div></div>

@@ -16,7 +16,8 @@ export default function Landing({ onStart, onBrowse, onReset, hasSavedProgress }
       <section className="landing-intro">
         <span className="landing-kicker">完整方案 · 逐题判断</span>
         <h1>论证链实验室</h1>
-        <p>先判断一个完整政策方案，再逐步找出真正改变判断的条件与理由。</p>
+        <p>从一个具体政策方案出发，看看哪些条件会改变你的判断，以及你为什么这样想。</p>
+        <p className="landing-guide">8 个政策情景，按你的回答逐步追问。可以任选一题、随时暂停，不必一次答完，也不需要使用 AI。</p>
         <div className="landing-actions">
           <button className="button primary landing-start" type="button" onClick={onStart}>
             {hasSavedProgress ? '继续答题' : '开始答题'}<ArrowRight size={18} />
@@ -38,7 +39,7 @@ export default function Landing({ onStart, onBrowse, onReset, hasSavedProgress }
 
       <aside className="privacy-boundary">
         <LockKeyhole size={20} aria-hidden="true" />
-        <p>回答默认只保存在这个浏览器中。</p>
+        <p>回答只保存在这个浏览器中，不会自动公开。调用 AI 时，当前理由会发送给你选择的服务商。</p>
       </aside>
     </main>
   );

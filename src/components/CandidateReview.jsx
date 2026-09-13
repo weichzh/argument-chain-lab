@@ -35,13 +35,13 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
         </header>
 
         <div className="candidate-scroll">
-          <div className="candidate-notice"><CircleAlert size={19} /><p>请检查每句话是否准确表达你的想法。确认后只保存下面这份结构，不保存你刚才的原始输入或 AI 对话。</p></div>
+          <div className="candidate-notice"><CircleAlert size={19} /><p>请检查这些文字是否表达了你的想法。保存后仍标为自定义理由；下面的假设和案例不会因此自动算作已接受或已检验。原始输入和 AI 对话不进入持久记录。</p></div>
 
           <div className="candidate-section">
             <div className="candidate-symbol target">判断</div>
             <div className="candidate-fields">
               <label className="field"><span>简短名称</span><input value={candidate.target.shortLabel} readOnly={review.scope === 'current_target'} onChange={(event) => update(['target', 'shortLabel'], event.target.value)} /></label>
-              <label className="field"><span>你的判断</span><textarea rows={3} value={candidate.target.text} readOnly={review.scope === 'current_target'} onChange={(event) => update(['target', 'text'], event.target.value)} /></label>
+              <label className="field"><span>当前说明的判断或原则</span><textarea rows={3} value={candidate.target.text} readOnly={review.scope === 'current_target'} onChange={(event) => update(['target', 'text'], event.target.value)} /></label>
               {review.scope === 'new_root' ? <label className="field"><span>判断方向</span><select value={candidate.direction} onChange={(event) => update(['direction'], event.target.value)}><option value="support">支持</option><option value="oppose">反对</option></select></label> : null}
               <label className="field"><span>理由标题</span><input value={candidate.argument.title} onChange={(event) => update(['argument', 'title'], event.target.value)} /></label>
               <label className="field"><span>理由摘要</span><textarea rows={3} value={candidate.argument.summary} onChange={(event) => update(['argument', 'summary'], event.target.value)} /></label>
@@ -70,7 +70,7 @@ export default function CandidateReview({ review, onConfirm, onClose }) {
               <label className="field"><span>为什么这足以支持判断</span><textarea rows={3} value={candidate.bridge.text} onChange={(event) => update(['bridge', 'text'], event.target.value)} /></label>
               <label className="field"><span>解释</span><textarea rows={3} value={candidate.bridge.explanation} onChange={(event) => update(['bridge', 'explanation'], event.target.value)} /></label>
               <label className="field"><span>例子</span><textarea rows={3} value={candidate.bridge.example} onChange={(event) => update(['bridge', 'example'], event.target.value)} /></label>
-              <label className="field"><span>接下来怎么处理这个理由</span><select value={candidate.bridge.kind} onChange={(event) => update(['bridge', 'kind'], event.target.value)}><option value="bridge">继续追问为什么</option><option value="terminal">作为目前最根本的理由</option></select></label>
+              <label className="field"><span>整理后的依据类型（仅记录）</span><select value={candidate.bridge.kind} onChange={(event) => update(['bridge', 'kind'], event.target.value)}><option value="bridge">仍可继续追问的原则</option><option value="terminal">建议的暂时停止点</option></select></label>
             </div>
           </div>
 

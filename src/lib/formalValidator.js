@@ -1,14 +1,12 @@
 export { diffFrames, resolveFrame, validateModel } from './decisionEngine.js';
 
 export const validateReasonPath = (model, path) => {
-  if (path?.customReason) {
-    return { ok: false, status: 'custom_unverified', errors: ['自定义理由尚未经过题库形式校验。'] };
-  }
+  const custom = Boolean(path?.customReason);
   const errors = [];
   const allowedStatuses = new Set([
-    'in_progress', 'accepted', 'qualified', 'retracted', 'uncertain', 'unchecked',
+    'in_progress', 'accepted', 'qualified', 'retracted', 'uncertain', 'unchecked', 'unresolved', 'custom_unverified',
   ]);
-  if (!allowedStatuses.has(path?.status)) errors.push('理由路径状态无效。');
+  if (!allowedStatuses.has(path?.status) && !custom) errors.push('理由路径状态无效。');
   let targetClaimId = path?.rootClaimId;
   for (const step of path?.steps || []) {
     const reason = model.reasons[step.reasonId];
@@ -24,7 +22,14 @@ export const validateReasonPath = (model, path) => {
     }
     targetClaimId = reason.bridgeClaimId;
   }
-  if (!path?.steps?.length) errors.push('理由路径为空。');
+  if (!path?.steps?.length && !custom && path?.status !== 'unresolved') errors.push('理由路径为空。');
+  if (path?.customTargetClaimId && (path.customTargetClaimId !== targetClaimId
+    || (path.customReason?.target && path.customReason.target.text !== model.claims[targetClaimId]?.text))) {
+    errors.push('自定义理由没有指向已确认路径末端的判断或原则。');
+  }
+  if (path?.unresolvedTargetClaimId && path.unresolvedTargetClaimId !== targetClaimId) {
+    errors.push('未解决的理由没有指向当前路径末端。');
+  }
   if (path?.stress) {
     const statusByResponse = {
       apply: 'accepted',
@@ -38,6 +43,9 @@ export const validateReasonPath = (model, path) => {
     if (path.stress.claimId !== targetClaimId) {
       errors.push('相似案例没有检查理由路径的实际停止点。');
     }
+  }
+  if (!errors.length && custom) {
+    return { ok: false, status: 'custom_unverified', errors: ['自定义理由尚未经过题库形式校验。'] };
   }
   return {
     ok: errors.length === 0,
@@ -108,13 +116,20 @@ export const validatePolicyResult = (model, result) => {
       expectedCounterClaimId = policy.counterClaims.whenOpposingWithoutAcceptedRevision;
     }
   }
-  if (expectedDiagnosisClaimId && result.diagnosisClaimId !== expectedDiagnosisClaimId) {
+  if (expectedDiagnosisClaimId && result.diagnosisClaimId != null && result.diagnosisClaimId !== expectedDiagnosisClaimId) {
     errors.push('理由路径的判断目标与根判断或修改方案不一致。');
   }
   if (!expectedDiagnosisClaimId && result.diagnosisClaimId) {
     errors.push('未形成明确根判断的结果不应附带判断目标。');
   }
 
+  if (result.unresolvedRevisionFrameId && (result.rootAnswer !== 'no'
+    || result.acceptedRevisionFrameId || result.diagnosisClaimId
+    || !policy.diagnostics.some((item) => item.candidateFrameId === result.unresolvedRevisionFrameId))) {
+    errors.push('尚未判断的修改方案与诊断状态不一致。');
+  }
+  if ((result.mainPaths || []).length && !result.diagnosisClaimId) errors.push('理由路径缺少判断目标。');
+  if (result.counterPath && !result.counterClaimId) errors.push('相反理由路径缺少判断目标。');
   for (const path of result.mainPaths || []) {
     if (path.rootClaimId !== result.diagnosisClaimId) {
       errors.push('主要理由路径没有从当前判断目标开始。');
@@ -125,7 +140,7 @@ export const validatePolicyResult = (model, result) => {
   if (['yes', 'no'].includes(result.rootAnswer) && !(result.mainPaths || []).length) {
     warnings.push('这项政策记录了根判断，但没有已校验的主要理由路径。');
   }
-  if (expectedCounterClaimId && result.counterClaimId !== expectedCounterClaimId) {
+  if (expectedCounterClaimId && result.counterClaimId != null && result.counterClaimId !== expectedCounterClaimId) {
     errors.push('相反理由没有指向当前判断对应的反方命题。');
   }
   if (result.counterPath) {

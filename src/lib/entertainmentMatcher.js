@@ -1,6 +1,6 @@
 import { validatePolicyResults } from './formalValidator.js';
 
-export const MATCHER_VERSION = 'entertainment-matcher-3.1';
+export const MATCHER_VERSION = 'entertainment-matcher-3.2';
 
 export const DEFAULT_FEATURE_WEIGHTS = Object.freeze({
   rootAnswer: 0.10,
@@ -36,14 +36,14 @@ const enginePathFeatures = (model, result) => {
   const mainPath = first(result.mainPaths) || null;
   const supportedMainPath = mainPath?.status === 'retracted' ? null : mainPath;
   const mainReasonIds = supportedMainPath?.steps?.map((step) => step.reasonId) || [];
-  const terminalValueId = supportedMainPath?.stress?.claimId
-    || supportedMainPath?.steps?.at(-1)?.bridgeClaimId
-    || null;
+  const terminalValueId = ['accepted', 'qualified'].includes(supportedMainPath?.status)
+    ? supportedMainPath?.stress?.claimId || supportedMainPath?.steps?.at(-1)?.bridgeClaimId || null
+    : null;
   const supportedCounterPath = result.counterPath?.status === 'retracted' ? null : result.counterPath;
   const counterReasonIds = supportedCounterPath?.steps?.map((step) => step.reasonId) || [];
-  const counterTerminalValueId = supportedCounterPath?.stress?.claimId
-    || supportedCounterPath?.steps?.at(-1)?.bridgeClaimId
-    || null;
+  const counterTerminalValueId = ['accepted', 'qualified'].includes(supportedCounterPath?.status)
+    ? supportedCounterPath?.stress?.claimId || supportedCounterPath?.steps?.at(-1)?.bridgeClaimId || null
+    : null;
   return {
     policyId: result.policyId,
     rootAnswer: result.rootAnswer ?? null,

@@ -323,6 +323,12 @@ p {
   line-height: 1.8;
 }
 
+.landing-intro .landing-guide {
+  margin-top: 18px;
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
 .landing-actions {
   margin-top: 30px;
   display: flex;
@@ -1187,7 +1193,7 @@ details > summary {
 
 .v4-proof-path h4 {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 1rem;
 }
 
 .v4-proof-path ol {
@@ -1197,8 +1203,8 @@ details > summary {
 
 .v4-proof-path li {
   margin: 8px 0;
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 0.9375rem;
+  line-height: 1.8;
 }
 
 .v4-proof-path li span {
@@ -1800,6 +1806,29 @@ details > summary {
   }
 }
 
+.v4-custom-detail {
+  margin-top: 18px;
+  padding: 16px;
+  border-left: 3px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.v4-custom-detail h5 {
+  margin: 12px 0 8px;
+  font-size: 0.9375rem;
+}
+
+.result-caveat, .metric-explanation {
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+
+.persistence-warning {
+  margin: 16px auto;
+  padding: 14px 18px;
+  width: min(1040px, calc(100% - 32px));
+  border: 1px solid var(--amber);
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

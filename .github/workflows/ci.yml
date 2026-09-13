@@ -36,4 +36,6 @@ jobs:
         run: npm run build
 
       - name: 运行浏览器回归测试
+        env:
+          E2E_PRODUCTION: '1'
         run: npm run test:e2e

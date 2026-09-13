@@ -182,7 +182,7 @@ test('娱乐基准只在主动启用后加载，并且一次只追加一道精�
   await expect(page.getByRole('button', { name: '生成娱乐匹配', exact: true })).toBeVisible();
   expect(benchmarkRequests).toHaveLength(0);
   await page.getByRole('button', { name: '生成娱乐匹配', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '只看目前的信息，你位于以下几个参考立场之间。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '根据已答内容，以下几种参考路径与你比较接近。' })).toBeVisible();
   await expect(page.locator('.entertainment-profile code')).toHaveText(/^[0-9A-F]{16}$/);
   await expect(page.locator('.entertainment-prototype-list strong').first()).toHaveText(/[\u3400-\u9fff]+（[A-Za-z]/u);
   await expect(page.getByText(/主要理由方向接近/)).toHaveCount(0);

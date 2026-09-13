@@ -380,6 +380,7 @@ export const createSession = (model, options = {}) => {
     rootAnswer: null,
     activeFrameId: null,
     acceptedRevisionFrameId: null,
+    unresolvedRevisionFrameId: null,
     diagnosticIndex: 0,
     diagnosisClaimId: null,
     activeClaimId: null,
@@ -414,6 +415,7 @@ export const startSession = (model, state = createSession(model)) => {
     rootAnswer: null,
     activeFrameId: policy.rootFrameId,
     acceptedRevisionFrameId: null,
+    unresolvedRevisionFrameId: null,
     diagnosticIndex: 0,
     diagnosisClaimId: null,
     activeClaimId: null,
@@ -431,6 +433,20 @@ export const startSession = (model, state = createSession(model)) => {
     updatedAt: now(),
   };
 };
+
+// Custom continuations explain the end of the confirmed prefix, not its root.
+export const getReasonTargetId = (state) => state.phase === PHASES.CUSTOM_REASON_REQUIRED
+  ? state.currentPath?.steps?.at(-1)?.bridgeClaimId || state.currentPath?.rootClaimId || state.activeClaimId
+  : state.activeClaimId;
+
+export const getReasonDirection = (model, state) => {
+  const target = model.claims[getReasonTargetId(state)];
+  if (['normative', 'value'].includes(target?.kind)) return 'support';
+  return state.chainMode === 'counter'
+    ? state.rootAnswer === 'yes' ? 'oppose' : 'support'
+    : state.rootAnswer === 'yes' ? 'support' : 'oppose';
+};
+
 
 const policyFor = (model, state) => indexPolicies(model)[state.currentPolicyId];
 
@@ -470,7 +486,8 @@ export const getQuestion = (model, state) => {
         explanation: diagnostic.explanation,
         candidateFrameId: diagnostic.candidateFrameId,
         changes: revisionChangesFor(policy, diagnostic.candidateFrameId),
-        options: model.product.revisionAnswers,
+        options: model.product.revisionAnswers.map((option) => option.id === 'reject'
+          ? { ...option, description: '这项修改还不足以让我接受整个方案。' } : option),
       };
     }
 
@@ -498,7 +515,7 @@ export const getQuestion = (model, state) => {
         kind: 'assumption_check',
         title: '先核对一个假设',
         statement: premise.question || premise.statement,
-        explanation: '这只决定当前理由能否继续，不会自动改变你对整个政策的回答。',
+        explanation: '这里只记录你是否愿意采用这个前提，不表示系统已核实它，也不会自动改变政策判断。',
         premiseId: premise.id,
         options: model.product.assumptionAnswers,
       };
@@ -526,6 +543,7 @@ export const getQuestion = (model, state) => {
         kind: 'why_or_stop',
         title: '你还想继续追问为什么吗？',
         statement: claim.text,
+        explanation: '可以暂时停在这里；这不表示它是不可质疑的最终答案。',
         options: [
           { id: 'stop_here', label: '这就是我目前愿意停下来的理由' },
           ...deeper,
@@ -591,8 +609,10 @@ export const getQuestion = (model, state) => {
     case PHASES.CUSTOM_REASON_REQUIRED:
       return {
         kind: 'custom_reason_required',
-        title: '题库没有覆盖你的理由',
-        statement: '你可以写下自己的理由，让系统或你选择的 AI 整理成候选；也可以把本题保留为未解决。',
+        title: '补充你自己的理由',
+        statement: model.claims[getReasonTargetId(state)]?.text,
+        explanation: '请说明为什么接受上面的判断或原则。可以直接保存，不必使用 AI；也可以暂时保留为未解决。',
+        claimId: getReasonTargetId(state),
         options: [
           { id: 'leave_unresolved', label: '暂时保留为未解决' },
         ],
@@ -671,6 +691,7 @@ const finishPolicyRecord = (model, state) => {
     rootAnswer: state.rootAnswer,
     finalRootAnswer,
     acceptedRevisionFrameId: state.acceptedRevisionFrameId,
+    unresolvedRevisionFrameId: state.unresolvedRevisionFrameId || null,
     derivedConditionalAcceptance: Boolean(
       state.rootAnswer === 'no' && state.acceptedRevisionFrameId
     ),
@@ -701,8 +722,13 @@ const finishCustomReason = (model, state, extra) => {
   if (text.length > 4000 || (candidate && JSON.stringify(candidate).length > 24000)) {
     throw new Error('Custom reason content is too long.');
   }
+  const targetClaimId = getReasonTargetId(state);
+  if (candidate && candidate.target?.text !== model.claims[targetClaimId]?.text) {
+    throw new Error('自定义候选不能改写当前正在说明的判断或原则。');
+  }
   const finishedPath = {
     ...state.currentPath,
+    customTargetClaimId: targetClaimId,
     status: 'custom_unverified',
     customReason: candidate || { text },
   };
@@ -761,6 +787,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
         return completeCurrentPolicy(model, {
           ...state,
           diagnosisClaimId: null,
+          unresolvedRevisionFrameId: diagnostic.candidateFrameId,
           notes: [...state.notes, `Uncertain about revision ${diagnostic.id}`],
         });
       }
@@ -853,7 +880,11 @@ const advance = (model, originalState, optionId, extra = {}) => {
     }
 
     case PHASES.WHY_OR_STOP:
-      if (optionId === 'custom') return { ...state, phase: PHASES.CUSTOM_REASON_REQUIRED };
+      if (optionId === 'custom') return {
+        ...state,
+        activeClaimId: state.currentBridgeClaimId,
+        phase: PHASES.CUSTOM_REASON_REQUIRED,
+      };
       if (optionId === 'stop_here') return { ...state, phase: PHASES.STRESS_TEST };
       return beginReason(model, {
         ...state,
@@ -897,14 +928,22 @@ const advance = (model, originalState, optionId, extra = {}) => {
       }
       return completeCurrentPolicy(model, { ...state, counterImpact: optionId });
 
-    case PHASES.CUSTOM_REASON_REQUIRED:
+    case PHASES.CUSTOM_REASON_REQUIRED: {
       if (optionId === 'save_custom') return finishCustomReason(model, state, extra);
       if (optionId !== 'leave_unresolved') throw new Error('Invalid custom-reason response.');
+      const unfinishedPath = {
+        ...state.currentPath,
+        status: 'unresolved',
+        unresolvedTargetClaimId: getReasonTargetId(state),
+      };
       return completeCurrentPolicy(model, {
         ...state,
+        mainPaths: state.chainMode === 'main' ? [...state.mainPaths, unfinishedPath] : state.mainPaths,
+        counterPath: state.chainMode === 'counter' ? unfinishedPath : state.counterPath,
         counterImpact: state.chainMode === 'counter' ? 'uncertain' : state.counterImpact,
-        notes: [...state.notes, `Unresolved custom reason for ${state.activeClaimId}`],
+        notes: [...state.notes, `Unresolved custom reason for ${getReasonTargetId(state)}`],
       });
+    }
 
     case PHASES.POLICY_DONE:
       if (optionId === 'results') return { ...state, phase: PHASES.RESULTS };
@@ -1027,8 +1066,13 @@ export const summarizePolicyResult = (model, result) => {
     mainReason: firstStep?.reasonId || null,
     mainReasonTitle: firstStep ? model.reasons[firstStep.reasonId]?.title || null
       : customReason?.argument?.title || customReason?.text || null,
-    deeperReason: lastStep && mainPath?.status !== 'retracted' ? model.claims[lastStep.bridgeClaimId]?.plain
-      || model.claims[lastStep.bridgeClaimId]?.text || null : null,
+    deeperReason: customReason && lastStep
+      ? (mainPath.customTargetClaimId ? customReason.argument?.title || customReason.text : null)
+      : lastStep && !['retracted', 'unresolved'].includes(mainPath?.status)
+        ? model.claims[lastStep.bridgeClaimId]?.plain || model.claims[lastStep.bridgeClaimId]?.text || null : null,
+    customUnverified: Boolean(customReason || result.counterPath?.customReason),
+    customTargetUnrecorded: Boolean(customReason && lastStep && !mainPath.customTargetClaimId),
+    reasonUnresolved: mainPath?.status === 'unresolved' || (!mainPath && ['yes', 'no'].includes(result.rootAnswer)),
     counterReasonTitle: counterStep ? model.reasons[counterStep.reasonId]?.title || null
       : result.counterPath?.customReason?.argument?.title
         || result.counterPath?.customReason?.text || null,
@@ -1072,6 +1116,15 @@ export const summarizePolicyResult = (model, result) => {
       diagnosis: diagnosis?.plain || null,
       acceptedRevision: policy.frames[result.acceptedRevisionFrameId].label,
       changes,
+      counterImpact: result.counterImpact,
+      ...pathDetails,
+    };
+  }
+  if (!result.diagnosisClaimId) {
+    return {
+      title: policy.shortTitle,
+      summary: '你不接受原方案，但还没有确定哪些修改能改变判断。',
+      unresolvedRevision: policy.frames[result.unresolvedRevisionFrameId]?.label || null,
       counterImpact: result.counterImpact,
       ...pathDetails,
     };

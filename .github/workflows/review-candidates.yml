@@ -1,8 +1,8 @@
 name: 归档旧契约候选论证
 
+# Current v4 does not consume this archive. Run explicitly when maintaining R2.
+# Missing legacy credentials must not generate daily unrelated failure alerts.
 on:
-  schedule:
-    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:

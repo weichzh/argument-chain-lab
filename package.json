@@ -1,14 +1,15 @@
 {
   "name": "argument-chain-lab",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/validate-model.mjs && node scripts/validate-ideology-benchmark.mjs && vite build",
+    "build": "node scripts/validate-model.mjs && node scripts/validate-ideology-benchmark.mjs && vite build && node scripts/write-release-info.mjs",
     "preview": "vite preview",
-    "test": "node scripts/test-engine.mjs && node scripts/test-model-mutations.mjs && node scripts/test-formal-validator.mjs && node scripts/test-session-migration.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs && node scripts/validate-model.mjs && node scripts/validate-ideology-benchmark.mjs && node scripts/test-entertainment-matcher.mjs",
+    "test": "node scripts/test-engine.mjs && node scripts/test-reason-continuation.mjs && node scripts/test-model-mutations.mjs && node scripts/test-formal-validator.mjs && node scripts/test-session-migration.mjs && node scripts/test-runtime-features.mjs && node scripts/test-contribution-pipeline.mjs && node scripts/validate-model.mjs && node scripts/validate-ideology-benchmark.mjs && node scripts/test-entertainment-matcher.mjs",
     "test:e2e": "playwright test",
+    "test:release": "npm test && npm run build && E2E_PRODUCTION=1 playwright test",
     "export:model": "node scripts/export-model.mjs",
     "dev:worker": "wrangler -c worker/wrangler.jsonc dev",
     "normalize:community": "node scripts/normalize-community-bank.mjs",

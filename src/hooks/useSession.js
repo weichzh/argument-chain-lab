@@ -126,13 +126,15 @@ const nextUnansweredPolicy = (model, state) => (
 export function useSession() {
   const model = getModelV4();
   const [state, setState] = useState(() => loadState(model));
+  const [persistenceError, setPersistenceError] = useState(null);
 
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+      setPersistenceError(null);
     } catch {
-      // The questionnaire still works when local persistence is unavailable.
+      setPersistenceError('这个浏览器暂时无法保存进度。当前页面仍可继续，刷新或关闭后可能丢失；请先导出已完成结果。');
     }
   }, [state]);
 
@@ -200,6 +202,7 @@ export function useSession() {
     const currentAnswers = (state.answerLog || []).filter((entry) => entry.policyId === state.currentPolicyId);
     return {
       clearLocalData,
+      persistenceError,
       hasSavedProgress: Boolean(state.startedAt),
       canGoBack: state.history.length > 0,
       answerHistory: currentAnswers,
@@ -207,7 +210,7 @@ export function useSession() {
       answeredCount: results.length,
       nextPolicyId: nextUnansweredPolicy(model, state),
     };
-  }, [clearLocalData, model, state]);
+  }, [clearLocalData, model, state, persistenceError]);
 
   return [state, dispatch, controls];
 }
