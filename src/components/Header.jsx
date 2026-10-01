@@ -9,6 +9,7 @@ const utilityButton = (label, Icon, onClick, active = false) => (
     type="button"
     onClick={onClick}
     title={label}
+    aria-label={label}
   >
     <Icon size={18} aria-hidden="true" />
     <span>{label}</span>

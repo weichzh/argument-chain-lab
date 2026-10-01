@@ -4,7 +4,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import { validateBankManifest } from '../src/data/bank.js';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
-const modelUrl = new URL('../public/bank/model-1.2.2.json', import.meta.url);
+import { modelUrl } from './current-bank.mjs';
 const schemaUrl = new URL('../public/bank/model-v4.schema.json', import.meta.url);
 const manifestUrl = new URL('../public/bank/manifest.json', import.meta.url);
 const bytes = fs.readFileSync(modelUrl);
@@ -22,8 +22,8 @@ if (!schemaValid) {
 const semantic = validateModel(model);
 if (!semantic.ok) throw new Error(`Semantic validation failed:\n${semantic.errors.join('\n')}`);
 const selected = validateBankManifest(manifest);
-if (manifest.default !== model.meta.version || selected.path !== 'model-1.2.2.json') {
-  throw new Error('Manifest must load the 1.2 current model.');
+if (manifest.default !== model.meta.version || selected.path !== `model-${model.meta.version}.json`) {
+  throw new Error('Manifest must load the current versioned model.');
 }
 if (!manifest.legacy?.every((item) => item.loadInProduct === false && item.status === 'archive_only')) {
   throw new Error('Legacy models must remain archive-only.');
@@ -38,7 +38,7 @@ const counts = {
   reasons: Object.keys(model.reasons).length,
   argumentSchemes: Object.keys(model.argumentSchemes).length,
 };
-const expected = { policies: 13, dimensions: 53, frames: 63, diagnostics: 50, claims: 197, reasons: 302, argumentSchemes: 11 };
+const expected = { policies: 13, dimensions: 53, frames: 63, diagnostics: 50, claims: 199, reasons: 306, argumentSchemes: 11 };
 if (JSON.stringify(counts) !== JSON.stringify(expected)) {
   throw new Error(`Unexpected model counts: ${JSON.stringify(counts)}`);
 }
@@ -49,10 +49,10 @@ if (model.product.defaultPolicyIds.length !== 8
 }
 
 const bridgeClaims = new Set(Object.values(model.reasons).map((reason) => reason.bridgeClaimId));
-if (bridgeClaims.size !== 71
+if (bridgeClaims.size !== 73
   || [...bridgeClaims].some((claimId) => !model.claims[claimId]?.stressTest?.scenario
     || !model.claims[claimId]?.stressTest?.question)) {
-  throw new Error('The 1.2 model must provide 71 concrete stress tests.');
+  throw new Error('The 1.3 model must provide 73 concrete stress tests, including retained historical definitions.');
 }
 
 console.log(JSON.stringify({

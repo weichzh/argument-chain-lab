@@ -7,6 +7,7 @@ import {
   backToAnswer,
   createSession,
   openPolicy,
+  recordUncertainty,
   skipPolicy,
   startSession,
 } from '../lib/decisionEngine.js';
@@ -38,9 +39,30 @@ const freshState = (model, retained = {}) => ({
   ...retained,
 });
 
-const normalizeCurrentState = (value, model) => {
+// Older v4 sessions stopped at the first accepted/uncertain revision. Only
+// those sequentially implied answers are recoverable; never infer preferences.
+const recoverRevisionAnswers = (model, value, policyId = value?.currentPolicyId) => {
+  if (value?.revisionAnswers && typeof value.revisionAnswers === 'object') return value.revisionAnswers;
+  if (value?.rootAnswer !== 'no') return {};
+  const policy = model.policies.find(item => item.id === policyId);
+  if (!policy) return {};
+  const answers = {};
+  if (value.diagnosisClaimId === policy.fallbackOpposeClaimId) {
+    policy.diagnostics.forEach(item => { answers[item.candidateFrameId] = 'reject'; });
+    return answers;
+  }
+  const terminalFrame = value.acceptedRevisionFrameId || value.unresolvedRevisionFrameId;
+  const terminalIndex = policy.diagnostics.findIndex(item => item.candidateFrameId === terminalFrame);
+  const index = terminalIndex >= 0 ? terminalIndex
+    : value.phase === PHASES.REVISION_TEST && Number.isInteger(value.diagnosticIndex) ? value.diagnosticIndex : 0;
+  policy.diagnostics.slice(0, index).forEach(item => { answers[item.candidateFrameId] = 'reject'; });
+  if (terminalIndex >= 0) answers[terminalFrame] = value.acceptedRevisionFrameId ? 'accept' : 'uncertain';
+  return answers;
+};
+
+export const normalizeCurrentState = (value, model) => {
   const compatibleModel = value?.modelVersion === model.meta.version
-    || (model.meta.version === '1.2.2' && ['1.0.0', '1.1.0', '1.2.0'].includes(value?.modelVersion));
+    || (model.meta.compatibleSessionVersions || ['1.0.0', '1.1.0', '1.2.0']).includes(value?.modelVersion);
   if (value?.storageVersion !== STORAGE_VERSION || !compatibleModel) return null;
   const allPolicyIds = [...model.policies]
     .sort((left, right) => left.order - right.order)
@@ -65,6 +87,7 @@ const normalizeCurrentState = (value, model) => {
     {
       ...result,
       sourceModelVersion: result?.sourceModelVersion || value.modelVersion,
+      revisionAnswers: recoverRevisionAnswers(model, result, policyId),
       ...(['yes', 'no'].includes(result?.rootAnswer) && result.counterClaimId && result.counterImpact == null
         ? { counterImpact: 'uncertain' } : {}),
     },
@@ -73,13 +96,19 @@ const normalizeCurrentState = (value, model) => {
     ...freshState(model),
     ...value,
     modelVersion: model.meta.version,
+    progressSourceModelVersion: value.progressSourceModelVersion || value.modelVersion,
+    revisionAnswers: recoverRevisionAnswers(model, value),
+    policyDrafts: value.policyDrafts && typeof value.policyDrafts === 'object' ? value.policyDrafts : {},
     policyIds,
     policyPosition,
     currentPolicyId,
     policyResults,
     history: Array.isArray(value.history)
       ? value.history.map((snapshot) => ({
-        ...snapshot, modelVersion: model.meta.version,
+        ...snapshot,
+        progressSourceModelVersion: snapshot.progressSourceModelVersion || snapshot.modelVersion || value.modelVersion,
+        revisionAnswers: recoverRevisionAnswers(model, snapshot),
+        modelVersion: model.meta.version,
         policyResults: Object.fromEntries(Object.entries(snapshot.policyResults || {}).map(([id, result]) => [
           id, { ...result, sourceModelVersion: result?.sourceModelVersion || snapshot.modelVersion || value.modelVersion },
         ])),
@@ -176,6 +205,10 @@ export function useSession() {
           return { ...next, view: next.phase === PHASES.RESULTS ? VIEWS.RESULTS : VIEWS.QUESTIONNAIRE };
         case 'OPEN_POLICY':
           return { ...openPolicy(model, current, action.policyId), view: VIEWS.QUESTIONNAIRE };
+        case 'RESTART_POLICY':
+          return { ...openPolicy(model, current, action.policyId, { restart: true }), view: VIEWS.QUESTIONNAIRE };
+        case 'RECORD_UNCERTAINTY':
+          return recordUncertainty(model, current, action.extra);
         case 'OPEN_OVERVIEW':
           return { ...current, view: VIEWS.OVERVIEW };
         case 'SHOW_RESULTS':

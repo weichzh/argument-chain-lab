@@ -349,10 +349,41 @@ const emptyPath = (claimId) => ({
   stress: null,
 });
 
-const historySnapshot = (state) => {
-  const snapshot = clone(state);
-  snapshot.history = [];
-  return snapshot;
+// Checkpoints contain only one policy. Restoring them must not roll back work
+// subsequently completed in a different policy or recursively copy all drafts.
+const POLICY_FIELDS = [
+  'currentPolicyId', 'phase', 'rootAnswer', 'activeFrameId', 'acceptedRevisionFrameId',
+  'unresolvedRevisionFrameId', 'diagnosticIndex', 'diagnosisClaimId', 'activeClaimId',
+  'currentReasonId', 'premiseIndex', 'currentBridgeClaimId', 'chainMode', 'currentPath',
+  'mainPaths', 'counterPath', 'counterClaimId', 'counterImpact', 'triedReasonIds',
+  'revisionAnswers', 'uncertaintyByFrame', 'rejectedReasonAttempts', 'reviewCheckpoint', 'progressSourceModelVersion',
+];
+const historySnapshot = (state, includeHistory = false) => clone({
+  ...Object.fromEntries(POLICY_FIELDS.map(key => [key, state[key]])),
+  modelVersion: state.modelVersion,
+  policyResult: state.policyResults[state.currentPolicyId] || null,
+  answerLog: (state.answerLog || []).filter(entry => entry.policyId === state.currentPolicyId),
+  history: includeHistory ? state.history : [],
+});
+const restorePolicySnapshot = (state, snapshot) => {
+  const policyId = snapshot.currentPolicyId;
+  const policyResults = { ...state.policyResults };
+  const recorded = snapshot.policyResult || snapshot.policyResults?.[policyId];
+  if (recorded) policyResults[policyId] = clone(recorded);
+  else delete policyResults[policyId];
+  return {
+    ...state,
+    ...Object.fromEntries(POLICY_FIELDS.map(key => [key, clone(snapshot[key])])),
+    policyPosition: state.policyIds.indexOf(policyId),
+    progressSourceModelVersion: snapshot.progressSourceModelVersion || snapshot.modelVersion || state.progressSourceModelVersion,
+    policyResults,
+    answerLog: [
+      ...(state.answerLog || []).filter(entry => entry.policyId !== policyId),
+      ...(snapshot.answerLog || []).filter(entry => entry.policyId === policyId),
+    ].sort((a, b) => a.id - b.id),
+    history: clone(snapshot.history || []),
+    updatedAt: now(),
+  };
 };
 
 const pushHistory = (state) => ({
@@ -395,6 +426,11 @@ export const createSession = (model, options = {}) => {
     counterImpact: null,
     triedReasonIds: {},
     policyResults: {},
+    policyDrafts: {},
+    revisionAnswers: {},
+    uncertaintyByFrame: {},
+    rejectedReasonAttempts: [],
+    reviewCheckpoint: null,
     history: [],
     notes: [],
     answerLog: [],
@@ -411,6 +447,7 @@ export const startSession = (model, state = createSession(model)) => {
   return {
     ...state,
     currentPolicyId: policyId,
+    progressSourceModelVersion: model.meta.version,
     phase: PHASES.POLICY_DECISION,
     rootAnswer: null,
     activeFrameId: policy.rootFrameId,
@@ -429,6 +466,10 @@ export const startSession = (model, state = createSession(model)) => {
     counterClaimId: null,
     counterImpact: null,
     triedReasonIds: {},
+    revisionAnswers: {},
+    uncertaintyByFrame: {},
+    rejectedReasonAttempts: [],
+    reviewCheckpoint: null,
     startedAt: state.startedAt || now(),
     updatedAt: now(),
   };
@@ -448,14 +489,31 @@ export const getReasonDirection = (model, state) => {
 };
 
 
-const policyFor = (model, state) => indexPolicies(model)[state.currentPolicyId];
+export const policyForRecord = (model, policyId, sourceModelVersion) => (
+  sourceModelVersion && sourceModelVersion !== model.meta.version
+    ? model.product.frameHistory?.[sourceModelVersion]?.[policyId] || indexPolicies(model)[policyId]
+    : indexPolicies(model)[policyId]
+);
+const policyFor = (model, state) => policyForRecord(model, state.currentPolicyId, state.progressSourceModelVersion);
 
 export const getCurrentPolicy = (model, state) => policyFor(model, state) || null;
+
+const claimContextText = (model, state, claimId) => {
+  const policy = policyFor(model, state);
+  if (state.acceptedRevisionFrameId) {
+    const diagnostic = policy.diagnostics.find(item => item.candidateFrameId === state.acceptedRevisionFrameId);
+    const changes = revisionChangesFor(policy, state.acceptedRevisionFrameId);
+    if (claimId === diagnostic?.acceptedClaimId) return `你拒绝原方案，但接受“${policy.frames[state.acceptedRevisionFrameId].label}”。已确认的差异是：${changes.map(item => `${item.dimensionLabel}：${item.fromLabel} → ${item.toLabel}`).join('；')}。`;
+    if (claimId === diagnostic?.counterClaimId) return `接下来检查相反理由，它要说明为什么仍应保留这些原有安排：${changes.map(item => `${item.dimensionLabel}：${item.fromLabel}`).join('；')}。认可局部理由不等于接受完整原方案。`;
+  }
+  return model.claims[claimId]?.text;
+};
 
 const availableReasons = (model, state, claimId) => {
   const tried = new Set(state.triedReasonIds[claimId] || []);
   return Object.values(model.reasons).filter((reason) => (
     reason.targetClaimId === claimId && !tried.has(reason.id)
+    && !(model.product.retiredReasonIds || []).includes(reason.id)
   ));
 };
 
@@ -505,7 +563,12 @@ export const getQuestion = (model, state) => {
       return {
         kind: 'reason_choice',
         title: '你这样判断的最主要原因是什么？',
-        statement: claim?.text,
+        statement: state.activeClaimId === policy.fallbackOpposeClaimId
+          ? '你不接受原方案，已测试的修改也未改变判断。这不等于你反对所有其他可能的方案。'
+          : claimContextText(model, state, state.activeClaimId),
+        explanation: state.acceptedRevisionFrameId
+          ? '接受只说明这项修改足以改变判断，不代表找到了唯一原因，也不表示它是必要条件、最小组合或你最偏好的方案。未测试的方案仍然未知。'
+          : undefined,
         claimId: state.activeClaimId,
         options,
       };
@@ -516,11 +579,12 @@ export const getQuestion = (model, state) => {
       const premise = reason.premises[state.premiseIndex];
       return {
         kind: 'assumption_check',
-        title: '先核对一个假设',
+        title: ['relevance', 'normative', 'normative_link'].includes(premise.role) ? '核对理由中的判断' : '先核对一个假设',
         statement: premise.question || premise.statement,
-        explanation: '这里只记录你是否愿意采用这个前提，不表示系统已核实它，也不会自动改变政策判断。',
+        reasonContext: reason.title,
+        explanation: '暂时采用前提不等于证据已核实。也可以先保存所选理由，把检验留待以后。',
         premiseId: premise.id,
-        options: model.product.assumptionAnswers,
+        options: [...model.product.assumptionAnswers, { id: 'save_unchecked', label: '先记录这条理由，暂不检验' }],
       };
     }
 
@@ -531,7 +595,9 @@ export const getQuestion = (model, state) => {
         kind: 'rule_check',
         title: '即使前面的情况成立，这一点也足以成为一个理由吗？',
         statement: bridge.text,
-        options: model.product.ruleAnswers,
+        reasonContext: reason.title,
+        explanation: '请检查这条原则能否支持上面的具体理由；认可原则本身，不等于认可它在这里的适用。',
+        options: [...model.product.ruleAnswers, { id: 'not_applicable', label: '原则可以成立，但没有解释这里的担忧' }],
       };
     }
 
@@ -590,7 +656,9 @@ export const getQuestion = (model, state) => {
       return {
         kind: 'counter_reason_choice',
         title: '下面哪条相反理由最值得你认真考虑？',
-        statement: model.claims[state.counterClaimId]?.text,
+        statement: state.rootAnswer === 'yes'
+          ? '你已接受完整原方案。现在检查反对该方案的理由；这不会自动改变你原来的回答。'
+          : claimContextText(model, state, state.counterClaimId),
         options: [
           ...options,
           { id: 'none', label: '这些理由都不影响我的判断' },
@@ -629,7 +697,11 @@ export const getQuestion = (model, state) => {
         kind: 'policy_done',
         title: '这一题已经结束',
         options: [
-          { id: 'next', label: '进入下一题' },
+          ...(state.reviewCheckpoint ? [{ id: 'continue_review', label: '继续核对刚才的理由' }] : []),
+          ...(state.rootAnswer === 'no' && state.unresolvedRevisionFrameId && !state.acceptedRevisionFrameId
+            && state.diagnosticIndex + 1 < policy.diagnostics.length
+            ? [{ id: 'continue_revisions', label: '保留不确定，继续比较其他修改' }] : []),
+          ...(state.policyPosition + 1 < state.policyIds.length ? [{ id: 'next', label: '进入下一题' }] : []),
           { id: 'results', label: '现在查看结果' },
         ],
       };
@@ -655,7 +727,16 @@ const rejectCurrentReason = (model, state, response, part) => {
     ...next,
     currentReasonId: null,
     premiseIndex: 0,
-    notes: [...next.notes, `${response} ${part} in ${state.currentReasonId}`],
+    notes: [...(next.notes || []), `${response} ${part} in ${state.currentReasonId}`],
+    rejectedReasonAttempts: [...(state.rejectedReasonAttempts || []), {
+      reasonId: state.currentReasonId,
+      targetClaimId: state.activeClaimId,
+      part,
+      response,
+      premiseId: part === 'premise' ? model.reasons[state.currentReasonId].premises[state.premiseIndex]?.id : null,
+      chainMode: state.chainMode,
+      sourceModelVersion: model.meta.version,
+    }],
     // Rejecting an explanation does not retract the principle it explains.
     ...(confirmedTarget === state.activeClaimId ? {
       currentBridgeClaimId: confirmedTarget,
@@ -714,11 +795,14 @@ const finishPolicyRecord = (model, state) => {
   return {
     policyId: policy.id,
     rootFrameId: policy.rootFrameId,
-    sourceModelVersion: model.meta.version,
+    sourceModelVersion: state.progressSourceModelVersion || model.meta.version,
     rootAnswer: state.rootAnswer,
     finalRootAnswer,
     acceptedRevisionFrameId: state.acceptedRevisionFrameId,
     unresolvedRevisionFrameId: state.unresolvedRevisionFrameId || null,
+    revisionAnswers: { ...(state.revisionAnswers || {}) },
+    uncertaintyByFrame: clone(state.uncertaintyByFrame || {}),
+    rejectedReasonAttempts: clone(state.rejectedReasonAttempts || []),
     derivedConditionalAcceptance: Boolean(
       state.rootAnswer === 'no' && state.acceptedRevisionFrameId
     ),
@@ -778,6 +862,18 @@ const advance = (model, originalState, optionId, extra = {}) => {
   const state = pushHistory(originalState);
   const policy = policyFor(model, state);
 
+  if (optionId === 'save_unchecked' && state.phase === PHASES.PREMISE_CHECK) {
+    const reviewCheckpoint = Object.fromEntries(POLICY_FIELDS.filter(key => key !== 'reviewCheckpoint')
+      .map(key => [key, clone(state[key])]));
+    const selected = { ...state.currentPath, status: 'unchecked', selectedReasonId: state.currentReasonId };
+    return completeCurrentPolicy(model, {
+      ...state, reviewCheckpoint,
+      mainPaths: state.chainMode === 'main' ? [...state.mainPaths, selected] : state.mainPaths,
+      counterPath: state.chainMode === 'counter' ? selected : state.counterPath,
+      counterImpact: state.chainMode === 'counter' ? 'uncertain' : state.counterImpact,
+    });
+  }
+
   switch (state.phase) {
     case PHASES.POLICY_DECISION:
       if (!['yes', 'no', 'uncertain'].includes(optionId)) throw new Error('Invalid root answer.');
@@ -810,6 +906,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
     case PHASES.REVISION_TEST: {
       const diagnostic = policy.diagnostics[state.diagnosticIndex];
       if (!['accept', 'reject', 'uncertain'].includes(optionId)) throw new Error('Invalid revision answer.');
+      state.revisionAnswers = { ...(state.revisionAnswers || {}), [diagnostic.candidateFrameId]: optionId };
       if (optionId === 'uncertain') {
         return completeCurrentPolicy(model, {
           ...state,
@@ -822,6 +919,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
         return {
           ...state,
           acceptedRevisionFrameId: diagnostic.candidateFrameId,
+          unresolvedRevisionFrameId: null,
           activeFrameId: diagnostic.candidateFrameId,
           diagnosisClaimId: diagnostic.acceptedClaimId,
           activeClaimId: diagnostic.acceptedClaimId,
@@ -836,6 +934,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
           phase: PHASES.REVISION_TEST,
         };
       }
+      if (state.unresolvedRevisionFrameId) return completeCurrentPolicy(model, { ...state, diagnosisClaimId: null });
       return {
         ...state,
         diagnosisClaimId: policy.fallbackOpposeClaimId,
@@ -866,7 +965,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
     }
 
     case PHASES.RULE_CHECK: {
-      if (!['accept', 'reject', 'uncertain'].includes(optionId)) throw new Error('Invalid rule answer.');
+      if (!['accept', 'reject', 'uncertain', 'not_applicable'].includes(optionId)) throw new Error('Invalid rule answer.');
       const reason = model.reasons[state.currentReasonId];
       if (optionId !== 'accept') {
         return rejectCurrentReason(model, state, optionId, 'rule');
@@ -877,6 +976,7 @@ const advance = (model, originalState, optionId, extra = {}) => {
         premiseAnswers: Object.fromEntries(reason.premises.map((premise) => [premise.id, 'accept'])),
         bridgeClaimId: reason.bridgeClaimId,
         ruleAnswer: 'accept',
+        sourceModelVersion: state.progressSourceModelVersion || model.meta.version,
       };
       return {
         ...state,
@@ -959,16 +1059,23 @@ const advance = (model, originalState, optionId, extra = {}) => {
     }
 
     case PHASES.POLICY_DONE:
+      if (optionId === 'continue_review' && state.reviewCheckpoint) {
+        const policyResults = { ...state.policyResults };
+        delete policyResults[state.currentPolicyId];
+        return { ...state, ...clone(state.reviewCheckpoint), reviewCheckpoint: null, policyResults };
+      }
+      if (optionId === 'continue_revisions' && state.rootAnswer === 'no' && state.unresolvedRevisionFrameId
+        && !state.acceptedRevisionFrameId && state.diagnosticIndex + 1 < policy.diagnostics.length) {
+        const policyResults = { ...state.policyResults };
+        delete policyResults[state.currentPolicyId];
+        return { ...state, policyResults, diagnosticIndex: state.diagnosticIndex + 1, phase: PHASES.REVISION_TEST };
+      }
       if (optionId === 'results') return { ...state, phase: PHASES.RESULTS };
       if (optionId !== 'next') throw new Error('Invalid policy-done answer.');
       if (state.policyPosition + 1 >= state.policyIds.length) {
         return { ...state, phase: PHASES.RESULTS };
       }
-      return startSession(model, {
-        ...state,
-        policyPosition: state.policyPosition + 1,
-        history: [],
-      });
+      return openPolicy(model, state, state.policyIds[state.policyPosition + 1]);
 
     default:
       throw new Error(`Cannot answer in phase ${state.phase}`);
@@ -981,12 +1088,12 @@ export const answer = (model, state, optionId, extra = {}) => {
   const label = option?.label
     || (optionId === 'save_custom' ? extra.candidate?.argument?.title || '写下自己的理由' : optionId);
   const next = advance(model, state, optionId, extra);
-  return {
+  const updated = {
     ...next,
     answerLog: [
       ...(state.answerLog || []),
       {
-        id: (state.answerLog?.at(-1)?.id || 0) + 1,
+        id: Math.max(0, ...(state.answerLog || []).map(entry => entry.id)) + 1,
         policyId: state.currentPolicyId,
         question: question.title,
         answer: label,
@@ -994,11 +1101,17 @@ export const answer = (model, state, optionId, extra = {}) => {
     ],
     updatedAt: now(),
   };
+  // Refresh completed checkpoints after logging the completion action. A stale
+  // in-progress checkpoint must never replace a newly completed result.
+  if (updated.phase === PHASES.POLICY_DONE) {
+    updated.policyDrafts = { ...updated.policyDrafts, [updated.currentPolicyId]: historySnapshot(updated, true) };
+  }
+  return updated;
 };
 
 export const back = (state) => {
   if (!state.history.length) return state;
-  const previous = clone(state.history.at(-1));
+  const previous = restorePolicySnapshot(state, state.history.at(-1));
   previous.history = state.history.slice(0, -1);
   return previous;
 };
@@ -1007,26 +1120,54 @@ export const backToAnswer = (state, answerId) => {
   const currentAnswers = (state.answerLog || []).filter((entry) => entry.policyId === state.currentPolicyId);
   const index = currentAnswers.findIndex((entry) => entry.id === answerId);
   if (index < 0 || !state.history[index]) return state;
-  const previous = clone(state.history[index]);
+  const previous = restorePolicySnapshot(state, state.history[index]);
   previous.history = state.history.slice(0, index);
   previous.updatedAt = now();
   return previous;
 };
 
-export const openPolicy = (model, state, policyId) => {
+export const openPolicy = (model, state, policyId, { restart = false } = {}) => {
   if (!indexPolicies(model)[policyId]) throw new Error(`Unknown selected policy ${policyId}`);
+  if (!restart && state.startedAt && state.currentPolicyId === policyId && state.phase !== PHASES.RESULTS) return state;
   const policyIds = state.policyIds.includes(policyId) ? state.policyIds : [...state.policyIds, policyId];
-  const position = policyIds.indexOf(policyId);
+  const policyDrafts = { ...(state.policyDrafts || {}) };
+  if (state.currentPolicyId && state.startedAt && state.phase !== PHASES.RESULTS
+    && !(restart && policyId === state.currentPolicyId)) {
+    policyDrafts[state.currentPolicyId] = historySnapshot(state, true);
+  }
+  const base = { ...state, policyIds, policyDrafts };
+  if (!restart && policyDrafts[policyId]) return restorePolicySnapshot(base, policyDrafts[policyId]);
+  delete policyDrafts[policyId];
   const policyResults = { ...state.policyResults };
-  delete policyResults[policyId];
-  return startSession(model, {
-    ...state,
-    policyIds,
-    policyPosition: position,
+  if (restart) delete policyResults[policyId];
+  const next = startSession(model, {
+    ...base,
+    policyPosition: policyIds.indexOf(policyId),
     policyResults,
     history: [],
-    answerLog: (state.answerLog || []).filter((entry) => entry.policyId !== policyId),
+    answerLog: restart ? (state.answerLog || []).filter(entry => entry.policyId !== policyId) : state.answerLog,
   });
+  return policyResults[policyId] && !restart
+    ? { ...next, ...policyResults[policyId],
+      progressSourceModelVersion: policyResults[policyId].sourceModelVersion || model.meta.version,
+      diagnosticIndex: Math.max(0, indexPolicies(model)[policyId].diagnostics.findIndex(item => item.candidateFrameId === policyResults[policyId].unresolvedRevisionFrameId)),
+      phase: PHASES.POLICY_DONE }
+    : next;
+};
+
+export const recordUncertainty = (model, state, { category = '', text = '' } = {}) => {
+  if (!['', 'evidence', 'definition', 'tradeoff', 'other'].includes(category)) throw new Error('Invalid uncertainty category.');
+  if (typeof text !== 'string' || text.length > 1000) throw new Error('Uncertainty note is too long.');
+  const result = state.policyResults[state.currentPolicyId];
+  if (!result || (result.rootAnswer !== 'uncertain' && !result.unresolvedRevisionFrameId)) return state;
+  const frameId = result.unresolvedRevisionFrameId || policyFor(model, state).rootFrameId;
+  const uncertaintyByFrame = { ...(result.uncertaintyByFrame || {}), [frameId]: { category, text: text.trim() } };
+  const updated = {
+    ...state, uncertaintyByFrame, updatedAt: now(),
+    policyResults: { ...state.policyResults, [state.currentPolicyId]: { ...result, uncertaintyByFrame } },
+  };
+  updated.policyDrafts = { ...updated.policyDrafts, [state.currentPolicyId]: historySnapshot(updated, true) };
+  return updated;
 };
 
 export const skipPolicy = (model, originalState) => {
@@ -1057,17 +1198,20 @@ export const skipPolicy = (model, originalState) => {
   const next = {
     ...state,
     answerLog,
+    phase: PHASES.POLICY_DONE,
+    rootAnswer: 'skipped',
     policyResults: { ...state.policyResults, [state.currentPolicyId]: result },
+    policyDrafts: Object.fromEntries(Object.entries(state.policyDrafts || {}).filter(([id]) => id !== state.currentPolicyId)),
     updatedAt: now(),
   };
   if (state.policyPosition + 1 >= state.policyIds.length) {
     return { ...next, phase: PHASES.RESULTS };
   }
-  return startSession(model, { ...next, policyPosition: state.policyPosition + 1, history: [] });
+  return openPolicy(model, next, state.policyIds[state.policyPosition + 1]);
 };
 
 export const summarizePolicyResult = (model, result) => {
-  const policy = indexPolicies(model)[result.policyId];
+  const policy = policyForRecord(model, result.policyId, result.sourceModelVersion);
   if (!policy) return null;
   const diagnosis = result.diagnosisClaimId ? model.claims[result.diagnosisClaimId] : null;
   const mainPath = result.mainPaths?.[0] || null;
@@ -1076,9 +1220,12 @@ export const summarizePolicyResult = (model, result) => {
   const customReason = mainPath?.customReason || null;
   const counterStep = result.counterPath?.steps?.[0] || null;
   const pathDetails = {
+    revisionHistory: Object.entries(result.revisionAnswers || {}).map(([frameId, response]) => ({
+      frameId, response, label: policy.frames[frameId]?.label || frameId,
+    })),
     mainReason: firstStep?.reasonId || null,
     mainReasonTitle: firstStep ? model.reasons[firstStep.reasonId]?.title || null
-      : customReason?.argument?.title || customReason?.text || null,
+      : customReason?.argument?.title || customReason?.text || model.reasons[mainPath?.selectedReasonId]?.title || null,
     deeperReason: customReason && lastStep
       ? (mainPath.customTargetClaimId ? customReason.argument?.title || customReason.text : null)
       : lastStep && !['retracted', 'unresolved'].includes(mainPath?.status)
@@ -1088,7 +1235,7 @@ export const summarizePolicyResult = (model, result) => {
     reasonUnresolved: mainPath?.status === 'unresolved' || (!mainPath && ['yes', 'no'].includes(result.rootAnswer)),
     counterReasonTitle: counterStep ? model.reasons[counterStep.reasonId]?.title || null
       : result.counterPath?.customReason?.argument?.title
-        || result.counterPath?.customReason?.text || null,
+        || result.counterPath?.customReason?.text || model.reasons[result.counterPath?.selectedReasonId]?.title || null,
     pathStatus: mainPath?.status || null,
     counterPathStatus: result.counterPath?.status || null,
   };

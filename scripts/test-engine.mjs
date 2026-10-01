@@ -149,6 +149,8 @@ const newSpeechSession = () => startSession(model, createSession(model, { policy
   assert.equal(state.policyResults.speech_restriction.rootAnswer, 'skipped');
   assert.equal(state.currentPolicyId, 'metadata_surveillance');
   state = openPolicy(model, state, 'speech_restriction');
+  assert.equal(state.policyResults.speech_restriction.rootAnswer, 'skipped');
+  state = openPolicy(model, state, 'speech_restriction', { restart: true });
   assert.equal(state.policyResults.speech_restriction, undefined);
 }
 

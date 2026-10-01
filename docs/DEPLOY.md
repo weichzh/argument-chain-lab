@@ -1,60 +1,46 @@
 # 构建与发布
 
-应用与题库 1.2.2 使用 `npm run test:release` 一次执行单元检查、生产构建和针对生产产物的浏览器回归。CI 同样使用生产预览，不以开发服务器测试替代产物验收。
+当前源码应用与题库为 1.3.0。运行 `npm run test:release`，一次完成单元检查、生产构建和针对生产产物的浏览器回归。1.2.2 的历史发布记录保留在对应 RELEASE 文档中，不能把它当作 1.3.0 已上线的证据。
 
-构建生成 `dist/client/release.json`，记录应用版本、题库版本、完整源码提交和题库哈希。正式发布必须由干净、已推送的提交构建，在线读取该文件并核对 `sourceCommit`、`sourceDirty: false`；Sites 返回部署成功与在线关键路径通过是两项独立证据。旧候选归档工作流改为手动触发，维护旧 R2 区时才启用。
+## 发布对象
 
-1.2 的当前产品是同源静态站点：浏览器读取 v4 正式题库、保存本地进度，并按需读取娱乐 benchmark 或直接调用用户选择的 AI 服务商。
-
-## 静态站点
+现版是同源静态站点。`dist/client/` 包含 HTML、代码分块、`runtime-config.js`、题库和 `release.json`；Sites 项目使用仓库已有构建输出，不只上传单个 HTML。Vite 使用相对路径，支持子目录部署。无需服务器端 AI 密钥。
 
 ```bash
 npm install
-npm test
-npm run build
-npm run test:e2e
+npx playwright install chromium
+npm run test:release
+npm run simulate:benchmark
+npm run preview -- --host 127.0.0.1 --port 4174 --strictPort
 ```
 
-把完整 `dist/` 目录部署到静态托管。目录包含 HTML、代码分块、`runtime-config.js` 和 `bank/`；不能只上传 `index.html`。Vite `base` 使用相对路径，支持子目录部署。
+正式发布必须从干净、已推送的提交构建。构建生成的 `dist/client/release.json` 记录应用版本、题库版本、源码提交、工作区状态与题库哈希。在线读取该文件，核对 `applicationVersion: 1.3.0`、`modelVersion: 1.3.0`、正确的 `sourceCommit` 和 `sourceDirty: false`。
 
-发布前确认：
+`public/bank/manifest.json` 的现版只能是 `model-1.3.0.json`，参考库为 `ideology-benchmark-1.3.0.json`。1.2.2 旧文件保留原字节且 `loadInProduct: false`；部分旧框架文本和旧理由定义由 1.3.0 提供只读来源兼容，不重新执行旧检验。
 
-- `dist/client/bank/manifest.json` 的 `default` 为 `1.2.2`；
-- manifest 只有一个 `status: current` 的 v4 模型；
-- `model-1.2.2.json`、`ideology-benchmark-1.2.2.json` 和 `model-v4.schema.json` 可以从部署 Origin 读取；
-- 1.0 和 0.9 模型只位于 `bank/legacy/`，且 `loadInProduct` 为 `false`；
-- 首次进入和普通问卷不会请求娱乐 benchmark，只有用户主动生成娱乐匹配后才请求；
-- 桌面与移动端的题前信息顺序、根判断、顺序诊断、理由、自定义理由、回退、刷新、跳过、结果、中英并列候选组和单道精度题流程通过；
-- 无 AI 配置时问卷仍可完整使用，AI 失败不会改变进度。
+## 关键验收
 
-## 旧会话
+- 完整方案和固定题设在原判断前可读；桌面、320/390/768/1440 像素视口不横向溢出。不得为了缩短首屏隐藏关键方案条件。
+- 列表默认续答；切题、刷新和本题回退不覆盖其他题。查看完成小结不清除结果，重答需要确认且可以取消。
+- 已接受、不接受、不确定和未测试的修改明确区分；支持原方案的用户不会在反方页被说成反对。
+- 未检验理由能保存并原位继续；拒绝适用性保留原尝试；缺少检验不能记为通过。
+- 结果首先展示实际判断与边界，Markdown 和 JSON 导出保留来源、未确定处与理由，不带配置或凭据。
+- 普通问卷不请求 benchmark。用户主动启用后才读取，普通比较不包含 16 个测试参考及 23 个待整理条目。
+- 记录完整度独立于参考集合；双方可比覆盖不当成用户思想深度；不确定或缺失不计为肯定相似。
+- 无 AI 配置时完整可用；模拟 AI 成功、失败和存储不足时，已有判断不被清除。真实付费服务商请求不作为必需的发布门槛。
 
-1.0 与 1.1 结构化进度直接续用 1.2 的兼容核心模型，不进入旧版归档。
+## 数据与旧会话
 
-首次读取 0.9 本地进度时，客户端将其保存在新版 `legacyArchive` 中并开始空白 v4 问卷。验收应确认旧 `conditional` 和组件回答没有进入新版 `policyResults`，同时可以在“本地数据”中查看和导出旧记录。
+1.0、1.1、1.2.0、1.2.2 的 v4 进度保留作答来源。旧顺序诊断只恢复流程明确蕴含的修改记录，不推断未测试方案。专家权限修订不反向解释旧答案。0.9 进度只作为只读 `legacyArchive`，不进入新版 `policyResults`。
 
-## AI
-
-AI 配置只存在当前页面内存中。静态站点不需要服务器端密钥，也不应在构建变量、日志或部署产物中写入真实凭据。浏览器直接调用用户选择的模型服务商。
+AI 配置、密钥和完整 AI 消息只在页面内存中。浏览器只把当前用户确认需要整理的理由及必要上下文发送给用户选择的服务商；构建变量、日志和产物不得写入真实凭据。外站可见浏览器及截图只用于用户授权的研究，个人结果文件不得提交到公开仓库。
 
 ## 兼容贡献边界
 
-`worker/`、`shared/` 和候选审核脚本仍保留旧贡献契约的独立验证与私有 R2 边界，但 1.2 前端不提交旧贡献包，v4 manifest 也不加载 `community-contributions-v1.json`。旧候选不能在没有完整框架、局部目标和 v4 理由审核的情况下进入新版正式题库。
+`worker/`、`shared/` 和旧候选审核脚本继续独立测试，但当前 v4 前端不提交旧贡献包，manifest 不加载旧社区扩展。旧候选不能没有完整框架、局部目标和人工审核就进入现版。
 
-若需要维护旧候选区，先运行：
+维护旧候选区时另行运行 `node scripts/test-contribution-pipeline.mjs` 和 `npm run dev:worker`；这不等于现版题库发布。
 
-```bash
-node scripts/test-contribution-pipeline.mjs
-npm run dev:worker
-```
+## 发布结论必须分层
 
-这项兼容运维不等同于 1.2 正式题库发布。
-
-## 发布验收
-
-发布结论必须区分：
-
-- `npm test`、`npm run build`：本地模型、代码和构建证据；
-- `npm run test:e2e`：本地真实 Chromium 证据；
-- 部署 Origin 的浏览器检查：真实目标证据；
-- 生产发布：只有部署状态成功并完成在线关键路径后才能声明。
+本地测试、浏览器测试、本地预览和生产上线是不同证据。本地预览通过不能表述为线上已更新。只有正式部署返回成功，且真实部署 Origin 的版本文件与关键路径都通过后，才能宣布生产发布完成。没有取得现有托管项目的正式发布能力时，保留经验证的提交、构建和本地预览，明确列出上线缺口。

@@ -3,8 +3,7 @@ import fs from 'node:fs';
 import { validateModel } from '../src/lib/decisionEngine.js';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
-const model = read('../public/bank/model-1.2.2.json');
-const benchmark = read('../public/bank/ideology-benchmark-1.2.2.json');
+import { model, benchmark } from './current-bank.mjs';
 
 const EXPECTED_LABELS = [
   'Anarcho-Communism', 'Libertarian Communism', 'Trotskyism', 'Marxism',
@@ -258,7 +257,7 @@ if (provisionalCount !== 23) add(errors, 'PROVISIONAL_COUNT', `应有 23 个暂�
 
 const report = {
   schema: 'argument-chain-ideology-benchmark-validation',
-  version: '1.2.2',
+  version: model.meta.version,
   ok: errors.length === 0,
   summary: {
     modelVersion: model.meta.version,

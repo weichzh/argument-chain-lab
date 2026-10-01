@@ -8,11 +8,16 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { sessionDraftKey } from '../hooks/useSession.js';
-import { getQuestion, getReasonTargetId, proposalItemsFor } from '../lib/decisionEngine.js';
+import { getCurrentPolicy, getQuestion, getReasonTargetId, proposalItemsFor } from '../lib/decisionEngine.js';
 import { getModelV4, getPolicyV4 } from '../lib/modelV4.js';
 import InlineTermText from './InlineTermText.jsx';
 import QuestionCard from './QuestionCard.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
+import PolicySnapshot from './PolicySnapshot.jsx';
+import UncertaintyNote from './UncertaintyNote.jsx';
+import RestartPolicyButton from './RestartPolicyButton.jsx';
+import { attemptLabel } from '../lib/resultPresentation.js';
+import '../styles-v13.css';
 
 const CopyText = ({ children, definitions }) => (
   <InlineTermText text={children} definitions={definitions} />
@@ -30,9 +35,12 @@ function PolicyQuestionPrelude({ question, termDefinitions }) {
           <ul>{question.fixedConditions.map((item) => (
             <li key={item.id}>
               <strong><CopyText definitions={termDefinitions}>{item.text}</CopyText></strong>
-              <span><CopyText definitions={termDefinitions}>{item.explanation}</CopyText></span>
             </li>
           ))}</ul>
+          {question.fixedConditions.some(item => item.explanation) ? <details className="condition-clarification">
+            <summary>这些限定排除了什么？</summary>
+            <ul>{question.fixedConditions.filter(item => item.explanation).map(item => <li key={item.id}><CopyText definitions={termDefinitions}>{item.explanation}</CopyText></li>)}</ul>
+          </details> : null}
         </section>
       ) : null}
       <section aria-labelledby="proposal-title">
@@ -65,8 +73,7 @@ function RevisionQuestionPrelude({ question, termDefinitions }) {
           </React.Fragment>
         ))}
       </dl>
-      <p>没有列出的安排保持不变。</p>
-      <p>之前未接受的修改不会自动叠加。</p>
+      <p className="comparison-basis">未列出的安排保持原方案；之前未接受的修改不叠加。</p>
       {question.unchangedItems?.length ? <details className="revision-unchanged" key={question.candidateFrameId}>
         <summary>查看本次保持不变的安排</summary>
         <ul>{question.unchangedItems.map((item) => <li key={item.dimensionId}>
@@ -174,7 +181,7 @@ function StressDistinction({ onSubmit }) {
   return (
     <div className="v4-distinction">
       <label htmlFor="stress-distinction">这个案例有什么重要区别？</label>
-      <textarea id="stress-distinction" rows={3} maxLength={1000} value={text} onChange={(event) => setText(event.target.value)} />
+      <textarea autoFocus id="stress-distinction" rows={3} maxLength={1000} value={text} onChange={(event) => setText(event.target.value)} />
       <button className="button primary" type="button" disabled={!text.trim()} onClick={() => onSubmit(text.trim())}>确认区别并继续</button>
     </div>
   );
@@ -182,7 +189,7 @@ function StressDistinction({ onSubmit }) {
 
 export default function Questionnaire({ state, dispatch, sessionControls, onAskAi, aiLoading }) {
   const model = getModelV4();
-  const policy = getPolicyV4(state.currentPolicyId);
+  const policy = getCurrentPolicy(model, state);
   const question = useMemo(() => getQuestion(model, state), [model, state]);
   const [distinctionOpen, setDistinctionOpen] = useState(false);
 
@@ -200,8 +207,16 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
     dispatch({ type: 'ANSWER', optionId });
   };
 
+  const stage = question.kind === 'policy_done' ? 5
+    : state.chainMode === 'counter' ? 4
+    : question.kind === 'policy_decision' ? 0
+    : question.kind === 'revision_test' ? 1
+    : ['reason_choice', 'custom_reason_required'].includes(question.kind) ? 2 : 3;
+  const completed = state.policyResults[state.currentPolicyId];
+  const lastAttempt = state.rejectedReasonAttempts?.at(-1);
+
   return (
-    <main className="workspace v4-workspace">
+    <main className="workspace v4-workspace v13-workspace">
       <nav className="workspace-toolbar" aria-label="答题导航">
         <button className="icon-button workspace-home" type="button" title="回到主页" aria-label="回到主页" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><House size={19} /></button>
         <button className="button quiet previous-answer" type="button" title="上一题" disabled={!sessionControls.canGoBack} onClick={() => dispatch({ type: 'GO_BACK' })}><ArrowLeft size={17} />上一题</button>
@@ -212,8 +227,14 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
         <button className="button quiet stop-answering" type="button" title="中止并看结果" onClick={() => dispatch({ type: 'SHOW_RESULTS' })}><Eye size={17} />中止并看结果</button>
       </nav>
 
+      <ol className="question-stages" aria-label="本题阶段">
+        {['判断方案', '比较修改', '选择理由', '检查适用', '相反理由', '本题小结'].map((label, index) => <li key={label} aria-current={stage === index ? 'step' : undefined}>{label}</li>)}
+      </ol>
+      {lastAttempt && ['reason_choice', 'counter_reason_choice', 'why_or_stop', 'custom_reason_required'].includes(question.kind) ? <p className="attempt-notice" role="status">
+        已保留上一条未确认的尝试：{attemptLabel(lastAttempt)}。这不表示你没有理由。
+      </p> : null}
       <QuestionCard
-        question={{ ...question, options: question.kind === 'custom_reason_required' ? [] : question.options }}
+        question={{ ...question, explanation: question.kind === 'revision_test' ? null : question.explanation, options: question.kind === 'custom_reason_required' ? [] : question.options }}
         context={`${policy.shortTitle} · ${state.policyPosition + 1} / ${state.policyIds.length}`}
         onAnswer={handleAnswer}
         termDefinitions={model.terms}
@@ -228,6 +249,10 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
             }} termDefinitions={model.terms} />
           </details> : null}
         </>}
+        beforeOptions={question.kind === 'policy_done' && completed ? <>
+          <PolicySnapshot model={model} result={completed} />
+          {(completed.rootAnswer === 'uncertain' || completed.unresolvedRevisionFrameId) ? <UncertaintyNote key={`${completed.policyId}-${completed.unresolvedRevisionFrameId || 'root'}`} result={completed} dispatch={dispatch} /> : null}
+        </> : null}
         afterQuestion={(
           <QuestionAfter
             question={question}
@@ -240,6 +265,7 @@ export default function Questionnaire({ state, dispatch, sessionControls, onAskA
         )}
       />
 
+      {question.kind === 'policy_done' ? <RestartPolicyButton policyId={policy.id} title={policy.shortTitle} dispatch={dispatch} /> : null}
       <ReviewAnswers entries={sessionControls.answerHistory} onRevisit={(answerId) => dispatch({ type: 'BACK_TO_ANSWER', answerId })} />
     </main>
   );

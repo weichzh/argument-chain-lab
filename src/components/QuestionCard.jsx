@@ -8,6 +8,7 @@ export default function QuestionCard({
   onAnswer,
   termDefinitions = {},
   beforeQuestion = null,
+  beforeOptions = null,
   afterQuestion = null,
 }) {
   return (
@@ -17,9 +18,11 @@ export default function QuestionCard({
       {question.principle ? <aside className="stress-principle"><strong>正在检查的原则</strong><p><InlineTermText text={question.principle} definitions={termDefinitions} /></p></aside> : null}
       <header>
         <h1 id="current-question"><InlineTermText text={question.title} definitions={termDefinitions} /></h1>
+        {question.reasonContext ? <p className="reason-context"><b>正在说明：</b>{question.reasonContext}</p> : null}
         {question.statement ? <p><InlineTermText text={question.statement} definitions={termDefinitions} /></p> : null}
         {question.explanation ? <small><InlineTermText text={question.explanation} definitions={termDefinitions} /></small> : null}
       </header>
+      {beforeOptions}
       {question.options?.length ? (
         <div className="v4-choice-list">
           {question.options.map((option) => (

@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import fs from 'node:fs';
 import { PHASES, answer, createSession, startSession, getQuestion } from '../src/lib/decisionEngine.js';
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url)));
+import { model } from '../scripts/current-bank.mjs';
 const previous = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.0.json', import.meta.url)));
 const key = 'argument-chain-lab:progress:v10';
 const click = (page, name) => page.getByRole('button', { name, exact: true }).click();
@@ -89,10 +89,12 @@ test('旧题库的自定义候选原文和来源保留，刷新后仍可比较',
   await expect(page.locator('.v4-custom-detail')).toContainText(oldText);
   await expect(page.locator('.v4-custom-detail')).toContainText('来自题库 1.2.0');
   await click(page, '生成娱乐匹配');
-  await expect(page.locator('.entertainment-profile code')).toHaveText(/^[0-9A-F]{16}$/);
+  await expect(page.getByRole('heading', { name: '对照具体记录，不给人贴标签' })).toBeVisible();
+  await page.getByText('记录完整度与校验指纹', { exact: true }).click();
+  await expect(page.locator('.entertainment-results code')).toHaveText(/^[0-9A-F]{16}$/);
   await page.reload();
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), key);
-  expect(saved.modelVersion).toBe('1.2.2');
+  expect(saved.modelVersion).toBe('1.3.0');
   expect(saved.policyResults.speech_restriction.sourceModelVersion).toBe('1.2.0');
   expect(saved.policyResults.speech_restriction.mainPaths[0].customReason.target.text).toBe(oldText);
 });

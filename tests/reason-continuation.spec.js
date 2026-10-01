@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import fs from 'node:fs';
 
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url)));
+import { model } from '../scripts/current-bank.mjs';
 const principle = model.claims.n_proportionate_burden.text;
 const storageKey = 'argument-chain-lab:progress:v10';
 const click = (page, name) => page.getByRole('button', { name, exact: true }).click();
@@ -37,14 +37,15 @@ test('更深自定义理由刷新后仍说明当前原则，摘要、详情和�
   await showResults(page);
   const result = page.locator('.v4-result-item').first();
   await expect(result).toContainText(`更深理由：${text}`);
-  await expect(result).toContainText('主要理由：罚款或拘留超过了必要程度');
+  await expect(result).toContainText('罚款或拘留超过了必要程度');
   await expect(result).toContainText('尚未经过题库校验');
   await result.getByText('查看详细推理记录', { exact: true }).click();
   await expect(result.locator('.v4-proof-path ol')).toContainText('罚款或拘留超过了必要程度');
   await expect(result.locator('.v4-custom-detail')).toContainText(principle);
   await expect(result.locator('.v4-custom-detail')).toContainText(text);
+  await page.getByText('结构化数据与导出说明', { exact: true }).click();
   const downloaded = page.waitForEvent('download');
-  await click(page, '导出结果');
+  await click(page, '导出结构化 JSON');
   const download = await downloaded;
   const payload = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
   const path = payload.policyResults.speech_restriction.mainPaths[0];
@@ -61,7 +62,9 @@ test('修改方案不确定不会被摘要改写为全部拒绝，也不会阻�
   await expect(page.locator('.v4-result-item')).toContainText('尚未确定是否接受的修改：只允许民事责任');
   await expect(page.locator('.v4-result-item')).not.toContainText('修改都不足以');
   await click(page, '生成娱乐匹配');
-  await expect(page.locator('.entertainment-profile code')).toHaveText(/^[0-9A-F]{16}$/);
+  await expect(page.getByRole('heading', { name: '对照具体记录，不给人贴标签' })).toBeVisible();
+  await page.getByText('记录完整度与校验指纹', { exact: true }).click();
+  await expect(page.locator('.entertainment-results code')).toHaveText(/^[0-9A-F]{16}$/);
   await expect(page.locator('.entertainment-error')).toHaveCount(0);
 });
 

@@ -1,6 +1,6 @@
 import { validatePolicyResults } from './formalValidator.js';
 
-export const MATCHER_VERSION = 'entertainment-matcher-3.3';
+export const MATCHER_VERSION = 'entertainment-matcher-4.0';
 
 export const DEFAULT_FEATURE_WEIGHTS = Object.freeze({
   rootAnswer: 0.10,
@@ -40,34 +40,47 @@ export const comparableStressResponse = (model, result, path) => {
 
 const enginePathFeatures = (model, result) => {
   const mainPath = first(result.mainPaths) || null;
-  const supportedMainPath = mainPath?.status === 'retracted' ? null : mainPath;
+  const retired = new Set(model.product.retiredReasonIds || []);
+  const supportedMainPath = mainPath?.status === 'retracted'
+    || mainPath?.steps?.some(step => retired.has(step.reasonId)) ? null : mainPath;
   const mainReasonIds = supportedMainPath?.steps?.map((step) => step.reasonId) || [];
   const terminalValueId = ['accepted', 'qualified'].includes(supportedMainPath?.status)
     ? supportedMainPath?.stress?.claimId || supportedMainPath?.steps?.at(-1)?.bridgeClaimId || null
     : null;
-  const supportedCounterPath = result.counterPath?.status === 'retracted' ? null : result.counterPath;
+  const supportedCounterPath = result.counterPath?.status === 'retracted'
+    || result.counterPath?.steps?.some(step => retired.has(step.reasonId)) ? null : result.counterPath;
   const counterReasonIds = supportedCounterPath?.steps?.map((step) => step.reasonId) || [];
   const counterTerminalValueId = ['accepted', 'qualified'].includes(supportedCounterPath?.status)
     ? supportedCounterPath?.stress?.claimId || supportedCounterPath?.steps?.at(-1)?.bridgeClaimId || null
     : null;
-  return {
+  const features = {
     policyId: result.policyId,
     rootAnswer: result.rootAnswer ?? null,
     finalRootAnswer: result.finalRootAnswer ?? result.rootAnswer ?? null,
-    revisionKnown: result.rootAnswer === 'no' && Boolean(result.diagnosisClaimId),
+    revisionKnown: result.rootAnswer === 'no' && Boolean(result.diagnosisClaimId)
+      && !(result.sourceModelVersion && result.sourceModelVersion !== model.meta.version
+        && (model.product.revisedFramePolicyIds || []).includes(result.policyId)),
     acceptedRevisionFrameId: result.acceptedRevisionFrameId ?? null,
     diagnosisClaimId: result.diagnosisClaimId ?? null,
     primaryReasonId: mainReasonIds[0] ?? null,
     reasonIds: mainReasonIds,
     reasonFamilies: reasonFamilies(model, mainReasonIds),
     terminalValueId,
-    stressResponse: comparableStressResponse(model, result, mainPath),
+    stressResponse: mainPath?.steps?.some(step => retired.has(step.reasonId)) ? null : comparableStressResponse(model, result, mainPath),
     counterClaimId: result.counterClaimId ?? null,
     counterReasonIds,
     counterFamilies: reasonFamilies(model, counterReasonIds),
     counterTerminalValueId,
     counterImpact: result.counterImpact ?? null,
   };
+  if (result.sourceModelVersion && result.sourceModelVersion !== model.meta.version
+    && (model.product.revisedFramePolicyIds || []).includes(result.policyId)) {
+    return { ...features, revisionKnown: false, acceptedRevisionFrameId: null,
+      diagnosisClaimId: null, primaryReasonId: null, reasonIds: [], reasonFamilies: [],
+      terminalValueId: null, stressResponse: null, counterClaimId: null,
+      counterReasonIds: [], counterFamilies: [], counterTerminalValueId: null, counterImpact: null };
+  }
+  return features;
 };
 
 const benchmarkPathFeatures = (model, path) => ({
@@ -92,9 +105,8 @@ const benchmarkPathFeatures = (model, path) => ({
 });
 
 const equalityScore = (left, right, { uncertainPartial = 0.4 } = {}) => {
-  if (left == null || right == null) return null;
+  if (left == null || right == null || left === 'uncertain' || right === 'uncertain') return null;
   if (left === right) return 1;
-  if (left === 'uncertain' || right === 'uncertain') return uncertainPartial;
   return 0;
 };
 
@@ -124,7 +136,7 @@ const impactOrder = {
   reverse: 3,
 };
 const impactScore = (left, right) => {
-  if (left == null || right == null) return null;
+  if (left == null || right == null || left === 'uncertain' || right === 'uncertain') return null;
   if (left === right) return 1;
   const a = impactOrder[left];
   const b = impactOrder[right];
@@ -208,24 +220,73 @@ const profileFeatures = (model, profile) => Object.fromEntries(
 const weightedProfileScore = (userByPolicy, profileByPolicy, weights, policyWeights = {}) => {
   let obtained = 0;
   let availableFeatureWeight = 0;
+  let userFeatureWeight = 0;
   let answeredPolicyWeight = 0;
   const policyDetails = {};
   for (const [policyId, user] of Object.entries(userByPolicy)) {
-    const profile = profileByPolicy[policyId];
-    if (!profile || !user.rootAnswer) continue;
+    if (!user.rootAnswer) continue;
     const policyWeight = policyWeights[policyId] ?? 1;
+    answeredPolicyWeight += policyWeight;
+    userFeatureWeight += policyWeight * policySimilarity(user, user, weights).coverage;
+    const profile = profileByPolicy[policyId];
+    if (!profile) continue;
     const result = policySimilarity(user, profile, weights);
     const coveredWeight = policyWeight * result.coverage;
-    answeredPolicyWeight += policyWeight;
     availableFeatureWeight += coveredWeight;
     if (result.score != null) obtained += coveredWeight * result.score;
     policyDetails[policyId] = result;
   }
   return {
     similarity: availableFeatureWeight ? obtained / availableFeatureWeight : 0,
+    // Missing reference data is not disagreement. It does reduce how much
+    // agreement has actually been demonstrated against a common user denominator.
+    supportedAgreement: userFeatureWeight ? obtained / userFeatureWeight : 0,
+    comparisonCoverage: userFeatureWeight ? availableFeatureWeight / userFeatureWeight : 0,
     reasoningDepth: answeredPolicyWeight ? availableFeatureWeight / answeredPolicyWeight : 0,
     answeredPolicyWeight,
     policyDetails,
+  };
+};
+
+export const recordCompleteness = (model, policyResults, expectedPolicyIds = model.product.defaultPolicyIds) => {
+  const records = Object.values(policyResults || {}).filter(result => ROOT_ANSWERS.has(result.rootAnswer)
+    && (!expectedPolicyIds?.length || expectedPolicyIds.includes(result.policyId)));
+  let sum = 0;
+  let selectedReasons = 0;
+  let checkedReasons = 0;
+  let checkedCases = 0;
+  let counterReasons = 0;
+  for (const result of records) {
+    const main = result.mainPaths?.[0];
+    const steps = main?.steps || [];
+    const canonical = result.canonicalReasonPath || [];
+    const selected = Boolean(steps.length || canonical.length || main?.selectedReasonId || main?.customReason);
+    const checked = Boolean(steps.length || canonical.length);
+    const cases = Boolean(main?.stress || result.stressResponse);
+    const counter = Boolean(result.counterPath?.steps?.length || result.canonicalCounterReasonPath?.length
+      || result.counterPath?.selectedReasonId || result.counterPath?.customReason);
+    selectedReasons += Number(selected || result.rejectedReasonAttempts?.some(attempt => attempt.chainMode === 'main'));
+    checkedReasons += Number(checked);
+    checkedCases += Number(cases);
+    counterReasons += Number(counter || result.rejectedReasonAttempts?.some(attempt => attempt.chainMode === 'counter'));
+    const present = {
+      rootAnswer: true,
+      acceptedRevision: result.rootAnswer === 'no' && Boolean(result.diagnosisClaimId || result.revisionBasis),
+      diagnosis: Boolean(result.diagnosisClaimId),
+      primaryReason: selected,
+      reasonFamilies: checked,
+      terminalValue: Boolean(result.terminalValueId || (['accepted', 'qualified'].includes(main?.status) && steps.length)),
+      stressResponse: cases,
+      counterFamilies: counter,
+      counterImpact: result.counterImpact != null,
+    };
+    sum += Object.entries(DEFAULT_FEATURE_WEIGHTS).reduce((total, [key, weight]) => total + (present[key] ? weight : 0), 0);
+  }
+  return {
+    percent: records.length ? Math.round(sum / records.length * 10000) / 100 : 0,
+    policyCount: records.length,
+    selectedReasons, checkedReasons, checkedCases, counterReasons,
+    uncertainPolicies: records.filter(result => result.rootAnswer === 'uncertain').length,
   };
 };
 
@@ -251,7 +312,7 @@ export const recommendTieBreaker = (model, benchmark, ranked, answeredPolicyIds,
   const answered = new Set(answeredPolicyIds);
   const candidates = ranked.filter((item) => (
     item.rank <= (options.maxCandidates || 6)
-    || item.similarityPercent >= ranked[0].similarityPercent - (options.candidateWindow || 8)
+    || item.supportedAgreement >= ranked[0].supportedAgreement - (options.candidateWindow || 8) / 100
   ));
   if (candidates.length <= 1) return null;
   const profileById = Object.fromEntries(benchmark.profiles.map((profile) => [profile.id, profile]));
@@ -358,12 +419,12 @@ export const buildArgumentProfile = async (model, userByPolicy) => {
     ]));
   const fingerprintInput = { modelVersion: model.meta?.version || null, matcherVersion: MATCHER_VERSION, paths: normalized };
   return {
-    label: `${valuePart}·${institution}·${boundary}型`,
+    label: `本轮 ${Object.keys(userByPolicy).length} 项判断的记录`,
     fingerprint: await fingerprint(JSON.stringify(fingerprintInput)),
     topValues: values,
     institutionalStyle: institution,
     boundaryStyle: boundary,
-    caveat: '这是由本次已回答论证结构生成的稳定描述和指纹，不是人格类型或科学分类。',
+    caveat: '指纹用于核对可比较的已确认结构，不包含全部自由文本；不是身份、人格类型或科学分类。',
   };
 };
 
@@ -476,7 +537,7 @@ const explainMatches = (model, userByPolicy, profile, limit = 5) => {
     if (!expected) continue;
     const reference = benchmarkPathFeatures(model, expected);
     const policyTitle = model.policies.find((item) => item.id === policyId)?.shortTitle || policyId;
-    if (user.rootAnswer !== reference.rootAnswer) continue;
+    if (user.rootAnswer === 'uncertain' || user.rootAnswer !== reference.rootAnswer) continue;
     if (user.acceptedRevisionFrameId && user.acceptedRevisionFrameId === reference.acceptedRevisionFrameId) {
       items.push({ kind: 'shared_revision_boundary', policyId, policyTitle, frameId: user.acceptedRevisionFrameId, strength: 4 });
     }
@@ -502,7 +563,7 @@ const explainMatches = (model, userByPolicy, profile, limit = 5) => {
         strength: 2 + familySimilarity,
       });
     }
-    if (user.counterImpact && user.counterImpact === reference.counterImpact) {
+    if (user.counterImpact && user.counterImpact !== 'uncertain' && user.counterImpact === reference.counterImpact) {
       items.push({ kind: 'shared_counter_response', policyId, policyTitle, counterImpact: user.counterImpact, strength: 2 });
     }
     items.push({ kind: 'shared_root_answer', policyId, policyTitle, rootAnswer: user.rootAnswer, strength: 1 });
@@ -514,7 +575,7 @@ const explainMatches = (model, userByPolicy, profile, limit = 5) => {
 };
 
 const validSimilarity = (model, item, user, profile) => {
-  if (!user || !profile || user.rootAnswer !== profile.rootAnswer) return false;
+  if (!user || !profile || user.rootAnswer === 'uncertain' || user.rootAnswer !== profile.rootAnswer) return false;
   if (item.kind === 'shared_revision_boundary') {
     return user.revisionKnown && profile.revisionKnown
       && user.acceptedRevisionFrameId === item.frameId
@@ -532,7 +593,7 @@ const validSimilarity = (model, item, user, profile) => {
     return similarity > 0 && similarity === item.familySimilarity;
   }
   if (item.kind === 'shared_counter_response') {
-    return Boolean(user.counterImpact)
+    return Boolean(user.counterImpact) && user.counterImpact !== 'uncertain'
       && user.counterImpact === profile.counterImpact
       && item.counterImpact === user.counterImpact;
   }
@@ -558,17 +619,18 @@ export const validateEntertainmentResult = (model, benchmark, policyResults, res
     if (item.rank !== index + 1
       || item.similarityPercent !== roundPercent(item.similarity)
       || item.evidenceCoveragePercent !== roundPercent(item.policyCoverage * item.reasoningDepth)
-      || (index && item.similarity > result.ranked[index - 1].similarity)) {
+      || (index && item.supportedAgreement > result.ranked[index - 1].supportedAgreement)) {
       errors.push(`ranked/${item.profileId}: 排名或覆盖率数值不自洽。`);
     }
   }
   const top = result.ranked[0] || null;
   const second = result.ranked[1] || null;
   const expectedMargin = top && second
-    ? Math.round((top.similarityPercent - second.similarityPercent) * 100) / 100
+    ? Math.round((top.supportedAgreement - second.supportedAgreement) * 10000) / 100
     : 0;
   if (result.closestReference?.profileId !== top?.profileId
-    || result.reasoningDepthPercent !== (top?.reasoningDepthPercent ?? 0)
+    || result.reasoningDepthPercent !== recordCompleteness(model, policyResults, []).percent
+    || JSON.stringify(result.recordCompleteness) !== JSON.stringify(recordCompleteness(model, policyResults, []))
     || result.evidenceCoveragePercent !== (top?.evidenceCoveragePercent ?? 0)
     || result.marginToSecond !== expectedMargin) {
     errors.push('closestReference: 最近参考或第一、第二名差距与排名不一致。');
@@ -657,6 +719,11 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     throw new Error(`政策结果未通过形式校验：${policyResultValidation.errors[0]}`);
   }
   const weights = { ...DEFAULT_FEATURE_WEIGHTS, ...(options.featureWeights || {}) };
+  if (Object.values(weights).some(weight => !Number.isFinite(weight) || weight < 0)
+    || !Object.values(weights).some(weight => weight > 0)
+    || Object.values(options.policyWeights || {}).some(weight => !Number.isFinite(weight) || weight <= 0)) {
+    throw new Error('比较权重必须是有限的非负数，政策权重必须大于零。');
+  }
   const userByPolicy = normalizeUserResults(model, policyResults);
   const expectedPolicyIds = unique(
     options.expectedPolicyIds
@@ -672,7 +739,13 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     : answeredPolicyIds.length ? 1 : 0;
   const optionalAnsweredPolicyIds = answeredPolicyIds.filter((policyId) => !expectedSet.has(policyId));
 
-  const ranked = benchmark.profiles.map((profile) => {
+  // Optional questions are still user records. Only core policy coverage uses
+  // expectedPolicyIds; completing an extra question must not disappear here.
+  const completeness = recordCompleteness(model, policyResults, []);
+  const eligibleProfiles = benchmark.profiles.filter(profile => options.includeNonProductionReferences === true
+    || (['source_anchored', 'tradition_reconstruction'].includes(profile.source?.status)
+      && profile.allowUniqueResult !== false && profile.referenceStatus !== 'provisional_reference_variant'));
+  const ranked = eligibleProfiles.map((profile) => {
     const scored = weightedProfileScore(userByPolicy, profileFeatures(model, profile), weights, options.policyWeights);
     const evidenceCoverage = policyCoverage * scored.reasoningDepth;
     return {
@@ -681,6 +754,11 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
       labelZh: profile.labelZh,
       similarity: scored.similarity,
       similarityPercent: Math.round(scored.similarity * 10000) / 100,
+      supportedAgreement: scored.supportedAgreement,
+      comparisonCoveragePercent: Math.round(scored.comparisonCoverage * 10000) / 100,
+      comparisonKind: Object.values(scored.policyDetails).some(item => Object.entries(item.featureScores)
+        .some(([key, value]) => !['rootAnswer', 'diagnosis', 'acceptedRevision'].includes(key) && value != null))
+        ? 'reason_paths' : 'policy_answers',
       reasoningDepth: scored.reasoningDepth,
       reasoningDepthPercent: Math.round(scored.reasoningDepth * 10000) / 100,
       policyCoverage,
@@ -700,16 +778,17 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
       presentation: presentationPolicy(profile),
       policyDetails: scored.policyDetails,
     };
-  }).sort((a, b) => b.similarity - a.similarity
+  }).sort((a, b) => b.supportedAgreement - a.supportedAgreement
     || b.evidenceCoverage - a.evidenceCoverage
     || a.label.localeCompare(b.label));
   ranked.forEach((item, index) => { item.rank = index + 1; });
   const top = ranked[0];
   const second = ranked[1];
-  const margin = top && second ? top.similarityPercent - second.similarityPercent : 0;
+  const margin = top && second ? (top.supportedAgreement - second.supportedAgreement) * 100 : 0;
   const candidateWindow = options.candidateDisplayWindow ?? 3;
-  const candidateGroup = top
-    ? ranked.filter((item) => item.similarityPercent >= top.similarityPercent - candidateWindow)
+  const candidateGroup = top && top.supportedAgreement > 0 && top.comparisonCoveragePercent >= 40
+    ? ranked.filter((item) => item.supportedAgreement * 100 >= top.supportedAgreement * 100 - candidateWindow
+      && item.comparisonCoveragePercent >= 40)
       .slice(0, options.maxDisplayedCandidates || 8)
     : [];
   const provisionalNearTop = candidateGroup.some((item) => !item.allowUniqueResult);
@@ -727,6 +806,7 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
   const decorateCandidate = (candidate) => candidate ? {
     ...candidate,
     differences: explainDifferences(model, userByPolicy, profileById[candidate.profileId]),
+    similarities: explainMatches(model, userByPolicy, profileById[candidate.profileId], 3),
   } : null;
   const closestReference = decorateCandidate(top);
   const nearestPrototype = uniquenessBlocked ? null : closestReference;
@@ -735,10 +815,10 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     .map(decorateCandidate);
   const displayedCandidates = candidateGroup.map(decorateCandidate);
   const tieBreaker = recommendTieBreaker(model, benchmark, ranked, answeredPolicyIds, options);
-  const displayStrategy = top?.policyCoveragePercent < 40
+  const displayStrategy = !top || !candidateGroup.length || policyCoverage < 0.4
     ? {
         id: 'argument_profile_only',
-        note: '已回答的政策还太少。只显示你自己的判断特点，不显示单一历史名称。',
+        note: '当前可比较的明确记录不足。你已保存的回答仍然有效；不确定或参考资料缺失不会被当作相同立场。',
       }
     : ['stable', 'provisional'].includes(confidence) && !uniquenessBlocked
       ? {
@@ -756,9 +836,13 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     expectedPolicyIds,
     answeredPolicyIds,
     optionalAnsweredPolicyIds,
-    policyCoveragePercent: top?.policyCoveragePercent ?? 0,
-    reasoningDepthPercent: top?.reasoningDepthPercent ?? 0,
+    policyCoveragePercent: Math.round(policyCoverage * 10000) / 100,
+    reasoningDepthPercent: completeness.percent,
+    recordCompleteness: completeness,
     evidenceCoveragePercent: top?.evidenceCoveragePercent ?? 0,
+    comparisonCoveragePercent: top?.comparisonCoveragePercent ?? 0,
+    eligibleReferenceCount: eligibleProfiles.length,
+    excludedReferenceCount: benchmark.profiles.length - eligibleProfiles.length,
     closestReference,
     nearestPrototype: displayStrategy.id === 'nearest_with_alternatives' ? nearestPrototype : null,
     candidateGroup: displayedCandidates,
@@ -773,15 +857,19 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
       ambiguous: uniquenessBlocked
         ? '当前最接近的候选中包含尚待独立整理的细分名称，或多个候选差距很小，因此不应挑出唯一名称。'
         : '多个参考立场目前十分接近，不应强行解释为唯一历史标签。',
-      exploratory: '当前只回答了少量政策，或者还没有说明足够多的理由，暂时无法稳定比较。',
+      exploratory: '双方可比较的信息暂时不足，可能来自尚未回答、未确定或参考资料缺失；不据此评价你的思考。',
     }[confidence],
     coverageExplanation: {
       policyCoverage: '在建议回答的政策中，你已经完成了多少道。',
-      reasoningDepth: '在已经回答的题目里，你是否只选了应当或不应当，还是已经继续说明可接受的修改、主要理由和相反理由。',
-      evidenceCoverage: '把已回答题数和理由核对程度合在一起，用来判断当前信息是否足够。',
+      reasoningDepth: '已记录字段的加权完整度，只由你的记录计算；不是思想深度、能力分数或立场强度。',
+      evidenceCoverage: '与某个参考双方都具备的可比信息；参考资料不足不代表你的回答不足。',
     },
     tieBreaker,
-    resultStage: resultStage(top?.reasoningDepthPercent ?? 0),
+    resultStage: {
+      id: completeness.checkedReasons ? 'main_reasons_known' : 'policy_answers_only',
+      label: `已选择 ${completeness.selectedReasons} 条主要理由，核对了 ${completeness.checkedCases} 个相似案例`,
+      note: '这些数量描述记录状态，不评价思考质量。未完成的部分仍可继续。',
+    },
     argumentProfile: await buildArgumentProfile(model, userByPolicy),
     decisiveSimilarities: top ? explainMatches(model, userByPolicy, profileById[top.profileId]) : [],
     differencesFromNearest: top ? explainDifferences(model, userByPolicy, profileById[top.profileId]) : [],

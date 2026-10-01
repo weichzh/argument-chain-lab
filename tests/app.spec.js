@@ -28,12 +28,12 @@ test('反对原方案后一次只测试一个完整修改方案', async ({ page 
   await page.getByRole('button', { name: '不应当', exact: true }).click();
   await expect(page.getByRole('heading', { name: '这样修改以后，你可以接受吗？' })).toBeVisible();
   await expect(page.getByText(/先只改处罚方式：不再罚款或拘留/)).toBeVisible();
-  await expect(page.getByText('没有列出的安排保持不变。', { exact: true })).toBeVisible();
+  await expect(page.getByText('未列出的安排保持原方案；之前未接受的修改不叠加。', { exact: true })).toBeVisible();
   await expect(page.getByText('处罚方式', { exact: true })).toBeVisible();
   await expect(page.locator('.v4-revision-prelude dd')).toContainText('可以罚款或拘留 → 只允许较轻的民事责任');
 
   await page.getByRole('button', { name: '这样改以后可以接受', exact: true }).click();
-  await expect(page.getByText(/本轮确认的方案差异是：处罚方式：可以罚款或拘留/)).toBeVisible();
+  await expect(page.getByText(/已确认的差异是：处罚方式：可以罚款或拘留/)).toBeVisible();
   await expect(page.getByRole('button', { name: /罚款或拘留超过了必要程度/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /强制程度越高，说明责任越重/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /禁令能够减少严重暴力伤害/ })).toHaveCount(0);
@@ -54,9 +54,11 @@ test('自定义理由走完整条路径并生成普通语言结果', async ({ pa
   await page.getByRole('button', { name: '这些理由都不影响我的判断', exact: true }).click();
   await page.getByRole('button', { name: '现在查看结果', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '这次判断的边界' })).toBeVisible();
+  await expect(page.getByText('阶段结果 · 已记录 1 道题', { exact: true })).toBeVisible();
   await expect(page.getByText('可接受的修改方案：只允许民事责任')).toBeVisible();
-  await expect(page.getByText('主要理由：较强处罚在这里造成了不必要的负担。')).toBeVisible();
+  await expect(page.getByText('你补充的理由（未校验）：较强处罚在这里造成了不必要的负担。')).toBeVisible();
+  await page.getByText('查看修改差异（1 项）', { exact: true }).click();
   await expect(page.getByText('可以罚款或拘留 → 只允许较轻的民事责任', { exact: true })).toBeVisible();
   await expect(page.getByText('formalStatus')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -101,9 +103,9 @@ test('相反理由改变结论时同时显示初始判断和最终判断', async
 
   await page.goto('/');
   const result = page.locator('.v4-result-item').first();
-  await expect(result.locator('header strong')).toHaveText('应当 → 不应当');
-  await expect(result.getByRole('heading', { name: /初始判断：你接受题目中的完整方案/ })).toBeVisible();
-  await expect(result.getByText('复核后的最终判断：不应当')).toBeVisible();
+  await expect(result.locator('.decision-badge')).toHaveText('复核后不接受原方案');
+  await expect(result.getByText('初始记录：你接受题目中的完整方案。')).toBeVisible();
+  await expect(result.getByText('复核后的最终判断：不接受原方案')).toBeVisible();
 });
 
 test('上一题、修改已答和刷新只保留当前有效路径', async ({ page }) => {
@@ -128,16 +130,16 @@ test('跳过、题目列表和中止查看结果保持单一问卷', async ({ pa
   await expect(page.getByText('元数据收集 · 2 / 8')).toBeVisible();
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
   await expect(page.locator('[data-policy-id="speech_restriction"]')).toContainText('已跳过');
-  await page.locator('[data-policy-id="metadata_surveillance"]').getByRole('button', { name: /从这里开始/ }).click();
+  await page.locator('[data-policy-id="metadata_surveillance"]').getByRole('button', { name: '继续：元数据收集', exact: true }).click();
   await page.getByRole('button', { name: '中止并看结果', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
+  await expect(page.getByText('阶段结果 · 已记录 1 道题', { exact: true })).toBeVisible();
   await expect(page.getByText('当前题停在中途，回答仍保存在这个浏览器中。')).toBeVisible();
 });
 
 test('娱乐基准只在主动启用后加载，并且一次只追加一道精度题', async ({ page }) => {
   const benchmarkRequests = [];
   page.on('request', (request) => {
-    if (request.url().includes('ideology-benchmark-1.2.2.json')) benchmarkRequests.push(request.url());
+    if (/ideology-benchmark-[\d.]+\.json/.test(request.url())) benchmarkRequests.push(request.url());
   });
   await page.addInitScript(() => {
     const policyIds = [
@@ -182,21 +184,26 @@ test('娱乐基准只在主动启用后加载，并且一次只追加一道精�
   await expect(page.getByRole('button', { name: '生成娱乐匹配', exact: true })).toBeVisible();
   expect(benchmarkRequests).toHaveLength(0);
   await page.getByRole('button', { name: '生成娱乐匹配', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '根据已答内容，以下几种参考路径与你比较接近。' })).toBeVisible();
-  await expect(page.locator('.entertainment-profile code')).toHaveText(/^[0-9A-F]{16}$/);
-  await expect(page.locator('.entertainment-prototype-list strong').first()).toHaveText(/[\u3400-\u9fff]+（[A-Za-z]/u);
+  await expect(page.getByRole('heading', { name: '对照具体记录，不给人贴标签' })).toBeVisible();
+  await expect(page.locator('.reference-card-grid')).toHaveCount(0);
+  await expect(page.locator('.entertainment-caveat')).toContainText('不确定或参考资料缺失不会被当作相同立场');
+  await page.getByText('记录完整度与校验指纹', { exact: true }).click();
+  await expect(page.locator('.entertainment-results code')).toHaveText(/^[0-9A-F]{16}$/);
   await expect(page.getByText(/主要理由方向接近/)).toHaveCount(0);
   expect(benchmarkRequests).toHaveLength(1);
 
-  await page.getByRole('button', { name: '再答一题：公民资格', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /一个长期守法居住并承担公共义务的人.*完整公民资格/ })).toBeVisible();
-  await expect(page.getByText('公民资格 · 9 / 9')).toBeVisible();
+  const extraQuestion = page.getByRole('button', { name: /^再答一题：/ });
+  await expect(extraQuestion).toHaveCount(1);
+  await extraQuestion.click();
+  await expect(page.locator('.v4-question-context')).toContainText('9 / 9');
+  const questionTitle = await page.locator('#current-question').textContent();
   await page.getByRole('button', { name: '题目列表', exact: true }).click();
-  await page.getByRole('button', { name: '继续精度题', exact: true }).click();
-  await expect(page.getByText('公民资格 · 9 / 9')).toBeVisible();
+  await page.getByRole('button', { name: '继续未完成的题目', exact: true }).click();
+  await expect(page.locator('#current-question')).toHaveText(questionTitle);
+  await expect(page.locator('.v4-question-context')).toContainText('9 / 9');
 });
 
-test('1.0 结构化进度原样进入兼容的 1.2 模型', async ({ page }) => {
+test('1.0 结构化进度保留来源进入兼容的 1.3 模型', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('argument-chain-lab:progress:v10', JSON.stringify({
       storageVersion: 10,
@@ -227,9 +234,10 @@ test('1.0 结构化进度原样进入兼容的 1.2 模型', async ({ page }) => 
   });
 
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '已记录 1 道题' })).toBeVisible();
+  await expect(page.getByText('阶段结果 · 已记录 1 道题', { exact: true })).toBeVisible();
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')));
-  expect(state.modelVersion).toBe('1.2.2');
+  expect(state.modelVersion).toBe('1.3.0');
+  expect(state.policyResults.speech_restriction.sourceModelVersion).toBe('1.0.0');
   expect(state.policyResults.speech_restriction.rootAnswer).toBe('uncertain');
   expect(state.policyIds).toHaveLength(8);
 });
@@ -267,7 +275,7 @@ test('旧进度中已进入但未解决的相反理由复核明确记为影响�
   });
 
   await page.goto('/');
-  await expect(page.getByText('复核结果：相反理由的影响暂时不能确定。')).toBeVisible();
+  await expect(page.getByText('复核记录：相反理由的影响未确定')).toBeVisible();
   const state = await page.evaluate(() => JSON.parse(localStorage.getItem('argument-chain-lab:progress:v10')));
   expect(state.policyResults.speech_restriction.counterImpact).toBe('uncertain');
 });
