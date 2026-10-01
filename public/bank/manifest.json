@@ -1,20 +1,20 @@
 {
   "schema": "argument-chain-bank-manifest",
   "version": 2,
-  "default": "1.2.2",
+  "default": "1.3.0",
   "models": [
     {
-      "version": "1.2.2",
+      "version": "1.3.0",
       "schemaVersion": 4,
-      "path": "model-1.2.2.json",
+      "path": "model-1.3.0.json",
       "status": "current",
-      "title": "明确比较对象与诊断限度的文案修订"
+      "title": "可恢复的判断边界、可追溯理由与独立记录完整度"
     }
   ],
   "entertainmentBenchmark": {
-    "version": "1.2.2",
-    "targetModelVersion": "1.2.2",
-    "path": "ideology-benchmark-1.2.2.json",
+    "version": "1.3.0",
+    "targetModelVersion": "1.3.0",
+    "path": "ideology-benchmark-1.3.0.json",
     "defaultLoaded": false
   },
   "legacy": [
@@ -33,6 +33,12 @@
     {
       "version": "1.2.0",
       "path": "model-1.2.0.json",
+      "status": "archive_only",
+      "loadInProduct": false
+    },
+    {
+      "version": "1.2.2",
+      "path": "model-1.2.2.json",
       "status": "archive_only",
       "loadInProduct": false
     }

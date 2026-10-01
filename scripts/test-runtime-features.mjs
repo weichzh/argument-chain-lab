@@ -16,14 +16,14 @@ import {
 } from '../src/lib/modelV4.js';
 import { validateArgumentCandidate } from '../src/lib/sessionOverlay.js';
 
-const manifest = JSON.parse(fs.readFileSync(new URL('../public/bank/manifest.json', import.meta.url), 'utf8'));
-const model = JSON.parse(fs.readFileSync(new URL('../public/bank/model-1.2.2.json', import.meta.url), 'utf8'));
-const benchmark = JSON.parse(fs.readFileSync(new URL('../public/bank/ideology-benchmark-1.2.2.json', import.meta.url), 'utf8'));
+import { manifest, model, benchmark } from './current-bank.mjs';
 
-assert.equal(validateBankManifest(manifest).version, '1.2.2');
-assert.equal(validateEntertainmentBenchmark(benchmark, '1.2.2').profiles.length, 75);
+assert.equal(validateBankManifest(manifest).version, model.meta.version);
+assert.equal(validateEntertainmentBenchmark(benchmark, model.meta.version).profiles.length, 75);
 const index = configureModelV4(model);
-assert.deepEqual(index, { version: '1.2.2', policyCount: 13, claimCount: 197, reasonCount: 302 });
+assert.deepEqual(index, { version: '1.3.0', policyCount: 13, claimCount: 199, reasonCount: 306 });
+assert(!getReasonsForClaimV4('c_speech_support_root').some(reason => reason.id === 'r_speech_support_participation'));
+assert(getReasonsForClaimV4('c_speech_support_root').some(reason => reason.id === 'r_speech_support_participation__v130'));
 assert.equal(getPolicyV4('speech_restriction').rootFrameId, 'speech_root');
 assert.equal(getResolvedFrameV4('speech_restriction', 'speech_civil_only').sanction, 'civil_only');
 assert(getReasonsForClaimV4('c_speech_reject_sanction').length >= 2);

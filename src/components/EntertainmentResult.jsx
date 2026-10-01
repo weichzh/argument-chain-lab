@@ -1,221 +1,94 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Sparkles, Target } from 'lucide-react';
+import { RefreshCw, BookOpen, Target } from 'lucide-react';
 import { loadEntertainmentBenchmark } from '../data/bank.js';
 import { matchEntertainment } from '../lib/entertainmentMatcher.js';
+import ReferenceEvidence from './ReferenceEvidence.jsx';
 
-const answerCopy = {
-  yes: '应当',
-  no: '不应当',
-  uncertain: '不确定',
+const answerCopy = { yes: '接受原方案', no: '不接受原方案', uncertain: '不确定' };
+const stressCopy = { apply: '仍然适用', qualified: '存在重要区别', retract: '撤回理由', uncertain: '不确定' };
+const counterCopy = { no_change: '不改变判断', weaken: '有所犹豫', offset: '暂不能决定', reverse: '改变判断', uncertain: '影响不确定' };
+const label = item => `${item.labelZh}（${item.label}）`;
+const frameLabel = (model, policyId, frameId) => frameId
+  ? model.policies.find(policy => policy.id === policyId)?.frames?.[frameId]?.label || frameId
+  : '未接受已测试的修改';
+const differenceText = (model, item) => {
+  if (item.kind === 'different_answer') return `${item.policyTitle}：你记录为“${answerCopy[item.userAnswer]}”，参考记录为“${answerCopy[item.profileAnswer]}”。`;
+  if (item.kind === 'different_revision_boundary') return `${item.policyTitle}：你接受“${frameLabel(model, item.policyId, item.userRevision)}”；参考记录为“${frameLabel(model, item.policyId, item.profileRevision)}”。`;
+  if (item.kind === 'different_diagnosis') return `${item.policyTitle}：比较目标分别是“${item.userDiagnosis}”和“${item.profileDiagnosis}”。`;
+  if (item.kind === 'different_terminal_value') return `${item.policyTitle}：你采用的更深理由是“${item.userTerminal}”，参考采用“${item.profileTerminal}”。`;
+  if (['different_primary_reason', 'different_reason_path', 'different_counter_reason'].includes(item.kind)) return `${item.policyTitle}：你记录“${item.userReason}”，参考记录“${item.profileReason}”。`;
+  if (item.kind === 'different_stress_response') return `${item.policyTitle}：相似案例的回答分别是“${stressCopy[item.userStressResponse]}”和“${stressCopy[item.profileStressResponse]}”。`;
+  if (item.kind === 'different_counter_response') return `${item.policyTitle}：相反理由的影响分别是“${counterCopy[item.userCounterImpact]}”和“${counterCopy[item.profileCounterImpact]}”。`;
+  return `${item.policyTitle}：记录不足，暂不能说明差异。`;
+};
+const sharedText = (model, item) => {
+  if (item.kind === 'shared_revision_boundary') return `${item.policyTitle}：均接受修改方案“${frameLabel(model, item.policyId, item.frameId)}”。`;
+  if (item.kind === 'shared_terminal_value') return `${item.policyTitle}：采用相同的更深理由“${item.valueLabel}”。`;
+  if (item.kind === 'shared_reason_family') return `${item.policyTitle}：所选理由涉及相同的论证主题，但不一定是同一条理由。`;
+  if (item.kind === 'shared_counter_response') return `${item.policyTitle}：相反理由对最终判断的影响相同。`;
+  return `${item.policyTitle}：对原方案均记录为“${answerCopy[item.rootAnswer]}”。`;
 };
 
-const stressCopy = {
-  apply: '仍然适用',
-  qualified: '存在重要区别',
-  retract: '撤回这条理由',
-  uncertain: '不确定',
-};
-
-const counterImpactCopy = {
-  no_change: '不改变原判断',
-  weaken: '有所犹豫但不改变结论',
-  offset: '两边暂时抵消',
-  reverse: '改变结论',
-  uncertain: '影响不确定',
-};
-
-const percent = (value) => `${Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`;
-
-const ideologyLabel = (item) => (
-  item?.labelZh ? `${item.labelZh}（${item.label}）` : item?.label || ''
-);
-
-const frameLabel = (model, policyId, frameId) => (
-  frameId ? model.policies.find((policy) => policy.id === policyId)?.frames?.[frameId]?.label || frameId : '不接受已测试的修改'
-);
-
-const similarityCopy = (item, model) => ({
-  shared_revision_boundary: `${item.policyTitle}：你们接受相同的修改方案“${frameLabel(model, item.policyId, item.frameId)}”。`,
-  shared_terminal_value: `${item.policyTitle}：你们都把“${item.valueLabel}”作为更深理由。`,
-  shared_reason_family: `${item.policyTitle}：你们选择的主要理由方向接近。`,
-  shared_counter_response: `${item.policyTitle}：相反理由对你们判断的影响相同。`,
-  shared_root_answer: `${item.policyTitle}：你们对原方案都选择“${answerCopy[item.rootAnswer]}”。`,
-}[item.kind]);
-
-const differenceCopy = (item, model) => {
-  if (item.kind === 'different_answer') {
-    return `${item.policyTitle}：你选择“${answerCopy[item.userAnswer]}”，该参考选择“${answerCopy[item.profileAnswer]}”。`;
-  }
-  if (item.kind === 'different_revision_boundary') {
-    return `${item.policyTitle}：你接受“${frameLabel(model, item.policyId, item.userRevision)}”，该参考接受“${frameLabel(model, item.policyId, item.profileRevision)}”。`;
-  }
-  if (item.kind === 'different_diagnosis') {
-    return `${item.policyTitle}：根判断相同，但你们定位到的判断目标分别是“${item.userDiagnosis}”和“${item.profileDiagnosis}”。`;
-  }
-  if (item.kind === 'different_terminal_value') {
-    return `${item.policyTitle}：根判断相同，但你的更深理由停在“${item.userTerminal}”，该参考路径停在“${item.profileTerminal}”。`;
-  }
-  if (item.kind === 'different_primary_reason') {
-    return `${item.policyTitle}：根判断相同；你的主要理由是“${item.userReason}”，该参考路径的主要理由是“${item.profileReason}”。`;
-  }
-  if (item.kind === 'different_reason_path') {
-    return `${item.policyTitle}：根判断和主要理由相同，但后续理由路径分别经过“${item.userReason}”和“${item.profileReason}”。`;
-  }
-  if (item.kind === 'different_stress_response') {
-    return `${item.policyTitle}：对相似案例，你选择“${stressCopy[item.userStressResponse]}”，该参考路径记录“${stressCopy[item.profileStressResponse]}”。`;
-  }
-  if (item.kind === 'different_counter_reason') {
-    return `${item.policyTitle}：你认真考虑的相反理由是“${item.userReason}”，该参考路径记录的是“${item.profileReason}”。`;
-  }
-  if (item.kind === 'different_counter_response') {
-    return `${item.policyTitle}：相反理由对你的影响是“${counterImpactCopy[item.userCounterImpact]}”，该参考路径记录的是“${counterImpactCopy[item.profileCounterImpact]}”。`;
-  }
-  return `${item.policyTitle}：当前记录不足以说明具体差异。`;
-};
-
-function PrototypeList({ items, model }) {
-  return (
-    <ol className="entertainment-prototype-list">
-      {items.map((item) => (
-        <li key={item.profileId}>
-          <div><strong>{ideologyLabel(item)}</strong><span>论证路径相似度 {percent(item.similarityPercent)}</span></div>
-          {!item.allowUniqueResult ? <small>参考名称，尚待独立整理</small> : null}
-          <details className="prototype-source">
-            <summary>来源说明</summary>
-            <p>{item.sourceQuality.note}{item.anchor ? ` 整理依据：${item.anchor}` : ''}</p>
+function ReferenceComparison({ model, result, onTieBreaker }) {
+  const candidates = result.displayStrategy.id === 'argument_profile_only' ? []
+    : [...result.candidateGroup].sort((a, b) => a.labelZh.localeCompare(b.labelZh, 'zh-CN'));
+  const completeness = result.recordCompleteness;
+  return <section className="entertainment-results" aria-live="polite">
+    <header className="entertainment-profile"><span>03 · 可选参考比较</span><h2>对照具体记录，不给人贴标签</h2>
+      <p>以下卡片按名称排列，不表示立场优劣，也不是对你政治身份的判定。正式比较使用 {result.eligibleReferenceCount} 项已整理参考；测试用和待整理条目不进入这里。</p>
+    </header>
+    <p className="reference-records-note">
+      你的记录：<strong>{completeness.policyCount}</strong> 个情景；其中 <strong>{completeness.selectedReasons}</strong> 题选过主要理由，<strong>{completeness.checkedReasons}</strong> 题有经过前提和原则核对的理由，<strong>{completeness.checkedCases}</strong> 题记录了相似案例检查。
+      参考资料不足不会减少这些数量。不确定和资料缺失不作为相同立场的证据。
+    </p>
+    {candidates.length ? <>
+      <h3>可供对照的参考记录</h3>
+      <ul className="reference-card-grid">{candidates.map((item, candidateIndex) => {
+        const comparablePolicies = Object.entries(item.policyDetails).filter(([, policy]) => Object.values(policy.featureScores).some(value => value != null));
+        return <li key={item.profileId}>
+          <h4>{label(item)}</h4>
+          <p className="source-band">{item.sourceQuality.band}</p>
+          <p>{item.comparisonKind === 'reason_paths' ? '本次包含理由层面的对照。' : '本次只对照了政策答案或修改边界，没有足够的双方理由记录。'}</p>
+          <p>可对照 {comparablePolicies.length} 个情景。双方可比信息覆盖 {Math.round(item.comparisonCoveragePercent)}%：分母是你已确认且可用于比较的信息，不是身份概率。</p>
+          <details className="reference-matrix-detail" open={candidateIndex < 2}><summary>查看逐项对照</summary><ReferenceEvidence candidate={item} /></details>
+          <details className="reference-text-detail"><summary>文字摘要与具体差异</summary>
+          {item.similarities?.length ? <><h5>实际相同的记录</h5><ul>{item.similarities.map((shared, index) => <li key={index}>{sharedText(model, shared)}</li>)}</ul></> : <p>当前没有足够记录来概括相同理由。</p>}
+          {item.differences?.length ? <details><summary>具体差异（{item.differences.length} 项）</summary><ul>{item.differences.map((difference, index) => <li key={index}>{differenceText(model, difference)}</li>)}</ul></details> : <p>在现有可比字段中未记录到差异；不等于完整立场相同。</p>}
           </details>
-          {item.presentation?.mode === 'neutral_contextualized' ? (
-            <p className="prototype-risk">中性呈现，准确记录不等于道德认可。{item.differences?.length ? `主要差异：${differenceCopy(item.differences[0], model)}` : '当前已确认路径中尚未记录到实质差异。'}</p>
-          ) : null}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function MatchedResult({ model, result, onTieBreaker }) {
-  const nearest = result.nearestPrototype;
-  const candidates = result.candidateGroup || [];
-  const nearestDifferences = result.differencesFromNearest || [];
-  const comparisonDifferences = nearestDifferences.length
-    ? nearestDifferences
-    : result.comparisonWithSecond?.differences || [];
-  const differenceTitle = nearestDifferences.length
-    ? '与最近参考的实质差异'
-    : `与第二候选${result.comparisonWithSecond ? `“${ideologyLabel(result.comparisonWithSecond)}”` : ''}的关键差异`;
-
-  return (
-    <section className="entertainment-results" aria-live="polite">
-      <header className="entertainment-profile">
-        <span>你的论证型</span>
-        <h2>{result.argumentProfile.label}</h2>
-        <p>分享指纹 <code>{result.argumentProfile.fingerprint}</code></p>
-        <small>{result.argumentProfile.caveat}</small>
-      </header>
-
-      <section className="entertainment-depth">
-        <div><span>当前结果深度</span><h3>{result.resultStage.label}</h3><p>{result.resultStage.note}</p></div>
-        <dl>
-          <div><dt>政策覆盖</dt><dd>{percent(result.policyCoveragePercent)}</dd></div>
-          <div><dt>论证深度</dt><dd>{percent(result.reasoningDepthPercent)}</dd></div>
-          <div><dt>可比较信息覆盖</dt><dd>{percent(result.evidenceCoveragePercent)}</dd></div>
-        </dl>
-        <p className="metric-explanation">政策覆盖表示答过多少核心情景；论证深度表示留下了多少理由信息。这些百分比都不是身份概率。</p>
-      </section>
-
-      {result.displayStrategy.id === 'candidate_group' ? (
-        <section className="entertainment-match-block">
-          <h3>根据已答内容，以下几种参考路径与你比较接近。</h3>
-          <PrototypeList items={candidates} model={model} />
-          <p>{result.displayStrategy.note}</p>
-        </section>
-      ) : null}
-
-      {result.displayStrategy.id === 'nearest_with_alternatives' && nearest ? (
-        <section className="entertainment-match-block">
-          <h3>目前最接近：{ideologyLabel(nearest)}</h3>
-          <dl className="entertainment-nearest-details">
-            <div><dt>论证路径相似度</dt><dd>{percent(nearest.similarityPercent)}</dd></div>
-            <div><dt>第一、第二名差距</dt><dd>{Number(result.marginToSecond).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} 个百分点</dd></div>
-          </dl>
-          {result.referenceSourceNote ? (
-            <details className="entertainment-source-note">
-              <summary>来源说明</summary>
-              <p>{result.referenceSourceNote.label}。{result.referenceSourceNote.note}{result.referenceSourceNote.anchor ? ` 整理依据：${result.referenceSourceNote.anchor}` : ''}</p>
-            </details>
-          ) : null}
-          {result.alternatives.length ? <><h4>其他相近参考</h4><PrototypeList items={result.alternatives.slice(0, 3)} model={model} /></> : null}
-        </section>
-      ) : null}
-
-      {result.decisiveSimilarities.length && result.displayStrategy.id !== 'argument_profile_only' ? (
-        <section className="entertainment-explanation">
-          <h3>为什么接近</h3>
-          <ul>{result.decisiveSimilarities.slice(0, 3).map((item, index) => (
-            <li key={`${item.kind}-${item.policyId}-${index}`}>{similarityCopy(item, model)}</li>
-          ))}</ul>
-        </section>
-      ) : null}
-
-      {comparisonDifferences.length && result.displayStrategy.id !== 'argument_profile_only' ? (
-        <section className="entertainment-explanation">
-          <h3>{differenceTitle}</h3>
-          <ul>{comparisonDifferences.slice(0, 3).map((item, index) => (
-            <li key={`${item.kind}-${item.policyId}-${index}`}>{differenceCopy(item, model)}</li>
-          ))}</ul>
-        </section>
-      ) : null}
-
-      {result.displayStrategy.id !== 'argument_profile_only'
-        && result.presentation?.mode === 'neutral_contextualized' ? (
-        <p className="entertainment-risk-note">{nearestDifferences.length
-          ? '准确记录相似路径不等于道德认可；这里保持中性，并同时列出实质差异。'
-          : '当前已确认路径中尚未记录到实质差异；准确记录相似路径仍不等于道德认可。'}</p>
-      ) : null}
-      <p className="entertainment-caveat">{result.displayCaveat}</p>
-
-      {result.displayStrategy.id !== 'argument_profile_only' && result.tieBreaker && onTieBreaker ? (
-        <section className="entertainment-tie-breaker">
-          <div><h3>提高精度</h3><p>{result.tieBreaker.explanation}</p></div>
-          <button className="button secondary" type="button" onClick={() => onTieBreaker(result.tieBreaker.policyId)}>
-            <Target size={17} />再答一题：{result.tieBreaker.title}
-          </button>
-        </section>
-      ) : null}
-    </section>
-  );
+          <details><summary>来源说明与限制</summary><p>{item.sourceQuality.note}</p>{item.anchor ? <p>{item.anchor}</p> : null}</details>
+        </li>;
+      })}</ul>
+    </> : <p className="entertainment-caveat">{result.displayStrategy.note}</p>}
+    {result.tieBreaker && onTieBreaker ? <section className="entertainment-tie-breaker">
+      <div><h3>继续探索一个情景</h3><p>这些参考记录在这项政策的安排和理由上存在差异。补答是可选的，不影响已经保存的内容。</p></div>
+      <button className="button secondary" type="button" onClick={() => onTieBreaker(result.tieBreaker.policyId)}><Target size={17} />再答一题：{result.tieBreaker.title}</button>
+    </section> : null}
+    <details className="result-exports"><summary>记录完整度与校验指纹</summary>
+      <p>记录完整度 {result.reasoningDepthPercent}%：按已填字段计算的工程指标，只取决于你的记录，与参考对象无关。它不评价思想深度、能力或立场强度。</p>
+      <p>已确认结构指纹 <code>{result.argumentProfile.fingerprint}</code>。只核对可比较的结构，不包含全部自由文本；不公开上传，也不代表身份。</p>
+      <p>具体参考的可比覆盖只计算双方都有的信息；匹配时优先采用有足够资料支持的相同记录，不把缺失当作反对，也不让空缺自动获得接近分。</p>
+    </details>
+  </section>;
 }
 
 export default function EntertainmentResult({ enabled, manifest, model, policyResults, onEnable, onTieBreaker }) {
   const [status, setStatus] = useState({ loading: false, error: null, result: null });
   const [retry, setRetry] = useState(0);
-
   useEffect(() => {
     if (!enabled) return undefined;
     let active = true;
-    setStatus((current) => ({ ...current, loading: true, error: null }));
+    setStatus({ loading: true, error: null, result: null });
     loadEntertainmentBenchmark(manifest)
-      .then((benchmark) => matchEntertainment(model, benchmark, policyResults))
-      .then((result) => {
-        if (active) setStatus({ loading: false, error: null, result });
-      })
-      .catch((error) => {
-        if (active) setStatus({ loading: false, error: error instanceof Error ? error.message : String(error), result: null });
-      });
+      .then(benchmark => matchEntertainment(model, benchmark, policyResults))
+      .then(result => { if (active) setStatus({ loading: false, error: null, result }); })
+      .catch(error => { if (active) setStatus({ loading: false, error: error instanceof Error ? error.message : String(error), result: null }); });
     return () => { active = false; };
   }, [enabled, manifest, model, policyResults, retry]);
-
-  if (!enabled) {
-    return (
-      <section className="entertainment-opt-in">
-        <div><span>可选娱乐结果</span><h2>比较当前论证路径</h2><p>比较你的已答内容与参考库中的路径。这不是政治身份或人格判断，也不会公开你的回答。</p></div>
-        <button className="button secondary" type="button" onClick={onEnable}><Sparkles size={17} />生成娱乐匹配</button>
-      </section>
-    );
-  }
-  if (status.loading && !status.result) return <section className="entertainment-loading" aria-live="polite"><span className="loading-line" /><p>正在比较当前论证路径…</p></section>;
-  if (status.error) {
-    return <section className="entertainment-error" role="alert"><p>{status.error}</p><button className="button secondary" type="button" onClick={() => setRetry((value) => value + 1)}><RefreshCw size={17} />重新读取</button></section>;
-  }
-  return status.result ? <MatchedResult model={model} result={status.result} onTieBreaker={onTieBreaker} /> : null;
+  if (!enabled) return <section className="entertainment-opt-in">
+    <div><span>可选娱乐结果</span><h2>再与参考记录对照</h2><p>在看清自己的判断以后，再比较具体的相同点、差异和资料缺口。参考名称不是身份结论，回答不会公开上传。</p></div>
+    <button className="button secondary" type="button" onClick={onEnable}><BookOpen size={17} />生成娱乐匹配</button>
+  </section>;
+  if (status.loading) return <section className="entertainment-loading" role="status"><p>正在对照已确认的记录…</p></section>;
+  if (status.error) return <section className="entertainment-error" role="alert"><div><h2>参考比较暂时不可用</h2><p>{status.error}</p><p>上面的实际回答仍然保留，可以继续阅读或导出。</p></div><button className="button secondary" type="button" onClick={() => setRetry(value => value + 1)}><RefreshCw size={17} />重新读取参考库</button></section>;
+  return status.result ? <ReferenceComparison model={model} result={status.result} onTieBreaker={onTieBreaker} /> : null;
 }

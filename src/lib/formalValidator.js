@@ -2,7 +2,8 @@ export { diffFrames, resolveFrame, validateModel } from './decisionEngine.js';
 
 export const validateReasonPath = (model, path, sourceModelVersion = model.meta.version) => {
   const custom = Boolean(path?.customReason);
-  const legacyCopy = model.meta.version === '1.2.2' && ['1.0.0', '1.1.0', '1.2.0'].includes(sourceModelVersion);
+  const legacyCopy = sourceModelVersion !== model.meta.version
+    && (model.meta.compatibleSessionVersions || ['1.0.0', '1.1.0', '1.2.0']).includes(sourceModelVersion);
   const errors = [];
   const allowedStatuses = new Set([
     'in_progress', 'accepted', 'qualified', 'retracted', 'uncertain', 'unchecked', 'unresolved', 'custom_unverified',
@@ -23,7 +24,12 @@ export const validateReasonPath = (model, path, sourceModelVersion = model.meta.
     }
     targetClaimId = reason.bridgeClaimId;
   }
-  if (!path?.steps?.length && !custom && path?.status !== 'unresolved') errors.push('理由路径为空。');
+  const pendingSelection = path?.status === 'unchecked' && Boolean(path.selectedReasonId);
+  if (pendingSelection && model.reasons[path.selectedReasonId]?.targetClaimId !== targetClaimId) {
+    errors.push('尚未检验的所选理由没有指向当前命题。');
+  }
+  if (path?.selectedReasonId && !pendingSelection) errors.push('尚未检验的理由不能标为通过。');
+  if (!path?.steps?.length && !custom && path?.status !== 'unresolved' && !pendingSelection) errors.push('理由路径为空。');
   if (path?.customTargetClaimId && (path.customTargetClaimId !== targetClaimId
     || (!legacyCopy && path.customReason?.target && path.customReason.target.text !== model.claims[targetClaimId]?.text))) {
     errors.push('自定义理由没有指向已确认路径末端的判断或原则。');
@@ -128,6 +134,19 @@ export const validatePolicyResult = (model, result) => {
     || result.acceptedRevisionFrameId || result.diagnosisClaimId
     || !policy.diagnostics.some((item) => item.candidateFrameId === result.unresolvedRevisionFrameId))) {
     errors.push('尚未判断的修改方案与诊断状态不一致。');
+  }
+  if (result.revisionAnswers) {
+    for (const [frameId, response] of Object.entries(result.revisionAnswers)) {
+      if (!policy.diagnostics.some(item => item.candidateFrameId === frameId)
+        || !['accept', 'reject', 'uncertain'].includes(response)) errors.push('修改比较记录无效。');
+    }
+    if (result.acceptedRevisionFrameId && result.revisionAnswers[result.acceptedRevisionFrameId] !== 'accept') {
+      errors.push('接受的修改与实际比较记录不一致。');
+    }
+    if (result.diagnosisClaimId === policy.fallbackOpposeClaimId && Object.keys(result.revisionAnswers).length
+      && policy.diagnostics.some(item => result.revisionAnswers[item.candidateFrameId] !== 'reject')) {
+      errors.push('不能把不确定或未测试的修改当成全部拒绝。');
+    }
   }
   if ((result.mainPaths || []).length && !result.diagnosisClaimId) errors.push('理由路径缺少判断目标。');
   if (result.counterPath && !result.counterClaimId) errors.push('相反理由路径缺少判断目标。');

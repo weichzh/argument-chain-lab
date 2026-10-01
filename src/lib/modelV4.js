@@ -11,6 +11,7 @@ export const configureModelV4 = (model) => {
   policyById = new Map(model.policies.map((policy) => [policy.id, policy]));
   reasonsByClaim = new Map();
   Object.values(model.reasons).forEach((reason) => {
+    if ((model.product.retiredReasonIds || []).includes(reason.id)) return;
     const list = reasonsByClaim.get(reason.targetClaimId) || [];
     list.push(reason);
     reasonsByClaim.set(reason.targetClaimId, list);

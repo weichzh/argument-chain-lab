@@ -9,8 +9,7 @@ import {
 import { simulateBenchmark } from './simulate-ideology-benchmark.mjs';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
-const model = read('../public/bank/model-1.2.2.json');
-const benchmark = read('../public/bank/ideology-benchmark-1.2.2.json');
+import { model, benchmark } from './current-bank.mjs';
 const profileById = Object.fromEntries(benchmark.profiles.map((profile) => [profile.id, profile]));
 const allPolicyIds = [...benchmark.corePolicyIds, ...benchmark.tieBreakerPolicyIds];
 const simulations = simulateBenchmark();
@@ -22,6 +21,7 @@ const depthValues = [];
 for (const simulation of simulations.results) {
   const profile = profileById[simulation.profileId];
   const result = await matchEntertainment(model, benchmark, simulation.policyResults, {
+    includeNonProductionReferences: true,
     expectedPolicyIds: allPolicyIds,
   });
   const represented = result.candidateGroup.some((candidate) => (
@@ -81,7 +81,7 @@ const metadataUser = {
     counterImpact: 'no_change',
   },
 };
-const metadataResult = await matchEntertainment(model, singlePolicyBenchmark, metadataUser);
+const metadataResult = await matchEntertainment(model, singlePolicyBenchmark, metadataUser, { includeNonProductionReferences: true });
 assert.equal(metadataResult.differencesFromNearest[0].kind, 'different_primary_reason');
 assert.equal(metadataResult.differencesFromNearest[0].userReason, '元数据模式能够发现协调性严重威胁');
 assert.equal(metadataResult.differencesFromNearest[0].profileReason, '现代安全威胁需要国家具备网络识别能力');
@@ -115,7 +115,7 @@ assert.equal(validateEntertainmentResult(
 const retractedMetadataUser = structuredClone(metadataUser);
 retractedMetadataUser.metadata_surveillance.mainPaths[0].status = 'retracted';
 retractedMetadataUser.metadata_surveillance.mainPaths[0].stress.response = 'retract';
-const retractedResult = await matchEntertainment(model, singlePolicyBenchmark, retractedMetadataUser);
+const retractedResult = await matchEntertainment(model, singlePolicyBenchmark, retractedMetadataUser, { includeNonProductionReferences: true });
 assert.equal(retractedResult.differencesFromNearest[0].kind, 'different_stress_response');
 assert.equal(retractedResult.decisiveSimilarities.some((item) => (
   ['shared_terminal_value', 'shared_reason_family'].includes(item.kind)
@@ -162,6 +162,7 @@ const syntheticResult = await matchEntertainment(
   profileById['ideology:national_totalitarianism'].expectedPaths,
   {
     expectedPolicyIds: allPolicyIds,
+    includeNonProductionReferences: true,
   },
 );
 assert.equal(syntheticResult.closestReference.sourceStatus, 'synthetic_stress_fixture');
@@ -170,6 +171,7 @@ assert(Array.isArray(syntheticResult.closestReference.differences));
 
 const marxism = profileById['ideology:marxism'];
 const marxismResult = await matchEntertainment(model, benchmark, marxism.expectedPaths, {
+  includeNonProductionReferences: true,
   expectedPolicyIds: allPolicyIds,
 });
 assert.equal(marxismResult.displayStrategy.id, 'candidate_group');
