@@ -1,12 +1,16 @@
 import React from 'react';
 import { ArrowRight, Download, House, ListChecks } from 'lucide-react';
 import { getClaimV4, getModelV4, getReasonV4 } from '../lib/modelV4.js';
-import { summarizePolicyResult } from '../lib/decisionEngine.js';
+import { policyForRecord, summarizePolicyResult } from '../lib/decisionEngine.js';
 import { recordCompleteness } from '../lib/entertainmentMatcher.js';
 import { ANSWER_LABELS, UNCERTAINTY_LABELS, resultStatus, reasonStatusLabel, counterImpactLabel, attemptLabel, orderedResults, readableResults } from '../lib/resultPresentation.js';
 import EntertainmentResult from './EntertainmentResult.jsx';
 import RestartPolicyButton from './RestartPolicyButton.jsx';
+import ResultAtlas from './ResultAtlas.jsx';
+import BoundaryTrack from './BoundaryTrack.jsx';
+import ReasoningMap from './ReasoningMap.jsx';
 import '../styles-v13.css';
+import '../styles-results.css';
 
 const stressResultCopy = stress => ({
   apply: '仍然适用', qualified: `存在重要区别：${stress.distinction}`,
@@ -35,6 +39,10 @@ function DetailedPath({ path, title, sourceModelVersion }) {
     {path.selectedReasonId ? <p>已选择、尚未检验：{getReasonV4(path.selectedReasonId)?.title}</p> : null}
     {path.steps?.length ? <ol>{path.steps.map((step, index) => <li key={`${step.reasonId}-${index}`}>
       <strong>{getReasonV4(step.reasonId)?.title}</strong><span>{getClaimV4(step.bridgeClaimId)?.text}</span>
+      {getReasonV4(step.reasonId)?.premises?.length ? <details className="recorded-premises"><summary>核对的前提（{getReasonV4(step.reasonId).premises.length} 项）</summary>
+        <ul>{getReasonV4(step.reasonId).premises.map(premise => <li key={premise.id}><p>{premise.statement}</p><small>{({ accept: '作答时暂时采用', reject: '未接受', uncertain: '不确定' })[step.premiseAnswers?.[premise.id]] || '旧记录未保存回答'}</small></li>)}</ul>
+        <p>原则判断：{step.ruleAnswer === 'accept' ? '已明确认可其构成一个理由' : '未保存明确认可记录'}</p>
+      </details> : null}
     </li>)}</ol> : null}
     {custom ? <div className="v4-custom-detail">
       <h5>{path.steps?.length ? '补充的更深理由' : '自定义理由'}</h5>
@@ -66,7 +74,7 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
   const completeness = recordCompleteness(model, state.policyResults, state.policyIds);
   const inProgress = Boolean(state.startedAt && !state.policyResults[state.currentPolicyId]);
   const nextPolicyId = sessionControls.nextPolicyId;
-  return <main className="v4-results v13-results">
+  return <main className="v4-results v13-results visual-results">
     <header className="v4-results-header">
       <div>
         <span>阶段结果 · 已记录 {results.length} 道题</span>
@@ -81,6 +89,7 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
         <button className="icon-button" type="button" aria-label="回到主页" onClick={() => dispatch({ type: 'EXIT_TO_LANDING' })}><House size={19} /></button>
       </div>
     </header>
+    <ResultAtlas model={model} state={state} dispatch={dispatch} />
     {results.length ? <>
       <dl className="record-stats" aria-label="本轮记录概况">
         <div><dt>有作答记录的情景</dt><dd>{completeness.policyCount}<small>/ {state.policyIds.length}</small></dd></div>
@@ -88,31 +97,23 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
         <div><dt>核对相似案例</dt><dd>{completeness.checkedCases}<small>题</small></dd></div>
         <div><dt>考虑过相反理由</dt><dd>{completeness.counterReasons}<small>题</small></dd></div>
       </dl>
-      <nav className="result-index" aria-label="跳到某题的判断记录">
-        {results.map(result => <a href={`#result-${result.policyId}`} key={result.policyId}>
-          <strong>{model.policies.find(policy => policy.id === result.policyId).shortTitle}</strong><span>{resultStatus(result).label}</span>
-        </a>)}
-      </nav>
+      <div className="visual-section-header"><span className="section-eyebrow">02 · 判断边界</span><h2>哪些安排改变了你的判断</h2><p>点选方案看差异，展开记录看理由。原方案、修改方案和复核后的判断分别保留。</p></div>
       <div className="v4-result-list">
         {results.map(result => {
           const summary = summarizePolicyResult(model, result);
           const status = resultStatus(result);
           const finalAnswer = result.finalRootAnswer ?? result.rootAnswer;
           const finalChanged = finalAnswer !== result.rootAnswer;
-          const hasDetails = Boolean(result.mainPaths?.length || result.counterPath || result.rejectedReasonAttempts?.length || Object.keys(result.revisionAnswers || {}).length);
+          const hasDetails = ['yes', 'no'].includes(result.rootAnswer) || Boolean(result.mainPaths?.length || result.counterPath || result.rejectedReasonAttempts?.length || Object.keys(result.revisionAnswers || {}).length);
           const canReview = (state.currentPolicyId === result.policyId && state.reviewCheckpoint) || state.policyDrafts?.[result.policyId]?.reviewCheckpoint;
-          return <article className="v4-result-item" id={`result-${result.policyId}`} key={result.policyId}>
+          return <article className={`v4-result-item card-state-${status.id}`} id={`result-${result.policyId}`} key={result.policyId} tabIndex={-1}>
             <header><h2>{summary.title}</h2><span className={`decision-badge ${status.id}`}>{status.label}</span></header>
             <p className="result-lead">{finalChanged ? '初始记录：' : ''}{summary.summary}</p>
             {finalChanged ? <p><b>复核后的最终判断：</b>{ANSWER_LABELS[finalAnswer]}</p> : null}
             {summary.acceptedRevision ? <p><b>{finalChanged ? '当时接受的修改方案：' : '可接受的修改方案：'}</b>{summary.acceptedRevision}</p> : null}
             {summary.unresolvedRevision ? <p><b>尚未确定是否接受的修改：</b>{summary.unresolvedRevision}</p> : null}
             {summary.acceptedRevision && summary.diagnosis ? <p><b>已确认足以改变判断的差异：</b>{summary.diagnosis}</p> : null}
-            {summary.changes?.length ? <details className="revision-diff-detail">
-              <summary>查看修改差异（{summary.changes.length} 项）</summary>
-              <dl className="v4-result-changes">{summary.changes.map(change => <React.Fragment key={change.dimensionId}><dt>{change.label}</dt><dd>{change.from} → {change.to}</dd></React.Fragment>)}</dl>
-              <small>只确认这个修改足够；未测试的其他方案仍然未知。</small>
-            </details> : null}
+            <BoundaryTrack model={model} result={result} />
             {summary.mainReasonTitle ? <p><b>{reasonStatusLabel(summary.pathStatus)}：</b>{summary.mainReasonTitle}</p> : null}
             {summary.deeperReason ? <p><b>更深理由：</b>{summary.deeperReason}</p> : null}
             {summary.reasonUnresolved ? <p className="result-caveat">判断已记录，理由尚未补全；这不代表你没有理由。</p> : null}
@@ -120,17 +121,22 @@ export default function ResultSummary({ state, dispatch, sessionControls, bankMa
             {summary.customTargetUnrecorded ? <p className="result-caveat">旧记录未标明补充理由的说明对象，这里不替你重新解释。</p> : null}
             {summary.counterReasonTitle ? <p><b>{reasonStatusLabel(summary.counterPathStatus, true)}：</b>{summary.counterReasonTitle}</p> : null}
             {['yes', 'no'].includes(result.rootAnswer) ? <p><b>复核记录：</b>{counterImpactLabel(result)}</p> : null}
-            {Object.entries(result.uncertaintyByFrame || {}).map(([frameId, note]) => <p key={frameId}><b>未确定处：</b>{UNCERTAINTY_LABELS[note.category] || '未分类'}{note.text ? `；${note.text}` : ''}</p>)}
+            {Object.entries(result.uncertaintyByFrame || {}).map(([frameId, note]) => <p key={frameId}><b>未确定处（{policyForRecord(model, result.policyId, result.sourceModelVersion)?.frames[frameId]?.label || '旧记录未标明方案'}）：</b>{UNCERTAINTY_LABELS[note.category] || '未分类'}{note.text ? `；${note.text}` : ''}</p>)}
             {result.sourceModelVersion && result.sourceModelVersion !== model.meta.version ? <small className="source-notice">来自题库 {result.sourceModelVersion}；保留旧回答，不自动重新执行修订后的检验。</small> : null}
-            {hasDetails ? <details>
+            {hasDetails ? <details className="reasoning-detail">
               <summary>查看详细推理记录</summary>
+              <ReasoningMap model={model} result={result} />
+              <div className="source-records-heading">原始理由、前提与案例</div>
               <DetailedPath path={result.mainPaths?.[0]} sourceModelVersion={result.sourceModelVersion} title="主要理由路径" />
               <DetailedPath path={result.counterPath} sourceModelVersion={result.sourceModelVersion} title="相反理由路径" />
               {result.rejectedReasonAttempts?.length ? <section className="rejected-attempts"><h4>已尝试但未确认的理由</h4>{result.rejectedReasonAttempts.map((attempt, index) => <p key={index}><b>{model.reasons[attempt.reasonId]?.title || attempt.reasonId}</b><br />{attemptLabel(attempt)}</p>)}</section> : null}
               {summary.revisionHistory?.length ? <section><h4>实际比较过的修改</h4>{summary.revisionHistory.map(item => <p key={item.frameId}>{item.label}：{({ accept: '接受', reject: '不接受', uncertain: '不确定' })[item.response]}</p>)}</section> : null}
             </details> : null}
+            <footer className="result-card-actions">
             {canReview ? <button className="button secondary" type="button" onClick={() => dispatch({ type: 'OPEN_POLICY', policyId: result.policyId })}>继续核对理由</button> : null}
             <RestartPolicyButton policyId={result.policyId} title={summary.title} dispatch={dispatch} />
+            <a href="#result-atlas-title">返回总览 ↑</a>
+            </footer>
           </article>;
         })}
       </div>

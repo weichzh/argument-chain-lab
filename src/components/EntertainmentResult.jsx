@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { RefreshCw, BookOpen, Target } from 'lucide-react';
 import { loadEntertainmentBenchmark } from '../data/bank.js';
 import { matchEntertainment } from '../lib/entertainmentMatcher.js';
+import ReferenceEvidence from './ReferenceEvidence.jsx';
 
 const answerCopy = { yes: '接受原方案', no: '不接受原方案', uncertain: '不确定' };
 const stressCopy = { apply: '仍然适用', qualified: '存在重要区别', retract: '撤回理由', uncertain: '不确定' };
@@ -33,7 +34,7 @@ function ReferenceComparison({ model, result, onTieBreaker }) {
     : [...result.candidateGroup].sort((a, b) => a.labelZh.localeCompare(b.labelZh, 'zh-CN'));
   const completeness = result.recordCompleteness;
   return <section className="entertainment-results" aria-live="polite">
-    <header className="entertainment-profile"><span>可选参考比较</span><h2>对照具体记录，不给人贴标签</h2>
+    <header className="entertainment-profile"><span>03 · 可选参考比较</span><h2>对照具体记录，不给人贴标签</h2>
       <p>以下卡片按名称排列，不表示立场优劣，也不是对你政治身份的判定。正式比较使用 {result.eligibleReferenceCount} 项已整理参考；测试用和待整理条目不进入这里。</p>
     </header>
     <p className="reference-records-note">
@@ -42,15 +43,18 @@ function ReferenceComparison({ model, result, onTieBreaker }) {
     </p>
     {candidates.length ? <>
       <h3>可供对照的参考记录</h3>
-      <ul className="reference-card-grid">{candidates.map(item => {
+      <ul className="reference-card-grid">{candidates.map((item, candidateIndex) => {
         const comparablePolicies = Object.entries(item.policyDetails).filter(([, policy]) => Object.values(policy.featureScores).some(value => value != null));
         return <li key={item.profileId}>
           <h4>{label(item)}</h4>
           <p className="source-band">{item.sourceQuality.band}</p>
           <p>{item.comparisonKind === 'reason_paths' ? '本次包含理由层面的对照。' : '本次只对照了政策答案或修改边界，没有足够的双方理由记录。'}</p>
           <p>可对照 {comparablePolicies.length} 个情景。双方可比信息覆盖 {Math.round(item.comparisonCoveragePercent)}%：分母是你已确认且可用于比较的信息，不是身份概率。</p>
+          <details className="reference-matrix-detail" open={candidateIndex < 2}><summary>查看逐项对照</summary><ReferenceEvidence candidate={item} /></details>
+          <details className="reference-text-detail"><summary>文字摘要与具体差异</summary>
           {item.similarities?.length ? <><h5>实际相同的记录</h5><ul>{item.similarities.map((shared, index) => <li key={index}>{sharedText(model, shared)}</li>)}</ul></> : <p>当前没有足够记录来概括相同理由。</p>}
           {item.differences?.length ? <details><summary>具体差异（{item.differences.length} 项）</summary><ul>{item.differences.map((difference, index) => <li key={index}>{differenceText(model, difference)}</li>)}</ul></details> : <p>在现有可比字段中未记录到差异；不等于完整立场相同。</p>}
+          </details>
           <details><summary>来源说明与限制</summary><p>{item.sourceQuality.note}</p>{item.anchor ? <p>{item.anchor}</p> : null}</details>
         </li>;
       })}</ul>

@@ -667,6 +667,9 @@ export const validateEntertainmentResult = (model, benchmark, policyResults, res
   }
   for (const candidate of [...(result.candidateGroup || []), ...(result.alternatives || [])]) {
     validateDifferences(candidate.profileId, candidate.differences, `candidate/${candidate.profileId}`);
+    if (JSON.stringify(candidate.evidenceRows) !== JSON.stringify(referenceEvidenceRows(model, policyResults, profiles[candidate.profileId]))) {
+      errors.push(`candidate/${candidate.profileId}: 字段对照与实际记录不一致。`);
+    }
   }
   if (result.comparisonWithSecond) {
     validateDifferences(
@@ -807,6 +810,7 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     ...candidate,
     differences: explainDifferences(model, userByPolicy, profileById[candidate.profileId]),
     similarities: explainMatches(model, userByPolicy, profileById[candidate.profileId], 3),
+    evidenceRows: referenceEvidenceRows(model, policyResults, profileById[candidate.profileId]),
   } : null;
   const closestReference = decorateCandidate(top);
   const nearestPrototype = uniquenessBlocked ? null : closestReference;
@@ -900,6 +904,77 @@ export const matchEntertainment = async (model, benchmark, policyResults, option
     throw new Error(`娱乐结果未通过形式校验：${resultValidation.errors[0]}`);
   }
   return result;
+};
+
+// This presentation compares exact recorded fields. It does not change scoring.
+export const referenceEvidenceRows = (model, policyResults, profile) => {
+  const labels = { yes: '接受原方案', no: '不接受原方案', uncertain: '不确定', skipped: '已跳过' };
+  const impacts = { no_change: '不改变判断', weaken: '有所犹豫', offset: '暂时抵消', reverse: '改变判断', uncertain: '影响不确定' };
+  const pathText = (record, path, ids) => {
+    const text = ids?.length ? ids.map(id => model.reasons[id]?.title || id).join(' → ')
+      : path?.customReason?.text || path?.customReason?.argument?.title
+        || model.reasons[path?.selectedReasonId]?.title || '尚无已核对的理由';
+    return path?.status === 'retracted' ? `已撤回：${text}`
+      : path?.customReason ? `自填、未校验：${text}` : path?.selectedReasonId ? `尚未检验：${text}` : text;
+  };
+  const cell = (key, label, userText, referenceText, a, b, note = '', comparable = true, overlap = false) => ({
+    key, label, userText, referenceText,
+    status: !comparable ? 'incomparable' : a == null || b == null ? 'missing' : a === b ? 'same' : overlap ? 'overlap' : 'different',
+    note,
+  });
+  const normalized = normalizeUserResults(model, policyResults);
+  return model.policies.filter(policy => Object.hasOwn(policyResults || {}, policy.id)).map(policy => {
+    const record = policyResults[policy.id];
+    const expected = profile?.expectedPaths?.[policy.id];
+    const user = normalized[policy.id] || enginePathFeatures(model, record);
+    const reference = expected ? benchmarkPathFeatures(model, expected) : {};
+    const main = record.mainPaths?.[0];
+    const historicalChange = record.sourceModelVersion && record.sourceModelVersion !== model.meta.version
+      && (model.product.revisedFramePolicyIds || []).includes(policy.id);
+    const retired = (model.product.retiredReasonIds || []).some(id => (main?.steps || []).some(step => step.reasonId === id));
+    const sameTarget = Boolean(user.diagnosisClaimId && user.diagnosisClaimId === reference.diagnosisClaimId);
+    const reasonComparable = !historicalChange && !retired && main?.status !== 'retracted'
+      && (!user.diagnosisClaimId || !reference.diagnosisClaimId || sameTarget);
+    const original = cell('original', '初始判断', labels[record.rootAnswer] || '未记录', labels[reference.rootAnswer] || '参考未记录',
+      ['yes', 'no'].includes(user.rootAnswer) ? user.rootAnswer : null,
+      ['yes', 'no'].includes(reference.rootAnswer) ? reference.rootAnswer : null,
+      '这里只比较初始判断。复核后的变化另见“反方影响”；不确定不作为相同立场的证据。');
+    const revisionText = value => value.rootAnswer !== 'no' ? '未进入反对后的修改比较'
+      : !value.revisionKnown ? '修改边界未确认' : value.acceptedRevisionFrameId
+        ? policy.frames[value.acceptedRevisionFrameId]?.label || value.acceptedRevisionFrameId : '未接受已比较的修改';
+    const revision = cell('revision', '修改边界', historicalChange ? '旧版方案，保留原定义' : revisionText(user), revisionText(reference),
+      user.revisionKnown ? user.acceptedRevisionFrameId || 'none' : null,
+      reference.revisionKnown ? reference.acceptedRevisionFrameId || 'none' : null,
+      historicalChange ? '旧版专家权限与现版不同，不能直接比较。'
+        : '只有双方都明确反对原方案且确认了修改边界时，才比较接受的完整修改方案。',
+      !historicalChange && (!expected || (user.rootAnswer === 'no' && reference.rootAnswer === 'no')));
+    const mainReason = cell('reason', '主要理由', pathText(record, main, (record.canonicalReasonPath || main?.steps?.map(step => step.reasonId))?.slice(0, 1)),
+      expected ? pathText(expected, null, expected.canonicalReasonPath?.slice(0, 1)) : '参考未记录',
+      user.primaryReasonId, reference.primaryReasonId,
+      !reasonComparable ? '说明的判断对象不同，或记录已撤回/属于旧版修订，不能当作同一理由比较。'
+        : '这里只对照第一条已核对的主要理由；“主题交集”不表示同一理由。自填或未检验内容保留原文，不自动判断其语义。',
+      reasonComparable, Boolean(user.reasonFamilies?.length && reference.reasonFamilies?.length && jaccard(user.reasonFamilies, reference.reasonFamilies) > 0));
+    const principleComparable = reasonComparable && main?.status !== 'qualified' && expected?.stressResponse !== 'qualified';
+    const principle = cell('principle', '停止点',
+      user.terminalValueId ? model.claims[user.terminalValueId]?.text || user.terminalValueId : '尚无可比较的已确认停止点',
+      reference.terminalValueId ? model.claims[reference.terminalValueId]?.text || reference.terminalValueId : '参考未记录停止点',
+      user.terminalValueId, reference.terminalValueId,
+      principleComparable ? '比较本轮愿意停下来的原则，不把它解释为不可质疑的最终价值。'
+        : '适用范围有保留、判断对象不同或记录已撤回，不能据相同名称判为相同原则。', principleComparable);
+    const counter = record.counterPath;
+    const sameCounter = user.counterReasonIds?.length && reference.counterReasonIds?.length
+      && user.counterClaimId === reference.counterClaimId
+      && user.counterReasonIds.join('|') === reference.counterReasonIds.join('|');
+    const effect = cell('counter', '反方影响',
+      record.counterImpact === 'no_change' && !counter ? '未选择相反理由，未记录改判'
+        : record.counterImpact ? impacts[record.counterImpact] || '未记录' : '尚未检查',
+      reference.counterImpact ? impacts[reference.counterImpact] || '未记录' : '参考未记录',
+      counter && record.counterImpact !== 'uncertain' ? record.counterImpact : null,
+      reference.counterImpact !== 'uncertain' ? reference.counterImpact : null,
+      '只有针对同一判断、核对同一路径后的影响才直接比较。没有选择相反理由，不表示已经检查过它。',
+      !historicalChange && counter?.status !== 'retracted' && (!counter || !reference.counterReasonIds?.length || Boolean(sameCounter)));
+    return { policyId: policy.id, title: policy.shortTitle, cells: [original, revision, mainReason, principle, effect] };
+  });
 };
 
 export const buildRootOnlyResults = (benchmarkProfile, policyIds) => Object.fromEntries(policyIds.map((policyId) => [

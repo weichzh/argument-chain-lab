@@ -11,7 +11,7 @@ export const resultStatus = result => {
   if (final === 'yes') return { id: 'accepted', label: '接受原方案' };
   if (result.acceptedRevisionFrameId) return { id: 'conditional', label: '接受一个修改方案' };
   if (result.unresolvedRevisionFrameId) return { id: 'boundary-uncertain', label: '修改边界待确定' };
-  return { id: 'rejected', label: '不接受已测试方案' };
+  return { id: 'rejected', label: '不接受原方案' };
 };
 
 export const reasonStatusLabel = (status, counter = false) => ({
@@ -25,7 +25,7 @@ export const reasonStatusLabel = (status, counter = false) => ({
 }[status] || '理由记录');
 
 export const counterImpactLabel = (result) => ({
-  no_change: result.counterPath ? '已核对的相反理由没有改变判断' : '未选择会改变判断的相反理由',
+  no_change: result.counterPath ? '记录的相反理由没有改变判断' : '未选择会改变判断的相反理由',
   weaken: '相反理由带来犹豫，未改变判断',
   offset: '两边暂时抵消，最终不能确定',
   reverse: '复核后改变了对原方案的判断',
